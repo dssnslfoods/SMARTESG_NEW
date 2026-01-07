@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +45,7 @@ interface Company {
 export default function CompanyManagement() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
+  const { logActivity } = useAuditLog();
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,26 +94,39 @@ export default function CompanyManagement() {
 
     setSaving(true);
     try {
+      const dataToSave = {
+        company_name: formData.company_name,
+        country: formData.country || null,
+        industry: formData.industry || null,
+      };
+
       if (editingCompany) {
         const { error } = await supabase
           .from('company')
-          .update({
-            company_name: formData.company_name,
-            country: formData.country || null,
-            industry: formData.industry || null,
-          })
+          .update(dataToSave)
           .eq('company_id', editingCompany.company_id);
 
         if (error) throw error;
-      } else {
-        const { error } = await supabase.from('company').insert({
-          company_id: formData.company_id,
-          company_name: formData.company_name,
-          country: formData.country || null,
-          industry: formData.industry || null,
+
+        await logActivity({
+          action: 'UPDATE',
+          entityType: 'company',
+          entityId: editingCompany.company_id,
+          beforeData: editingCompany,
+          afterData: { ...dataToSave, company_id: editingCompany.company_id },
         });
+      } else {
+        const insertData = { ...dataToSave, company_id: formData.company_id };
+        const { error } = await supabase.from('company').insert(insertData);
 
         if (error) throw error;
+
+        await logActivity({
+          action: 'CREATE',
+          entityType: 'company',
+          entityId: formData.company_id,
+          afterData: insertData,
+        });
       }
 
       toast({
@@ -136,9 +151,18 @@ export default function CompanyManagement() {
   const handleDelete = async () => {
     if (!deleteId) return;
 
+    const companyToDelete = companies.find(c => c.company_id === deleteId);
+
     try {
       const { error } = await supabase.from('company').delete().eq('company_id', deleteId);
       if (error) throw error;
+
+      await logActivity({
+        action: 'DELETE',
+        entityType: 'company',
+        entityId: deleteId,
+        beforeData: companyToDelete,
+      });
 
       toast({
         title: t('success'),

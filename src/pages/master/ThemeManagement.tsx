@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +55,7 @@ interface Dimension {
 export default function ThemeManagement() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
+  const { logActivity } = useAuditLog();
 
   const [themes, setThemes] = useState<Theme[]>([]);
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
@@ -102,24 +104,38 @@ export default function ThemeManagement() {
 
     setSaving(true);
     try {
+      const dataToSave = {
+        theme_name: formData.theme_name,
+        dimension_id: formData.dimension_id,
+      };
+
       if (editingTheme) {
         const { error } = await supabase
           .from('esg_theme')
-          .update({
-            theme_name: formData.theme_name,
-            dimension_id: formData.dimension_id,
-          })
+          .update(dataToSave)
           .eq('theme_id', editingTheme.theme_id);
 
         if (error) throw error;
-      } else {
-        const { error } = await supabase.from('esg_theme').insert({
-          theme_id: formData.theme_id,
-          theme_name: formData.theme_name,
-          dimension_id: formData.dimension_id,
+
+        await logActivity({
+          action: 'UPDATE',
+          entityType: 'esg_theme',
+          entityId: editingTheme.theme_id,
+          beforeData: editingTheme,
+          afterData: { ...dataToSave, theme_id: editingTheme.theme_id },
         });
+      } else {
+        const insertData = { ...dataToSave, theme_id: formData.theme_id };
+        const { error } = await supabase.from('esg_theme').insert(insertData);
 
         if (error) throw error;
+
+        await logActivity({
+          action: 'CREATE',
+          entityType: 'esg_theme',
+          entityId: formData.theme_id,
+          afterData: insertData,
+        });
       }
 
       toast({
@@ -144,9 +160,18 @@ export default function ThemeManagement() {
   const handleDelete = async () => {
     if (!deleteId) return;
 
+    const themeToDelete = themes.find(t => t.theme_id === deleteId);
+
     try {
       const { error } = await supabase.from('esg_theme').delete().eq('theme_id', deleteId);
       if (error) throw error;
+
+      await logActivity({
+        action: 'DELETE',
+        entityType: 'esg_theme',
+        entityId: deleteId,
+        beforeData: themeToDelete,
+      });
 
       toast({
         title: t('success'),

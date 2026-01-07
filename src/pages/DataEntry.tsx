@@ -3,6 +3,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuditLog } from "@/hooks/useAuditLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,6 +107,7 @@ export default function DataEntry() {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { logActivity } = useAuditLog();
 
   const [metricValues, setMetricValues] = useState<MetricValue[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
@@ -224,6 +226,7 @@ export default function DataEntry() {
   const handleDelete = async (valueId: string) => {
     if (!confirm(language === 'th' ? 'ยืนยันการลบข้อมูล?' : 'Confirm delete?')) return;
 
+    const valueToDelete = metricValues.find(v => v.value_id === valueId);
     const { error } = await supabase.from('metric_value').delete().eq('value_id', valueId);
 
     if (error) {
@@ -233,6 +236,12 @@ export default function DataEntry() {
         variant: 'destructive',
       });
     } else {
+      await logActivity({
+        action: 'DELETE',
+        entityType: 'metric_value',
+        entityId: valueId,
+        beforeData: valueToDelete,
+      });
       toast({
         title: language === 'th' ? 'สำเร็จ' : 'Success',
         description: language === 'th' ? 'ลบข้อมูลสำเร็จ' : 'Data deleted successfully',
@@ -269,9 +278,28 @@ export default function DataEntry() {
         .update(dataToSave)
         .eq('value_id', editingValue.value_id);
       error = updateError;
+      
+      if (!updateError) {
+        await logActivity({
+          action: 'UPDATE',
+          entityType: 'metric_value',
+          entityId: editingValue.value_id,
+          beforeData: editingValue,
+          afterData: dataToSave,
+        });
+      }
     } else {
       const { error: insertError } = await supabase.from('metric_value').insert(dataToSave);
       error = insertError;
+      
+      if (!insertError) {
+        await logActivity({
+          action: 'CREATE',
+          entityType: 'metric_value',
+          entityId: formData.value_id,
+          afterData: dataToSave,
+        });
+      }
     }
 
     if (error) {

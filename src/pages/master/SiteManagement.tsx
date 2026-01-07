@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +56,7 @@ interface Company {
 export default function SiteManagement() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
+  const { logActivity } = useAuditLog();
 
   const [sites, setSites] = useState<Site[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -104,26 +106,39 @@ export default function SiteManagement() {
 
     setSaving(true);
     try {
+      const dataToSave = {
+        site_name: formData.site_name,
+        company_id: formData.company_id,
+        location: formData.location || null,
+      };
+
       if (editingSite) {
         const { error } = await supabase
           .from('site')
-          .update({
-            site_name: formData.site_name,
-            company_id: formData.company_id,
-            location: formData.location || null,
-          })
+          .update(dataToSave)
           .eq('site_id', editingSite.site_id);
 
         if (error) throw error;
-      } else {
-        const { error } = await supabase.from('site').insert({
-          site_id: formData.site_id,
-          site_name: formData.site_name,
-          company_id: formData.company_id,
-          location: formData.location || null,
+
+        await logActivity({
+          action: 'UPDATE',
+          entityType: 'site',
+          entityId: editingSite.site_id,
+          beforeData: editingSite,
+          afterData: { ...dataToSave, site_id: editingSite.site_id },
         });
+      } else {
+        const insertData = { ...dataToSave, site_id: formData.site_id };
+        const { error } = await supabase.from('site').insert(insertData);
 
         if (error) throw error;
+
+        await logActivity({
+          action: 'CREATE',
+          entityType: 'site',
+          entityId: formData.site_id,
+          afterData: insertData,
+        });
       }
 
       toast({
@@ -148,9 +163,18 @@ export default function SiteManagement() {
   const handleDelete = async () => {
     if (!deleteId) return;
 
+    const siteToDelete = sites.find(s => s.site_id === deleteId);
+
     try {
       const { error } = await supabase.from('site').delete().eq('site_id', deleteId);
       if (error) throw error;
+
+      await logActivity({
+        action: 'DELETE',
+        entityType: 'site',
+        entityId: deleteId,
+        beforeData: siteToDelete,
+      });
 
       toast({
         title: t('success'),

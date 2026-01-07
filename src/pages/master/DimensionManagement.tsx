@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,7 @@ interface Dimension {
 export default function DimensionManagement() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
+  const { logActivity } = useAuditLog();
 
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,13 +96,29 @@ export default function DimensionManagement() {
           .eq('dimension_id', editingDimension.dimension_id);
 
         if (error) throw error;
+
+        await logActivity({
+          action: 'UPDATE',
+          entityType: 'esg_dimension',
+          entityId: editingDimension.dimension_id,
+          beforeData: editingDimension,
+          afterData: { dimension_id: editingDimension.dimension_id, dimension_name: formData.dimension_name },
+        });
       } else {
-        const { error } = await supabase.from('esg_dimension').insert({
+        const insertData = {
           dimension_id: formData.dimension_id,
           dimension_name: formData.dimension_name,
-        });
+        };
+        const { error } = await supabase.from('esg_dimension').insert(insertData);
 
         if (error) throw error;
+
+        await logActivity({
+          action: 'CREATE',
+          entityType: 'esg_dimension',
+          entityId: formData.dimension_id,
+          afterData: insertData,
+        });
       }
 
       toast({
@@ -125,9 +143,18 @@ export default function DimensionManagement() {
   const handleDelete = async () => {
     if (!deleteId) return;
 
+    const dimensionToDelete = dimensions.find(d => d.dimension_id === deleteId);
+
     try {
       const { error } = await supabase.from('esg_dimension').delete().eq('dimension_id', deleteId);
       if (error) throw error;
+
+      await logActivity({
+        action: 'DELETE',
+        entityType: 'esg_dimension',
+        entityId: deleteId,
+        beforeData: dimensionToDelete,
+      });
 
       toast({
         title: t('success'),
