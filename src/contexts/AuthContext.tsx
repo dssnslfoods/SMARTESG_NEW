@@ -20,7 +20,7 @@ interface AuthContextType {
   role: AppRole | null;
   loading: boolean;
   roleLoaded: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null; pendingApproval?: boolean; inactive?: boolean }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null; inactive?: boolean }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string): Promise<{ error: Error | null; pendingApproval?: boolean; inactive?: boolean }> => {
+  const signIn = async (email: string, password: string): Promise<{ error: Error | null; inactive?: boolean }> => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -115,9 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error as Error };
     }
     
-    // Check if user has role and is active
+    // Check if user is active
     if (data.user) {
-      const { hasRole, isActive } = await fetchUserData(data.user.id);
+      const { isActive } = await fetchUserData(data.user.id);
       
       if (!isActive) {
         await supabase.auth.signOut();
@@ -126,15 +126,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
         setRole(null);
         return { error: null, inactive: true };
-      }
-      
-      if (!hasRole) {
-        await supabase.auth.signOut();
-        setUser(null);
-        setSession(null);
-        setProfile(null);
-        setRole(null);
-        return { error: null, pendingApproval: true };
       }
     }
     

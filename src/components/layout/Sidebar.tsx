@@ -33,6 +33,8 @@ export function Sidebar() {
   const { t } = useLanguage();
   const [masterDataOpen, setMasterDataOpen] = useState(pathname.startsWith('/master'));
 
+  const isGuest = role === 'guest';
+
   const navItems = [
     {
       label: t('dashboard'),
@@ -44,13 +46,13 @@ export function Sidebar() {
       label: t('dataEntry'),
       href: '/data-entry',
       icon: FileInput,
-      roles: ['admin', 'supervisor'],
+      roles: ['admin', 'supervisor', 'guest'],
     },
     {
       label: t('reports'),
       href: '/reports',
       icon: BarChart3,
-      roles: ['admin', 'executive', 'supervisor'],
+      roles: ['admin', 'executive', 'supervisor', 'guest'],
     },
   ];
 
@@ -68,13 +70,13 @@ export function Sidebar() {
       label: t('users'),
       href: '/users',
       icon: Users,
-      roles: ['admin'],
+      roles: ['admin', 'guest'],
     },
     {
       label: t('auditLog'),
       href: '/audit-log',
       icon: History,
-      roles: ['admin'],
+      roles: ['admin', 'guest'],
     },
   ];
 
@@ -97,82 +99,109 @@ export function Sidebar() {
       <nav className="flex-1 space-y-1 overflow-y-auto p-4">
         {navItems
           .filter((item) => item.roles.includes(role || ''))
-          .map((item) => (
-            <Link
-              key={item.href}
-              to={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                isActive(item.href)
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          ))}
+          .map((item) => 
+            isGuest ? (
+              <div
+                key={item.href}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground cursor-not-allowed opacity-60"
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </div>
+            ) : (
+              <Link
+                key={item.href}
+                to={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  isActive(item.href)
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            )
+          )}
 
-        {(role === 'admin' || role === 'supervisor') && (
+        {(role === 'admin' || role === 'supervisor' || role === 'guest') && (
           <Collapsible open={masterDataOpen} onOpenChange={setMasterDataOpen}>
             <CollapsibleTrigger asChild>
               <button
                 className={cn(
                   'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  pathname.startsWith('/master')
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                  isGuest 
+                    ? 'text-muted-foreground cursor-not-allowed opacity-60'
+                    : pathname.startsWith('/master')
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
                 )}
+                disabled={isGuest}
               >
                 <div className="flex items-center gap-3">
                   <Database className="h-4 w-4" />
                   {t('masterData')}
                 </div>
-                <ChevronDown
-                  className={cn(
-                    'h-4 w-4 transition-transform',
-                    masterDataOpen && 'rotate-180'
-                  )}
-                />
+                {!isGuest && (
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 transition-transform',
+                      masterDataOpen && 'rotate-180'
+                    )}
+                  />
+                )}
               </button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-1 pl-4 pt-1">
-              {masterDataItems.map((item) => (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-                    isActive(item.href)
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              ))}
-            </CollapsibleContent>
+            {!isGuest && (
+              <CollapsibleContent className="space-y-1 pl-4 pt-1">
+                {masterDataItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                      isActive(item.href)
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                ))}
+              </CollapsibleContent>
+            )}
           </Collapsible>
         )}
 
         {adminItems
           .filter((item) => item.roles.includes(role || ''))
-          .map((item) => (
-            <Link
-              key={item.href}
-              to={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                isActive(item.href)
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          ))}
+          .map((item) => 
+            isGuest ? (
+              <div
+                key={item.href}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground cursor-not-allowed opacity-60"
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </div>
+            ) : (
+              <Link
+                key={item.href}
+                to={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  isActive(item.href)
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            )
+          )}
       </nav>
 
       <div className="border-t border-sidebar-border p-4">
