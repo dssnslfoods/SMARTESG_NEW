@@ -47,10 +47,13 @@ serve(async (req) => {
       .eq("user_id", caller.id)
       .maybeSingle();
     
-    if (!roleData || roleData.role !== "admin") {
-      console.log("User is not admin:", caller.id, roleData);
+    const isAdmin = roleData?.role === "admin";
+    const isSupervisor = roleData?.role === "supervisor";
+    
+    if (!roleData || (!isAdmin && !isSupervisor)) {
+      console.log("User is not admin or supervisor:", caller.id, roleData);
       return new Response(
-        JSON.stringify({ error: "Forbidden - Only admins can create users" }),
+        JSON.stringify({ error: "Forbidden - Only admins and supervisors can create users" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
