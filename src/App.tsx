@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import UserManagement from "./pages/UserManagement";
+import AuditLog from "./pages/AuditLog";
 import CompanyManagement from "./pages/master/CompanyManagement";
 import SiteManagement from "./pages/master/SiteManagement";
 import PeriodManagement from "./pages/master/PeriodManagement";
@@ -98,6 +99,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
                   <MetricManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/audit-log"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AuditLog />
                 </ProtectedRoute>
               }
             />
