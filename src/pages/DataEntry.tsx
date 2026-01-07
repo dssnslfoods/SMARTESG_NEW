@@ -353,12 +353,8 @@ export default function DataEntry() {
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
-      case 'approved':
-        return 'default';
       case 'submitted':
         return 'secondary';
-      case 'rejected':
-        return 'destructive';
       default:
         return 'outline';
     }
@@ -368,8 +364,6 @@ export default function DataEntry() {
     const labels: Record<string, { th: string; en: string }> = {
       draft: { th: 'ร่าง', en: 'Draft' },
       submitted: { th: 'ส่งแล้ว', en: 'Submitted' },
-      approved: { th: 'อนุมัติ', en: 'Approved' },
-      rejected: { th: 'ปฏิเสธ', en: 'Rejected' },
     };
     return labels[status]?.[language === 'th' ? 'th' : 'en'] || status;
   };
@@ -395,7 +389,7 @@ export default function DataEntry() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="border-l-4 border-l-primary">
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
@@ -415,20 +409,12 @@ export default function DataEntry() {
               <p className="text-2xl font-bold">{metricValues.filter(v => v.status === 'draft').length}</p>
             </CardContent>
           </Card>
-          <Card className="border-l-4 border-l-yellow-500">
+          <Card className="border-l-4 border-l-secondary">
             <CardHeader className="pb-2">
               <CardDescription>{language === 'th' ? 'ส่งแล้ว' : 'Submitted'}</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{metricValues.filter(v => v.status === 'submitted').length}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-green-500">
-            <CardHeader className="pb-2">
-              <CardDescription>{language === 'th' ? 'อนุมัติ' : 'Approved'}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{metricValues.filter(v => v.status === 'approved').length}</p>
             </CardContent>
           </Card>
         </div>
@@ -589,7 +575,6 @@ export default function DataEntry() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleEdit(value)}
-                              disabled={value.status === 'approved'}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -597,7 +582,6 @@ export default function DataEntry() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleDelete(value.value_id)}
-                              disabled={value.status === 'approved'}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
