@@ -44,7 +44,7 @@ interface DashboardStats {
   totalCompanies: number;
   totalSites: number;
   totalMetrics: number;
-  pendingApprovals: number;
+  totalSubmitted: number;
   myDrafts: number;
   mySubmitted: number;
 }
@@ -64,7 +64,7 @@ export default function Dashboard() {
     totalCompanies: 0,
     totalSites: 0,
     totalMetrics: 0,
-    pendingApprovals: 0,
+    totalSubmitted: 0,
     myDrafts: 0,
     mySubmitted: 0,
   });
@@ -87,7 +87,7 @@ export default function Dashboard() {
         { count: companiesCount },
         { count: sitesCount },
         { count: metricsCount },
-        { count: pendingCount },
+        { count: submittedTotalCount },
         { count: draftsCount },
         { count: submittedCount },
       ] = await Promise.all([
@@ -103,7 +103,7 @@ export default function Dashboard() {
         totalCompanies: companiesCount || 0,
         totalSites: sitesCount || 0,
         totalMetrics: metricsCount || 0,
-        pendingApprovals: pendingCount || 0,
+        totalSubmitted: submittedTotalCount || 0,
         myDrafts: draftsCount || 0,
         mySubmitted: submittedCount || 0,
       });
@@ -344,19 +344,18 @@ export default function Dashboard() {
       detailType: 'metrics' as const,
     },
     {
-      title: t('pendingApprovals'),
-      value: stats.pendingApprovals,
+      title: language === 'th' ? 'ข้อมูลที่ส่งแล้ว' : 'Total Submitted',
+      value: stats.totalSubmitted,
       icon: Clock,
-      color: 'text-destructive',
+      color: 'text-secondary',
       roles: ['admin', 'supervisor'],
-      detailType: 'pending' as const,
+      detailType: 'submitted' as const,
     },
   ];
 
   const quickActions = {
     admin: [
       { label: t('dataEntry'), href: '/data-entry', icon: FileInput },
-      { label: t('review'), href: '/review', icon: CheckSquare },
       { label: t('reports'), href: '/reports', icon: BarChart3 },
       { label: t('users'), href: '/users', icon: Building2 },
     ],
@@ -364,7 +363,7 @@ export default function Dashboard() {
       { label: t('reports'), href: '/reports', icon: BarChart3 },
     ],
     supervisor: [
-      { label: t('review'), href: '/review', icon: CheckSquare },
+      { label: t('dataEntry'), href: '/data-entry', icon: FileInput },
       { label: t('reports'), href: '/reports', icon: BarChart3 },
     ],
     staff: [
