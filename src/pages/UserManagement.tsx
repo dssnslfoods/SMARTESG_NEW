@@ -221,24 +221,16 @@ export default function UserManagement() {
 
       if (profileError) throw profileError;
 
-      // Update or insert role
+      // Update or insert role using upsert
       if (editingUser.role) {
-        const { data: existingRole } = await supabase
+        const { error: roleError } = await supabase
           .from('user_roles')
-          .select('id')
-          .eq('user_id', editingUser.user_id)
-          .maybeSingle();
-
-        if (existingRole) {
-          await supabase
-            .from('user_roles')
-            .update({ role: editingUser.role })
-            .eq('user_id', editingUser.user_id);
-        } else {
-          await supabase
-            .from('user_roles')
-            .insert({ user_id: editingUser.user_id, role: editingUser.role });
-        }
+          .upsert(
+            { user_id: editingUser.user_id, role: editingUser.role },
+            { onConflict: 'user_id' }
+          );
+        
+        if (roleError) throw roleError;
       }
 
       toast({
