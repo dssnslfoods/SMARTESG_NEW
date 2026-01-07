@@ -1,36 +1,38 @@
-import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Globe } from 'lucide-react';
+import { useState } from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Globe } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { z } from 'zod';
+} from "@/components/ui/dropdown-menu";
+import { z } from "zod";
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-const signupSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string(),
-  fullName: z.string().min(2, 'Name must be at least 2 characters'),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ['confirmPassword'],
-});
+const signupSchema = z
+  .object({
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z.string(),
+    fullName: z.string().min(2, "Name must be at least 2 characters"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 export default function Auth() {
   const { user, signIn, signUp, loading } = useAuth();
@@ -38,12 +40,12 @@ export default function Auth() {
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(false);
-  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [signupForm, setSignupForm] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    fullName: '',
+    email: "",
+    password: "",
+    confirmPassword: "",
+    fullName: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -84,25 +86,27 @@ export default function Auth() {
 
     if (error) {
       toast({
-        variant: 'destructive',
-        title: t('error'),
+        variant: "destructive",
+        title: t("error"),
         description: error.message,
       });
     } else if (inactive) {
       toast({
-        variant: 'destructive',
-        title: language === 'th' ? 'บัญชีถูกระงับ' : 'Account Inactive',
-        description: language === 'th' 
-          ? 'บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ'
-          : 'Your account has been deactivated. Please contact an administrator.',
+        variant: "destructive",
+        title: language === "th" ? "บัญชีถูกระงับ" : "Account Inactive",
+        description:
+          language === "th"
+            ? "บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ"
+            : "Your account has been deactivated. Please contact an administrator.",
       });
     } else if (pendingApproval) {
       toast({
-        variant: 'destructive',
-        title: language === 'th' ? 'รอการอนุมัติ' : 'Pending Approval',
-        description: language === 'th' 
-          ? 'บัญชีของคุณยังรอการอนุมัติบทบาทจากผู้ดูแลระบบ'
-          : 'Your account is pending role assignment from an administrator.',
+        variant: "destructive",
+        title: language === "th" ? "รอการอนุมัติ" : "Pending Approval",
+        description:
+          language === "th"
+            ? "บัญชีของคุณยังรอการอนุมัติบทบาทจากผู้ดูแลระบบ"
+            : "Your account is pending role assignment from an administrator.",
       });
     }
   };
@@ -132,16 +136,17 @@ export default function Auth() {
 
     if (error) {
       toast({
-        variant: 'destructive',
-        title: t('error'),
+        variant: "destructive",
+        title: t("error"),
         description: error.message,
       });
     } else {
       toast({
-        title: t('success'),
-        description: language === 'th' 
-          ? 'สมัครสมาชิกสำเร็จ กรุณารอการอนุมัติบทบาทจากผู้ดูแลระบบ'
-          : 'Sign up successful. Please wait for role assignment from an administrator.',
+        title: t("success"),
+        description:
+          language === "th"
+            ? "สมัครสมาชิกสำเร็จ กรุณารอการอนุมัติบทบาทจากผู้ดูแลระบบ"
+            : "Sign up successful. Please wait for role assignment from an administrator.",
       });
     }
   };
@@ -154,16 +159,12 @@ export default function Auth() {
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2">
               <Globe className="h-4 w-4" />
-              {language === 'th' ? 'ไทย' : 'EN'}
+              {language === "th" ? "ไทย" : "EN"}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setLanguage('th')}>
-              ไทย (Thai)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLanguage('en')}>
-              English
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage("th")}>ไทย (Thai)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage("en")}>English</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -173,16 +174,16 @@ export default function Auth() {
         <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground text-2xl font-bold">
           ESG
         </div>
-        <h1 className="text-2xl font-bold text-foreground">{t('appName')}</h1>
-        <p className="text-sm text-muted-foreground">{t('version')}</p>
+        <h1 className="text-2xl font-bold text-foreground">{t("appName")}</h1>
+        <p className="text-sm text-muted-foreground">{t("version")}</p>
       </div>
 
       <Card className="w-full max-w-md">
         <Tabs defaultValue="login">
           <CardHeader>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">{t('login')}</TabsTrigger>
-              <TabsTrigger value="signup">{t('signup')}</TabsTrigger>
+              <TabsTrigger value="login">{t("login")}</TabsTrigger>
+              <TabsTrigger value="signup">{t("signup")}</TabsTrigger>
             </TabsList>
           </CardHeader>
 
@@ -191,7 +192,7 @@ export default function Auth() {
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">{t('email')}</Label>
+                  <Label htmlFor="login-email">{t("email")}</Label>
                   <Input
                     id="login-email"
                     type="email"
@@ -204,7 +205,7 @@ export default function Auth() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">{t('password')}</Label>
+                  <Label htmlFor="login-password">{t("password")}</Label>
                   <Input
                     id="login-password"
                     type="password"
@@ -217,7 +218,7 @@ export default function Auth() {
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {t('login')}
+                  {t("login")}
                 </Button>
               </form>
             </TabsContent>
@@ -226,7 +227,7 @@ export default function Auth() {
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-name">{t('fullName')}</Label>
+                  <Label htmlFor="signup-name">{t("fullName")}</Label>
                   <Input
                     id="signup-name"
                     type="text"
@@ -238,7 +239,7 @@ export default function Auth() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">{t('email')}</Label>
+                  <Label htmlFor="signup-email">{t("email")}</Label>
                   <Input
                     id="signup-email"
                     type="email"
@@ -251,7 +252,7 @@ export default function Auth() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">{t('password')}</Label>
+                  <Label htmlFor="signup-password">{t("password")}</Label>
                   <Input
                     id="signup-password"
                     type="password"
@@ -263,7 +264,7 @@ export default function Auth() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="signup-confirm">{t('confirmPassword')}</Label>
+                  <Label htmlFor="signup-confirm">{t("confirmPassword")}</Label>
                   <Input
                     id="signup-confirm"
                     type="password"
@@ -276,7 +277,7 @@ export default function Auth() {
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {t('signup')}
+                  {t("signup")}
                 </Button>
               </form>
             </TabsContent>
@@ -284,9 +285,7 @@ export default function Auth() {
         </Tabs>
       </Card>
 
-      <p className="mt-4 text-sm text-muted-foreground">
-        © 2024 ESG Smart Performance. All rights reserved.
-      </p>
+      <p className="mt-4 text-sm text-muted-foreground">© 2026 ESG Smart Performance. All rights reserved.</p>
     </div>
   );
 }
