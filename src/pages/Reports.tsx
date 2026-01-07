@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -266,21 +265,18 @@ export default function Reports() {
 
   if (loading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">
-            {language === "th" ? "กำลังโหลด..." : "Loading..."}
-          </p>
-        </div>
-      </MainLayout>
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">
+          {language === "th" ? "กำลังโหลด..." : "Loading..."}
+        </p>
+      </div>
     );
   }
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
               <BarChart3 className="h-8 w-8 text-primary" />
@@ -341,11 +337,11 @@ export default function Reports() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
         </div>
+      </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2 text-primary">
@@ -654,9 +650,8 @@ export default function Reports() {
                 {language === "th" ? "ไม่มีข้อมูล" : "No data"}
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </MainLayout>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
