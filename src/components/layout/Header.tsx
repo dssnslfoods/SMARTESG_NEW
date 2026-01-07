@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Globe, User } from 'lucide-react';
+import { Globe, User, LogOut } from 'lucide-react';
 
 const roleColors = {
   admin: 'bg-destructive text-destructive-foreground',
@@ -19,8 +19,12 @@ const roleColors = {
 };
 
 export function Header() {
-  const { user, profile, role } = useAuth();
+  const { user, profile, role, signOut } = useAuth();
   const { language, setLanguage, t } = useLanguage();
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-border bg-background px-6">
@@ -63,6 +67,12 @@ export function Header() {
             </Badge>
           )}
         </div>
+
+        {/* Logout Button */}
+        <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10">
+          <LogOut className="h-4 w-4" />
+          {language === 'th' ? 'ออกจากระบบ' : 'Logout'}
+        </Button>
       </div>
     </header>
   );
