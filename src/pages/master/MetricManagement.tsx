@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +56,7 @@ interface Theme {
 export default function MetricManagement() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
+  const { logActivity } = useAuditLog();
 
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
@@ -104,26 +106,39 @@ export default function MetricManagement() {
 
     setSaving(true);
     try {
+      const dataToSave = {
+        metric_name: formData.metric_name,
+        theme_id: formData.theme_id,
+        unit: formData.unit || null,
+      };
+
       if (editingMetric) {
         const { error } = await supabase
           .from('esg_metric')
-          .update({
-            metric_name: formData.metric_name,
-            theme_id: formData.theme_id,
-            unit: formData.unit || null,
-          })
+          .update(dataToSave)
           .eq('metric_id', editingMetric.metric_id);
 
         if (error) throw error;
-      } else {
-        const { error } = await supabase.from('esg_metric').insert({
-          metric_id: formData.metric_id,
-          metric_name: formData.metric_name,
-          theme_id: formData.theme_id,
-          unit: formData.unit || null,
+
+        await logActivity({
+          action: 'UPDATE',
+          entityType: 'esg_metric',
+          entityId: editingMetric.metric_id,
+          beforeData: editingMetric,
+          afterData: { ...dataToSave, metric_id: editingMetric.metric_id },
         });
+      } else {
+        const insertData = { ...dataToSave, metric_id: formData.metric_id };
+        const { error } = await supabase.from('esg_metric').insert(insertData);
 
         if (error) throw error;
+
+        await logActivity({
+          action: 'CREATE',
+          entityType: 'esg_metric',
+          entityId: formData.metric_id,
+          afterData: insertData,
+        });
       }
 
       toast({
@@ -148,9 +163,18 @@ export default function MetricManagement() {
   const handleDelete = async () => {
     if (!deleteId) return;
 
+    const metricToDelete = metrics.find(m => m.metric_id === deleteId);
+
     try {
       const { error } = await supabase.from('esg_metric').delete().eq('metric_id', deleteId);
       if (error) throw error;
+
+      await logActivity({
+        action: 'DELETE',
+        entityType: 'esg_metric',
+        entityId: deleteId,
+        beforeData: metricToDelete,
+      });
 
       toast({
         title: t('success'),

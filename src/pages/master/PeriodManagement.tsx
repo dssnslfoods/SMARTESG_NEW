@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +59,7 @@ const monthNames: Record<number, { th: string; en: string }> = {
 export default function PeriodManagement() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
+  const { logActivity } = useAuditLog();
 
   const [periods, setPeriods] = useState<Period[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,26 +118,39 @@ export default function PeriodManagement() {
 
     setSaving(true);
     try {
+      const dataToSave = {
+        year: formData.year,
+        month: formData.month,
+        month_name: formData.month_name,
+      };
+
       if (editingPeriod) {
         const { error } = await supabase
           .from('reporting_period')
-          .update({
-            year: formData.year,
-            month: formData.month,
-            month_name: formData.month_name,
-          })
+          .update(dataToSave)
           .eq('period_id', editingPeriod.period_id);
 
         if (error) throw error;
-      } else {
-        const { error } = await supabase.from('reporting_period').insert({
-          period_id: formData.period_id,
-          year: formData.year,
-          month: formData.month,
-          month_name: formData.month_name,
+
+        await logActivity({
+          action: 'UPDATE',
+          entityType: 'reporting_period',
+          entityId: editingPeriod.period_id,
+          beforeData: editingPeriod,
+          afterData: { ...dataToSave, period_id: editingPeriod.period_id },
         });
+      } else {
+        const insertData = { ...dataToSave, period_id: formData.period_id };
+        const { error } = await supabase.from('reporting_period').insert(insertData);
 
         if (error) throw error;
+
+        await logActivity({
+          action: 'CREATE',
+          entityType: 'reporting_period',
+          entityId: formData.period_id,
+          afterData: insertData,
+        });
       }
 
       toast({
@@ -160,9 +175,18 @@ export default function PeriodManagement() {
   const handleDelete = async () => {
     if (!deleteId) return;
 
+    const periodToDelete = periods.find(p => p.period_id === deleteId);
+
     try {
       const { error } = await supabase.from('reporting_period').delete().eq('period_id', deleteId);
       if (error) throw error;
+
+      await logActivity({
+        action: 'DELETE',
+        entityType: 'reporting_period',
+        entityId: deleteId,
+        beforeData: periodToDelete,
+      });
 
       toast({
         title: t('success'),
