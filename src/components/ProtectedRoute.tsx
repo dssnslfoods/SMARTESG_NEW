@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MainLayout } from './layout/MainLayout';
 import { Loader2 } from 'lucide-react';
 
-type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff';
+type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest';
 
 interface ProtectedRouteProps {
   children: ReactNode;

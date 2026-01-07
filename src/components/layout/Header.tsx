@@ -15,6 +15,7 @@ const roleColors = {
   executive: 'bg-primary text-primary-foreground',
   supervisor: 'bg-accent text-accent-foreground border border-border',
   staff: 'bg-secondary text-secondary-foreground',
+  guest: 'bg-muted text-muted-foreground',
 };
 
 export function Header() {
