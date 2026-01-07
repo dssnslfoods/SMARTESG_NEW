@@ -47,12 +47,6 @@ export function Sidebar() {
       roles: ['admin', 'supervisor'],
     },
     {
-      label: t('review'),
-      href: '/review',
-      icon: CheckSquare,
-      roles: ['admin', 'supervisor'],
-    },
-    {
       label: t('reports'),
       href: '/reports',
       icon: BarChart3,

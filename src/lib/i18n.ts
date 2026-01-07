@@ -65,15 +65,11 @@ export const translations = {
     status: 'สถานะ',
     draft: 'ร่าง',
     submitted: 'ส่งแล้ว',
-    approved: 'อนุมัติแล้ว',
-    rejected: 'ปฏิเสธ',
     
     // Actions
     save: 'บันทึก',
     saveDraft: 'บันทึกร่าง',
-    submit: 'ส่งตรวจสอบ',
-    approve: 'อนุมัติ',
-    reject: 'ปฏิเสธ',
+    submit: 'ส่งข้อมูล',
     edit: 'แก้ไข',
     delete: 'ลบ',
     cancel: 'ยกเลิก',
@@ -186,15 +182,11 @@ export const translations = {
     status: 'Status',
     draft: 'Draft',
     submitted: 'Submitted',
-    approved: 'Approved',
-    rejected: 'Rejected',
     
     // Actions
     save: 'Save',
     saveDraft: 'Save Draft',
-    submit: 'Submit for Review',
-    approve: 'Approve',
-    reject: 'Reject',
+    submit: 'Submit',
     edit: 'Edit',
     delete: 'Delete',
     cancel: 'Cancel',

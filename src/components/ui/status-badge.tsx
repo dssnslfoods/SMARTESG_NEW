@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
-type Status = 'draft' | 'submitted' | 'approved' | 'rejected';
+type Status = 'draft' | 'submitted';
 
 interface StatusBadgeProps {
   status: Status;
@@ -12,16 +12,19 @@ interface StatusBadgeProps {
 const statusStyles: Record<Status, string> = {
   draft: 'bg-muted text-muted-foreground',
   submitted: 'bg-primary/10 text-primary border-primary/20',
-  approved: 'bg-green-500/10 text-green-700 border-green-500/20 dark:text-green-400',
-  rejected: 'bg-destructive/10 text-destructive border-destructive/20',
+};
+
+const statusLabels: Record<Status, { th: string; en: string }> = {
+  draft: { th: 'ร่าง', en: 'Draft' },
+  submitted: { th: 'ส่งแล้ว', en: 'Submitted' },
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const { t } = useLanguage();
+  const { language } = useLanguage();
   
   return (
     <Badge variant="outline" className={cn(statusStyles[status], className)}>
-      {t(status)}
+      {statusLabels[status]?.[language] || status}
     </Badge>
   );
 }
