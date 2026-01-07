@@ -79,7 +79,7 @@ export default function Auth() {
     }
 
     setIsLoading(true);
-    const { error } = await signIn(loginForm.email, loginForm.password);
+    const { error, pendingApproval, inactive } = await signIn(loginForm.email, loginForm.password);
     setIsLoading(false);
 
     if (error) {
@@ -87,6 +87,22 @@ export default function Auth() {
         variant: 'destructive',
         title: t('error'),
         description: error.message,
+      });
+    } else if (inactive) {
+      toast({
+        variant: 'destructive',
+        title: language === 'th' ? 'บัญชีถูกระงับ' : 'Account Inactive',
+        description: language === 'th' 
+          ? 'บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ'
+          : 'Your account has been deactivated. Please contact an administrator.',
+      });
+    } else if (pendingApproval) {
+      toast({
+        variant: 'destructive',
+        title: language === 'th' ? 'รอการอนุมัติ' : 'Pending Approval',
+        description: language === 'th' 
+          ? 'บัญชีของคุณยังรอการอนุมัติบทบาทจากผู้ดูแลระบบ'
+          : 'Your account is pending role assignment from an administrator.',
       });
     }
   };
