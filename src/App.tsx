@@ -14,6 +14,7 @@ import PeriodManagement from "./pages/master/PeriodManagement";
 import DimensionManagement from "./pages/master/DimensionManagement";
 import ThemeManagement from "./pages/master/ThemeManagement";
 import MetricManagement from "./pages/master/MetricManagement";
+import DataEntry from "./pages/DataEntry";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <UserManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/data-entry"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                  <DataEntry />
                 </ProtectedRoute>
               }
             />
