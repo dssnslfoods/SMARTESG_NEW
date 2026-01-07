@@ -7,6 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   Building2,
   MapPin,
   Activity,
@@ -15,6 +23,7 @@ import {
   CheckSquare,
   BarChart3,
   TrendingUp,
+  Shield,
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -24,6 +33,14 @@ interface DashboardStats {
   pendingApprovals: number;
   myDrafts: number;
   mySubmitted: number;
+}
+
+interface UserRole {
+  id: string;
+  user_id: string;
+  role: string;
+  email?: string;
+  full_name?: string;
 }
 
 export default function Dashboard() {
@@ -37,11 +54,15 @@ export default function Dashboard() {
     myDrafts: 0,
     mySubmitted: 0,
   });
+  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchStats();
-  }, [user]);
+    if (role === 'admin') {
+      fetchUserRoles();
+    }
+  }, [user, role]);
 
   const fetchStats = async () => {
     try {
@@ -73,6 +94,35 @@ export default function Dashboard() {
       console.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserRoles = async () => {
+    try {
+      // Fetch user roles with profile info
+      const { data: rolesData, error } = await supabase
+        .from('user_roles')
+        .select('id, user_id, role');
+
+      if (error) throw error;
+
+      if (rolesData) {
+        // Fetch profiles for each user
+        const userIds = rolesData.map(r => r.user_id);
+        const { data: profilesData } = await supabase
+          .from('app_user_profile')
+          .select('user_id, full_name')
+          .in('user_id', userIds);
+
+        const rolesWithProfile = rolesData.map(roleItem => ({
+          ...roleItem,
+          full_name: profilesData?.find(p => p.user_id === roleItem.user_id)?.full_name || 'N/A',
+        }));
+
+        setUserRoles(rolesWithProfile);
+      }
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
     }
   };
 
@@ -181,6 +231,51 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* User Roles Table (Admin only) */}
+      {role === 'admin' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              {language === 'th' ? 'ตารางสิทธิ์ผู้ใช้งาน' : 'User Roles Table'}
+            </CardTitle>
+            <CardDescription>
+              {language === 'th' ? 'รายการ Role ทั้งหมดในระบบ' : 'All user roles in the system'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {userRoles.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                {language === 'th' ? 'ไม่พบข้อมูล Role' : 'No roles found'}
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{language === 'th' ? 'ชื่อผู้ใช้' : 'User Name'}</TableHead>
+                    <TableHead>{language === 'th' ? 'User ID' : 'User ID'}</TableHead>
+                    <TableHead>{language === 'th' ? 'บทบาท' : 'Role'}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {userRoles.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.full_name}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{item.user_id}</TableCell>
+                      <TableCell>
+                        <Badge variant={item.role === 'admin' ? 'destructive' : 'secondary'}>
+                          {item.role}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Quick Actions */}
