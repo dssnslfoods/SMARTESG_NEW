@@ -44,7 +44,7 @@ export function Sidebar() {
       label: t('dataEntry'),
       href: '/data-entry',
       icon: FileInput,
-      roles: ['admin', 'staff'],
+      roles: ['admin', 'supervisor'],
     },
     {
       label: t('review'),
