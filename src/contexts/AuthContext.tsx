@@ -3,7 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
-type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff';
+type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest';
 
 interface UserProfile {
   user_id: string;

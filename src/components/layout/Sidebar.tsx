@@ -38,7 +38,7 @@ export function Sidebar() {
       label: t('dashboard'),
       href: '/dashboard',
       icon: LayoutDashboard,
-      roles: ['admin', 'executive', 'supervisor', 'staff'],
+      roles: ['admin', 'executive', 'supervisor', 'staff', 'guest'],
     },
     {
       label: t('dataEntry'),

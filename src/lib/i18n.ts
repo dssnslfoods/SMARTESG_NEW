@@ -22,6 +22,7 @@ export const translations = {
     executive: 'ผู้บริหาร',
     supervisor: 'หัวหน้างาน',
     staff: 'พนักงาน',
+    guest: 'ผู้เยี่ยมชม',
     
     // Master Data
     company: 'บริษัท',
@@ -142,6 +143,7 @@ export const translations = {
     executive: 'Executive',
     supervisor: 'Supervisor',
     staff: 'Staff',
+    guest: 'Guest',
     
     // Master Data
     company: 'Company',
