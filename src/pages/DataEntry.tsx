@@ -447,12 +447,12 @@ export default function DataEntry() {
                   <Building2 className="h-4 w-4" />
                   {language === 'th' ? 'บริษัท' : 'Company'}
                 </Label>
-                <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v); setFilterSite(''); }}>
+                <Select value={filterCompany || "__all__"} onValueChange={(v) => { setFilterCompany(v === "__all__" ? "" : v); setFilterSite(''); }}>
                   <SelectTrigger>
                     <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
                     {companies.map((company) => (
                       <SelectItem key={company.company_id} value={company.company_id}>
                         {company.company_name}
@@ -466,12 +466,12 @@ export default function DataEntry() {
                   <MapPin className="h-4 w-4" />
                   {language === 'th' ? 'สถานที่' : 'Site'}
                 </Label>
-                <Select value={filterSite} onValueChange={setFilterSite}>
+                <Select value={filterSite || "__all__"} onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
                     {filteredSites.map((site) => (
                       <SelectItem key={site.site_id} value={site.site_id}>
                         {site.site_name}
@@ -485,12 +485,12 @@ export default function DataEntry() {
                   <Calendar className="h-4 w-4" />
                   {language === 'th' ? 'รอบระยะเวลา' : 'Period'}
                 </Label>
-                <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+                <Select value={filterPeriod || "__all__"} onValueChange={(v) => setFilterPeriod(v === "__all__" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
                     {periods.map((period) => (
                       <SelectItem key={period.period_id} value={period.period_id}>
                         {period.month_name} {period.year}
@@ -501,12 +501,12 @@ export default function DataEntry() {
               </div>
               <div className="space-y-2">
                 <Label>{language === 'th' ? 'มิติ ESG' : 'Dimension'}</Label>
-                <Select value={filterDimension} onValueChange={(v) => { setFilterDimension(v); setFilterTheme(''); }}>
+                <Select value={filterDimension || "__all__"} onValueChange={(v) => { setFilterDimension(v === "__all__" ? "" : v); setFilterTheme(''); }}>
                   <SelectTrigger>
                     <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
                     {dimensions.map((dim) => (
                       <SelectItem key={dim.dimension_id} value={dim.dimension_id}>
                         {dim.dimension_name}
@@ -517,12 +517,12 @@ export default function DataEntry() {
               </div>
               <div className="space-y-2">
                 <Label>{language === 'th' ? 'หัวข้อ ESG' : 'Theme'}</Label>
-                <Select value={filterTheme} onValueChange={setFilterTheme}>
+                <Select value={filterTheme || "__all__"} onValueChange={(v) => setFilterTheme(v === "__all__" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
                     {filteredThemes.map((theme) => (
                       <SelectItem key={theme.theme_id} value={theme.theme_id}>
                         {theme.theme_name}
