@@ -125,6 +125,7 @@ export default function DataEntry() {
   const [filterPeriod, setFilterPeriod] = useState<string>("");
   const [filterDimension, setFilterDimension] = useState<string>("");
   const [filterTheme, setFilterTheme] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
 
   // Form filter states
   const [formDimension, setFormDimension] = useState<string>("");
@@ -318,6 +319,7 @@ export default function DataEntry() {
   const filteredValues = metricValues.filter(v => {
     if (filterSite && v.site_id !== filterSite) return false;
     if (filterPeriod && v.period_id !== filterPeriod) return false;
+    if (filterStatus && v.status !== filterStatus) return false;
     if (filterTheme) {
       const metric = metrics.find(m => m.metric_id === v.metric_id);
       if (metric?.theme_id !== filterTheme) return false;
@@ -514,6 +516,19 @@ export default function DataEntry() {
                         {theme.theme_name}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{language === 'th' ? 'สถานะ' : 'Status'}</Label>
+                <Select value={filterStatus || "__all__"} onValueChange={(v) => setFilterStatus(v === "__all__" ? "" : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                    <SelectItem value="draft">{language === 'th' ? 'ร่าง' : 'Draft'}</SelectItem>
+                    <SelectItem value="submitted">{language === 'th' ? 'ส่งแล้ว' : 'Submitted'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
