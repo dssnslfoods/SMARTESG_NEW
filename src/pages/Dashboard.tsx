@@ -32,6 +32,11 @@ import {
   TrendingUp,
   Shield,
   Eye,
+  Crown,
+  Briefcase,
+  UserCheck,
+  User,
+  UserX,
 } from 'lucide-react';
 
 interface DetailData {
@@ -487,9 +492,36 @@ export default function Dashboard() {
                       <TableCell className="font-medium">{item.full_name}</TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{item.user_id}</TableCell>
                       <TableCell>
-                        <Badge variant={item.role === 'admin' ? 'destructive' : 'secondary'}>
-                          {item.role}
-                        </Badge>
+                        {item.role === 'admin' && (
+                          <Badge className="bg-destructive text-destructive-foreground gap-1.5">
+                            <Crown className="h-3 w-3" />
+                            {item.role}
+                          </Badge>
+                        )}
+                        {item.role === 'executive' && (
+                          <Badge className="bg-primary text-primary-foreground gap-1.5">
+                            <Briefcase className="h-3 w-3" />
+                            {item.role}
+                          </Badge>
+                        )}
+                        {item.role === 'supervisor' && (
+                          <Badge className="bg-accent text-accent-foreground border border-border gap-1.5">
+                            <UserCheck className="h-3 w-3" />
+                            {item.role}
+                          </Badge>
+                        )}
+                        {item.role === 'staff' && (
+                          <Badge className="bg-secondary text-secondary-foreground gap-1.5">
+                            <User className="h-3 w-3" />
+                            {item.role}
+                          </Badge>
+                        )}
+                        {item.role === 'guest' && (
+                          <Badge className="bg-muted text-muted-foreground gap-1.5">
+                            <UserX className="h-3 w-3" />
+                            {item.role}
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
