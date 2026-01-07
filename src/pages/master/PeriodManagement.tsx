@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { useDeleteValidation } from '@/hooks/useDeleteValidation';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,6 +61,10 @@ export default function PeriodManagement() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
   const { logActivity } = useAuditLog();
+  const { checkPeriodDependencies } = useDeleteValidation();
+
+  const [checkingDelete, setCheckingDelete] = useState(false);
+  const [deleteBlockedMessage, setDeleteBlockedMessage] = useState<string | null>(null);
 
   const [periods, setPeriods] = useState<Period[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,8 +177,22 @@ export default function PeriodManagement() {
     }
   };
 
+  const handleDeleteClick = async (periodId: string) => {
+    setCheckingDelete(true);
+    setDeleteBlockedMessage(null);
+    
+    const { canDelete, message } = await checkPeriodDependencies(periodId);
+    
+    if (!canDelete) {
+      setDeleteBlockedMessage(message);
+    }
+    
+    setDeleteId(periodId);
+    setCheckingDelete(false);
+  };
+
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || deleteBlockedMessage) return;
 
     const periodToDelete = periods.find(p => p.period_id === deleteId);
 
@@ -202,6 +221,7 @@ export default function PeriodManagement() {
       });
     } finally {
       setDeleteId(null);
+      setDeleteBlockedMessage(null);
     }
   };
 
@@ -365,7 +385,8 @@ export default function PeriodManagement() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setDeleteId(period.period_id)}
+                            onClick={() => handleDeleteClick(period.period_id)}
+                            disabled={checkingDelete}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -379,19 +400,25 @@ export default function PeriodManagement() {
           </CardContent>
         </Card>
 
-        <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialog open={!!deleteId} onOpenChange={() => { setDeleteId(null); setDeleteBlockedMessage(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t('confirmDelete')}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {language === 'th'
+              <AlertDialogTitle>
+                {deleteBlockedMessage 
+                  ? (language === 'th' ? 'ไม่สามารถลบได้' : 'Cannot Delete')
+                  : t('confirmDelete')}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="whitespace-pre-line">
+                {deleteBlockedMessage || (language === 'th'
                   ? 'การลบข้อมูลนี้ไม่สามารถย้อนกลับได้'
-                  : 'This action cannot be undone.'}
+                  : 'This action cannot be undone.')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>{t('delete')}</AlertDialogAction>
+              <AlertDialogCancel>{deleteBlockedMessage ? (language === 'th' ? 'ปิด' : 'Close') : t('cancel')}</AlertDialogCancel>
+              {!deleteBlockedMessage && (
+                <AlertDialogAction onClick={handleDelete}>{t('delete')}</AlertDialogAction>
+              )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

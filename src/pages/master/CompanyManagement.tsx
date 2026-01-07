@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { useDeleteValidation } from '@/hooks/useDeleteValidation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +47,10 @@ export default function CompanyManagement() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
   const { logActivity } = useAuditLog();
+  const { checkCompanyDependencies } = useDeleteValidation();
+
+  const [checkingDelete, setCheckingDelete] = useState(false);
+  const [deleteBlockedMessage, setDeleteBlockedMessage] = useState<string | null>(null);
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,8 +153,22 @@ export default function CompanyManagement() {
     }
   };
 
+  const handleDeleteClick = async (companyId: string) => {
+    setCheckingDelete(true);
+    setDeleteBlockedMessage(null);
+    
+    const { canDelete, message } = await checkCompanyDependencies(companyId);
+    
+    if (!canDelete) {
+      setDeleteBlockedMessage(message);
+    }
+    
+    setDeleteId(companyId);
+    setCheckingDelete(false);
+  };
+
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || deleteBlockedMessage) return;
 
     const companyToDelete = companies.find(c => c.company_id === deleteId);
 
@@ -178,6 +197,7 @@ export default function CompanyManagement() {
       });
     } finally {
       setDeleteId(null);
+      setDeleteBlockedMessage(null);
     }
   };
 
@@ -333,7 +353,8 @@ export default function CompanyManagement() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setDeleteId(company.company_id)}
+                            onClick={() => handleDeleteClick(company.company_id)}
+                            disabled={checkingDelete}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -347,19 +368,25 @@ export default function CompanyManagement() {
           </CardContent>
         </Card>
 
-        <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialog open={!!deleteId} onOpenChange={() => { setDeleteId(null); setDeleteBlockedMessage(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t('confirmDelete')}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {language === 'th'
+              <AlertDialogTitle>
+                {deleteBlockedMessage 
+                  ? (language === 'th' ? 'ไม่สามารถลบได้' : 'Cannot Delete')
+                  : t('confirmDelete')}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="whitespace-pre-line">
+                {deleteBlockedMessage || (language === 'th'
                   ? 'การลบข้อมูลนี้ไม่สามารถย้อนกลับได้'
-                  : 'This action cannot be undone.'}
+                  : 'This action cannot be undone.')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>{t('delete')}</AlertDialogAction>
+              <AlertDialogCancel>{deleteBlockedMessage ? (language === 'th' ? 'ปิด' : 'Close') : t('cancel')}</AlertDialogCancel>
+              {!deleteBlockedMessage && (
+                <AlertDialogAction onClick={handleDelete}>{t('delete')}</AlertDialogAction>
+              )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
