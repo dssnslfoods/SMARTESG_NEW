@@ -119,7 +119,7 @@ export function Sidebar() {
             </Link>
           ))}
 
-        {role === 'admin' && (
+        {(role === 'admin' || role === 'supervisor') && (
           <Collapsible open={masterDataOpen} onOpenChange={setMasterDataOpen}>
             <CollapsibleTrigger asChild>
               <button

@@ -1,0 +1,349 @@
+import { useEffect, useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, Plus, Pencil, Search, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+interface Company {
+  company_id: string;
+  company_name: string;
+  country: string | null;
+  industry: string | null;
+  created_at: string;
+}
+
+export default function CompanyManagement() {
+  const { t, language } = useLanguage();
+  const { toast } = useToast();
+
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState({
+    company_id: '',
+    company_name: '',
+    country: '',
+    industry: '',
+  });
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
+
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('company')
+        .select('*')
+        .order('company_name');
+
+      if (error) throw error;
+      setCompanies(data || []);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!formData.company_id || !formData.company_name) {
+      toast({
+        variant: 'destructive',
+        title: t('error'),
+        description: language === 'th' ? 'กรุณากรอกข้อมูลให้ครบ' : 'Please fill all required fields',
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (editingCompany) {
+        const { error } = await supabase
+          .from('company')
+          .update({
+            company_name: formData.company_name,
+            country: formData.country || null,
+            industry: formData.industry || null,
+          })
+          .eq('company_id', editingCompany.company_id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('company').insert({
+          company_id: formData.company_id,
+          company_name: formData.company_name,
+          country: formData.country || null,
+          industry: formData.industry || null,
+        });
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: t('success'),
+        description: language === 'th' ? 'บันทึกข้อมูลสำเร็จ' : 'Data saved successfully',
+      });
+
+      setIsDialogOpen(false);
+      resetForm();
+      fetchCompanies();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: t('error'),
+        description: error.message,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    try {
+      const { error } = await supabase.from('company').delete().eq('company_id', deleteId);
+      if (error) throw error;
+
+      toast({
+        title: t('success'),
+        description: language === 'th' ? 'ลบข้อมูลสำเร็จ' : 'Data deleted successfully',
+      });
+
+      fetchCompanies();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: t('error'),
+        description: error.message,
+      });
+    } finally {
+      setDeleteId(null);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({ company_id: '', company_name: '', country: '', industry: '' });
+    setEditingCompany(null);
+  };
+
+  const openEditDialog = (company: Company) => {
+    setEditingCompany(company);
+    setFormData({
+      company_id: company.company_id,
+      company_name: company.company_name,
+      country: company.country || '',
+      industry: company.industry || '',
+    });
+    setIsDialogOpen(true);
+  };
+
+  const filteredCompanies = companies.filter(
+    (c) =>
+      c.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.company_id.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  return (
+    <MainLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">{t('companies')}</h1>
+            <p className="text-muted-foreground">
+              {language === 'th' ? 'จัดการข้อมูลบริษัท' : 'Manage company data'}
+            </p>
+          </div>
+
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                {t('add')}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingCompany
+                    ? language === 'th'
+                      ? 'แก้ไขบริษัท'
+                      : 'Edit Company'
+                    : language === 'th'
+                    ? 'เพิ่มบริษัท'
+                    : 'Add Company'}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>{t('companyId')} *</Label>
+                  <Input
+                    value={formData.company_id}
+                    onChange={(e) => setFormData({ ...formData, company_id: e.target.value })}
+                    disabled={!!editingCompany}
+                    placeholder="e.g., COMP001"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t('companyName')} *</Label>
+                  <Input
+                    value={formData.company_name}
+                    onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t('industry')}</Label>
+                  <Input
+                    value={formData.industry}
+                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t('country')}</Label>
+                  <Input
+                    value={formData.country}
+                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  />
+                </div>
+                <Button onClick={handleSave} className="w-full" disabled={saving}>
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {t('save')}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder={t('search')}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('companyId')}</TableHead>
+                  <TableHead>{t('companyName')}</TableHead>
+                  <TableHead>{t('industry')}</TableHead>
+                  <TableHead>{t('country')}</TableHead>
+                  <TableHead className="w-24"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCompanies.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      {t('noData')}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredCompanies.map((company) => (
+                    <TableRow key={company.company_id}>
+                      <TableCell className="font-mono text-sm">{company.company_id}</TableCell>
+                      <TableCell className="font-medium">{company.company_name}</TableCell>
+                      <TableCell>{company.industry || '-'}</TableCell>
+                      <TableCell>{company.country || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(company)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteId(company.company_id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('confirmDelete')}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {language === 'th'
+                  ? 'การลบข้อมูลนี้ไม่สามารถย้อนกลับได้'
+                  : 'This action cannot be undone.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>{t('delete')}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </MainLayout>
+  );
+}
