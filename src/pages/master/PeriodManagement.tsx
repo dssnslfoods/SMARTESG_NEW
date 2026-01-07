@@ -41,6 +41,21 @@ interface Period {
   month_name: string;
 }
 
+const monthNames: Record<number, { th: string; en: string }> = {
+  1: { th: 'มกราคม', en: 'January' },
+  2: { th: 'กุมภาพันธ์', en: 'February' },
+  3: { th: 'มีนาคม', en: 'March' },
+  4: { th: 'เมษายน', en: 'April' },
+  5: { th: 'พฤษภาคม', en: 'May' },
+  6: { th: 'มิถุนายน', en: 'June' },
+  7: { th: 'กรกฎาคม', en: 'July' },
+  8: { th: 'สิงหาคม', en: 'August' },
+  9: { th: 'กันยายน', en: 'September' },
+  10: { th: 'ตุลาคม', en: 'October' },
+  11: { th: 'พฤศจิกายน', en: 'November' },
+  12: { th: 'ธันวาคม', en: 'December' },
+};
+
 export default function PeriodManagement() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
@@ -57,8 +72,17 @@ export default function PeriodManagement() {
     period_id: '',
     year: new Date().getFullYear(),
     month: 1,
-    month_name: '',
+    month_name: monthNames[1][language === 'th' ? 'th' : 'en'],
   });
+
+  const handleMonthChange = (month: number) => {
+    const validMonth = Math.min(12, Math.max(1, month));
+    setFormData({
+      ...formData,
+      month: validMonth,
+      month_name: monthNames[validMonth]?.[language === 'th' ? 'th' : 'en'] || '',
+    });
+  };
 
   useEffect(() => {
     fetchPeriods();
@@ -252,7 +276,7 @@ export default function PeriodManagement() {
                   <Input
                     type="number"
                     value={formData.month}
-                    onChange={(e) => setFormData({ ...formData, month: parseInt(e.target.value) || 1 })}
+                    onChange={(e) => handleMonthChange(parseInt(e.target.value) || 1)}
                     min={1}
                     max={12}
                   />
