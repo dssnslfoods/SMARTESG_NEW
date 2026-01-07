@@ -42,7 +42,7 @@ interface UserWithRole {
   is_active: boolean;
   created_at: string;
   role: AppRole | null;
-  email?: string;
+  email: string;
 }
 
 interface Company {
@@ -76,6 +76,8 @@ export default function UserManagement() {
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [originalEmail, setOriginalEmail] = useState('');
+  const [loadingEmail, setLoadingEmail] = useState(false);
 
   // New user registration form
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -105,11 +107,14 @@ export default function UserManagement() {
       const profiles = profilesRes.data || [];
       const roles = rolesRes.data || [];
       
+      // Fetch emails from auth users via edge function or admin API
+      // For now, we'll need to get emails when editing
       const usersWithRoles: UserWithRole[] = profiles.map((profile) => {
         const userRole = roles.find((r) => r.user_id === profile.user_id);
         return {
           ...profile,
           role: userRole?.role as AppRole || null,
+          email: '', // Will be fetched when editing
         };
       });
 
@@ -190,6 +195,19 @@ export default function UserManagement() {
     
     setSaving(true);
     try {
+      // Update email if changed
+      if (editingUser.email && editingUser.email !== originalEmail) {
+        const { data, error: emailError } = await supabase.functions.invoke('update-user-email', {
+          body: {
+            userId: editingUser.user_id,
+            newEmail: editingUser.email,
+          },
+        });
+
+        if (emailError) throw emailError;
+        if (data?.error) throw new Error(data.error);
+      }
+
       // Update profile
       const { error: profileError } = await supabase
         .from('app_user_profile')
@@ -230,6 +248,7 @@ export default function UserManagement() {
 
       setIsDialogOpen(false);
       setEditingUser(null);
+      setOriginalEmail('');
       fetchData();
     } catch (error: any) {
       toast({
@@ -442,9 +461,23 @@ export default function UserManagement() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
+                        onClick={async () => {
                           setEditingUser(user);
                           setIsDialogOpen(true);
+                          setLoadingEmail(true);
+                          try {
+                            const { data, error } = await supabase.functions.invoke('get-user-email', {
+                              body: { userId: user.user_id },
+                            });
+                            if (!error && data?.email) {
+                              setEditingUser(prev => prev ? { ...prev, email: data.email } : null);
+                              setOriginalEmail(data.email);
+                            }
+                          } catch (err) {
+                            console.error('Error fetching email:', err);
+                          } finally {
+                            setLoadingEmail(false);
+                          }
                         }}
                       >
                         <Pencil className="h-4 w-4" />
@@ -468,6 +501,26 @@ export default function UserManagement() {
           </DialogHeader>
           {editingUser && (
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>{t('email')}</Label>
+                {loadingEmail ? (
+                  <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-muted">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-muted-foreground text-sm">
+                      {language === 'th' ? 'กำลังโหลด...' : 'Loading...'}
+                    </span>
+                  </div>
+                ) : (
+                  <Input
+                    type="email"
+                    value={editingUser.email || ''}
+                    onChange={(e) =>
+                      setEditingUser({ ...editingUser, email: e.target.value })
+                    }
+                    placeholder="user@example.com"
+                  />
+                )}
+              </div>
               <div className="space-y-2">
                 <Label>{t('fullName')}</Label>
                 <Input
