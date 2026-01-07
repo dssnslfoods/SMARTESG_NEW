@@ -19,6 +19,7 @@ interface AuthContextType {
   profile: UserProfile | null;
   role: AppRole | null;
   loading: boolean;
+  roleLoaded: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; pendingApproval?: boolean; inactive?: boolean }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -34,9 +35,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roleLoaded, setRoleLoaded] = useState(false);
 
   const fetchUserData = async (userId: string): Promise<{ hasRole: boolean; isActive: boolean }> => {
     try {
+      setRoleLoaded(false);
+      
       // Fetch profile
       const { data: profileData } = await supabase
         .from('app_user_profile')
@@ -57,12 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (roleData) {
         setRole(roleData.role as AppRole);
+        setRoleLoaded(true);
         return { hasRole: true, isActive: profileData?.is_active ?? true };
       }
       
+      setRoleLoaded(true);
       return { hasRole: false, isActive: profileData?.is_active ?? true };
     } catch (error) {
       console.error('Error fetching user data:', error);
+      setRoleLoaded(true);
       return { hasRole: false, isActive: true };
     }
   };
@@ -74,25 +81,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer Supabase calls with setTimeout
-        if (session?.user) {
-          setTimeout(() => {
-            fetchUserData(session.user.id);
-          }, 0);
-        } else {
+        if (!session?.user) {
           setProfile(null);
           setRole(null);
+          setRoleLoaded(true);
         }
         setLoading(false);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchUserData(session.user.id);
+        await fetchUserData(session.user.id);
+      } else {
+        setRoleLoaded(true);
       }
       setLoading(false);
     });
@@ -175,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         role,
         loading,
+        roleLoaded,
         signIn,
         signUp,
         signOut,
