@@ -31,32 +31,9 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Check if user is active
-  if (profile && !profile.is_active) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-destructive">Account Inactive</h1>
-          <p className="mt-2 text-muted-foreground">
-            Your account has been deactivated. Please contact an administrator.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // User has no role assigned yet
-  if (!role) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground">Pending Approval</h1>
-          <p className="mt-2 text-muted-foreground">
-            Your account is pending role assignment. Please contact an administrator.
-          </p>
-        </div>
-      </div>
-    );
+  // Check if user is active or has no role - redirect to auth
+  if ((profile && !profile.is_active) || !role) {
+    return <Navigate to="/auth" replace />;
   }
 
   return <MainLayout>{children}</MainLayout>;

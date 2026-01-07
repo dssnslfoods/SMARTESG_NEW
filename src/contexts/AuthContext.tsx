@@ -19,7 +19,7 @@ interface AuthContextType {
   profile: UserProfile | null;
   role: AppRole | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null; pendingApproval?: boolean; inactive?: boolean }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserData = async (userId: string) => {
+  const fetchUserData = async (userId: string): Promise<{ hasRole: boolean; isActive: boolean }> => {
     try {
       // Fetch profile
       const { data: profileData } = await supabase
@@ -57,9 +57,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (roleData) {
         setRole(roleData.role as AppRole);
+        return { hasRole: true, isActive: profileData?.is_active ?? true };
       }
+      
+      return { hasRole: false, isActive: profileData?.is_active ?? true };
     } catch (error) {
       console.error('Error fetching user data:', error);
+      return { hasRole: false, isActive: true };
     }
   };
 
@@ -96,12 +100,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+  const signIn = async (email: string, password: string): Promise<{ error: Error | null; pendingApproval?: boolean; inactive?: boolean }> => {
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { error: error as Error | null };
+    
+    if (error) {
+      return { error: error as Error };
+    }
+    
+    // Check if user has role and is active
+    if (data.user) {
+      const { hasRole, isActive } = await fetchUserData(data.user.id);
+      
+      if (!isActive) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+        setRole(null);
+        return { error: null, inactive: true };
+      }
+      
+      if (!hasRole) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+        setRole(null);
+        return { error: null, pendingApproval: true };
+      }
+    }
+    
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
