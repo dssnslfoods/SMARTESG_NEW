@@ -40,13 +40,13 @@ export function Sidebar() {
       label: t('dashboard'),
       href: '/dashboard',
       icon: LayoutDashboard,
-      roles: ['admin', 'executive', 'supervisor', 'staff', 'guest'],
+      roles: ['admin', 'executive', 'supervisor', 'guest'],
     },
     {
       label: t('dataEntry'),
       href: '/data-entry',
       icon: FileInput,
-      roles: ['admin', 'supervisor', 'guest'],
+      roles: ['admin', 'supervisor', 'staff', 'guest'],
     },
     {
       label: t('reports'),
