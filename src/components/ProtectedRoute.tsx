@@ -32,8 +32,8 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Check if user is active or has no role - redirect to auth
-  if ((profile && !profile.is_active) || !role) {
+  // Check if user is active - redirect to auth
+  if (profile && !profile.is_active) {
     return <Navigate to="/auth" replace />;
   }
 
