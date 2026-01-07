@@ -136,7 +136,15 @@ export default function Dashboard() {
           full_name: profilesData?.find(p => p.user_id === roleItem.user_id)?.full_name || 'N/A',
         }));
 
-        setUserRoles(rolesWithProfile);
+        // Sort by role order: admin, executive, supervisor, staff, guest
+        const roleOrder = ['admin', 'executive', 'supervisor', 'staff', 'guest'];
+        const sortedRoles = rolesWithProfile.sort((a, b) => {
+          const orderA = roleOrder.indexOf(a.role);
+          const orderB = roleOrder.indexOf(b.role);
+          return orderA - orderB;
+        });
+
+        setUserRoles(sortedRoles);
       }
     } catch (error) {
       console.error('Error fetching user roles:', error);
