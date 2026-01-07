@@ -135,40 +135,29 @@ export default function UserManagement() {
 
     setAddingUser(true);
     try {
-      // Sign up new user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUser.email,
-        password: newUser.password,
-        options: {
-          data: {
-            full_name: newUser.fullName,
-          },
+      // Call edge function to create user (admin only)
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newUser.email,
+          password: newUser.password,
+          fullName: newUser.fullName,
+          role: newUser.role,
         },
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('User creation failed');
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      // Update profile with company/site
-      const { error: profileError } = await supabase
-        .from('app_user_profile')
-        .update({
-          company_id: newUser.companyId || null,
-          site_id: newUser.siteId || null,
-        })
-        .eq('user_id', authData.user.id);
-
-      if (profileError) console.error('Profile update error:', profileError);
-
-      // Assign role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: newUser.role,
-        });
-
-      if (roleError) throw roleError;
+      // Update profile with company/site if provided
+      if (data?.userId && (newUser.companyId || newUser.siteId)) {
+        await supabase
+          .from('app_user_profile')
+          .update({
+            company_id: newUser.companyId || null,
+            site_id: newUser.siteId || null,
+          })
+          .eq('user_id', data.userId);
+      }
 
       toast({
         title: t('success'),
