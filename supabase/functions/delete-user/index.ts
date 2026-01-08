@@ -85,6 +85,21 @@ serve(async (req) => {
       );
     }
 
+    // Check if this is the last supervisor - prevent deletion
+    if (targetRoleData?.role === "supervisor") {
+      const { count: supervisorCount } = await supabaseAdmin
+        .from("user_roles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "supervisor");
+
+      if (supervisorCount !== null && supervisorCount <= 1) {
+        return new Response(
+          JSON.stringify({ error: "Cannot delete the last supervisor. At least one supervisor is required." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Delete the user from auth
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
