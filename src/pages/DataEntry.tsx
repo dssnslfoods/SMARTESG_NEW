@@ -116,7 +116,7 @@ interface FormData {
 
 export default function DataEntry() {
   const { t, language } = useLanguage();
-  const { user } = useAuth();
+  const { user, role, profile } = useAuth();
   const { toast } = useToast();
   const { logActivity } = useAuditLog();
 
@@ -205,9 +205,13 @@ export default function DataEntry() {
     setEditingValue(null);
     setFormDimension('');
     setFormTheme('');
+    
+    // For staff role, auto-set site_id from profile
+    const staffSiteId = role === 'staff' && profile?.site_id ? profile.site_id : '';
+    
     setFormData({
       value_id: generateValueId(),
-      site_id: '',
+      site_id: staffSiteId,
       period_id: '',
       metric_id: '',
       value: 0,
@@ -771,21 +775,32 @@ export default function DataEntry() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{language === 'th' ? 'สถานที่' : 'Site'} *</Label>
-                  <Select
-                    value={formData.site_id}
-                    onValueChange={(v) => setFormData({ ...formData, site_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={language === 'th' ? 'เลือกสถานที่' : 'Select site'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sites.map((site) => (
-                        <SelectItem key={site.site_id} value={site.site_id}>
-                          {site.site_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {role === 'staff' && profile?.site_id ? (
+                    <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm">
+                      <span className="text-foreground">
+                        {profile.site_name || getDisplayName(profile.site_id, 'site')}
+                        {profile.site_location && (
+                          <span className="text-muted-foreground ml-2">({profile.site_location})</span>
+                        )}
+                      </span>
+                    </div>
+                  ) : (
+                    <Select
+                      value={formData.site_id}
+                      onValueChange={(v) => setFormData({ ...formData, site_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={language === 'th' ? 'เลือกสถานที่' : 'Select site'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sites.map((site) => (
+                          <SelectItem key={site.site_id} value={site.site_id}>
+                            {site.site_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>{language === 'th' ? 'รอบระยะเวลา' : 'Period'} *</Label>
