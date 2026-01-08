@@ -19,8 +19,8 @@ export function MainLayout({ children }: MainLayoutProps) {
 
       {/* Mobile Sidebar Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="left" className="p-0 w-64">
-          <Sidebar onNavigate={() => setMobileMenuOpen(false)} />
+        <SheetContent side="left" className="p-0 w-64 [&>button]:hidden">
+          <Sidebar onNavigate={() => setMobileMenuOpen(false)} showCloseButton />
         </SheetContent>
       </Sheet>
 
