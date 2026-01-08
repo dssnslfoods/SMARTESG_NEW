@@ -166,6 +166,18 @@ export default function UserManagement() {
       return;
     }
 
+    // Staff role requires company and site
+    if (newUser.role === 'staff' && (!newUser.companyId || !newUser.siteId)) {
+      toast({
+        variant: 'destructive',
+        title: t('error'),
+        description: language === 'th' 
+          ? 'บทบาท Staff ต้องเลือกบริษัทและสถานที่' 
+          : 'Staff role requires company and site selection',
+      });
+      return;
+    }
+
     setAddingUser(true);
     try {
       // Call edge function to create user (admin only)
