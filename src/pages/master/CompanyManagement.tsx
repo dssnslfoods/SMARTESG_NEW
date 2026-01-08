@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { MasterDataLoadingSkeleton } from '@/components/ui/loading-skeleton';
 
 interface Company {
   company_id: string;
@@ -236,11 +237,7 @@ export default function CompanyManagement() {
   );
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <MasterDataLoadingSkeleton />;
   }
 
   return (

@@ -230,3 +230,29 @@ export function DataEntryLoadingSkeleton() {
     </div>
   );
 }
+
+// Master data management loading skeleton
+export function MasterDataLoadingSkeleton() {
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-56" />
+        </div>
+        <Skeleton className="h-10 w-24" />
+      </div>
+
+      {/* Card with search and table */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-10 w-full max-w-sm" />
+        </CardHeader>
+        <CardContent>
+          <TableLoadingSkeleton rows={8} columns={4} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
