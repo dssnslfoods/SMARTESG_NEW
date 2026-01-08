@@ -89,13 +89,16 @@ serve(async (req) => {
       .update({ full_name: fullName, is_active: true })
       .eq("user_id", userData.user.id);
 
-    // Assign role
+    // Assign role (use upsert since trigger may have already created a guest role)
     const { error: roleError } = await supabaseAdmin
       .from("user_roles")
-      .insert({ user_id: userData.user.id, role });
+      .upsert(
+        { user_id: userData.user.id, role },
+        { onConflict: "user_id" }
+      );
 
     if (roleError) {
-      console.log("Role insert error:", roleError);
+      console.log("Role upsert error:", roleError);
       return new Response(
         JSON.stringify({ error: roleError.message }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
