@@ -17,6 +17,7 @@ import {
   Tag,
   Activity,
   Leaf,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,9 +30,10 @@ import { ChevronDown } from 'lucide-react';
 
 interface SidebarProps {
   onNavigate?: () => void;
+  showCloseButton?: boolean;
 }
 
-export function Sidebar({ onNavigate }: SidebarProps) {
+export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
   const { pathname } = useLocation();
   const { role, signOut } = useAuth();
   const { t, language } = useLanguage();
@@ -89,8 +91,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   return (
     <aside className="flex h-full w-64 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Brand */}
-      <div className="flex h-16 items-center border-b border-sidebar-border px-5">
-        <Link to="/dashboard" className="flex items-center gap-3 group">
+      <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-5">
+        <Link to="/dashboard" className="flex items-center gap-3 group" onClick={onNavigate}>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm transition-transform group-hover:scale-105">
             <Leaf className="h-5 w-5 text-primary-foreground" />
           </div>
@@ -103,6 +105,18 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             </span>
           </div>
         </Link>
+        
+        {/* Close button for mobile */}
+        {showCloseButton && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            onClick={onNavigate}
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        )}
       </div>
 
       {/* Navigation */}
