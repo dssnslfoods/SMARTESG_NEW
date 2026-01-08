@@ -41,7 +41,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Pencil, Search, UserPlus, Trash2 } from 'lucide-react';
+import { Loader2, Pencil, Search, UserPlus, Trash2, KeyRound } from 'lucide-react';
 
 type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest';
 
@@ -77,7 +77,7 @@ const roleColors: Record<AppRole, string> = {
 
 export default function UserManagement() {
   const { t, language } = useLanguage();
-  const { role: currentUserRole } = useAuth();
+  const { role: currentUserRole, user: currentUser } = useAuth();
   const { toast } = useToast();
   
   const [users, setUsers] = useState<UserWithRole[]>([]);
@@ -106,6 +106,18 @@ export default function UserManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
+
+  // Password change
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [passwordUser, setPasswordUser] = useState<UserWithRole | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  // Check if current user is admin or supervisor (can manage others)
+  const isManager = currentUserRole === 'admin' || currentUserRole === 'supervisor';
+  // Check if current user is staff or executive (can only manage self)
+  const isSelfOnly = currentUserRole === 'executive' || currentUserRole === 'staff';
 
   useEffect(() => {
     fetchData();
@@ -358,10 +370,66 @@ export default function UserManagement() {
     }
   };
 
-  // Filter users: supervisors cannot see admin accounts
-  const visibleUsers = currentUserRole === 'supervisor' 
-    ? users.filter(u => u.role !== 'admin')
-    : users;
+  const handleChangePassword = async () => {
+    if (!passwordUser) return;
+
+    if (!newPassword || newPassword.length < 6) {
+      toast({
+        variant: 'destructive',
+        title: t('error'),
+        description: language === 'th' ? 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' : 'Password must be at least 6 characters',
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        variant: 'destructive',
+        title: t('error'),
+        description: language === 'th' ? 'รหัสผ่านไม่ตรงกัน' : 'Passwords do not match',
+      });
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('update-password', {
+        body: {
+          email: passwordUser.email,
+          newPassword: newPassword,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: t('success'),
+        description: language === 'th' ? 'เปลี่ยนรหัสผ่านสำเร็จ' : 'Password changed successfully',
+      });
+
+      setIsPasswordDialogOpen(false);
+      setPasswordUser(null);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: t('error'),
+        description: error.message,
+      });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  // Filter users based on role
+  // Admin sees all, supervisor sees non-admin, executive/staff see only self
+  const visibleUsers = isSelfOnly
+    ? users.filter(u => u.user_id === currentUser?.id)
+    : currentUserRole === 'supervisor' 
+      ? users.filter(u => u.role !== 'admin')
+      : users;
 
   const filteredUsers = visibleUsers.filter((user) =>
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -390,19 +458,21 @@ export default function UserManagement() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t('users')}</h1>
           <p className="text-muted-foreground">
-            {language === 'th' ? 'จัดการผู้ใช้และบทบาท' : 'Manage users and roles'}
+            {isSelfOnly 
+              ? (language === 'th' ? 'จัดการบัญชีของคุณ' : 'Manage your account')
+              : (language === 'th' ? 'จัดการผู้ใช้และบทบาท' : 'Manage users and roles')}
           </p>
         </div>
         
-        {/* Add User Button */}
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <UserPlus className="h-4 w-4" />
-              {language === 'th' ? 'เพิ่มผู้ใช้' : 'Add User'}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
+        {isManager && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <UserPlus className="h-4 w-4" />
+                {language === 'th' ? 'เพิ่มผู้ใช้' : 'Add User'}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
                 {language === 'th' ? 'เพิ่มผู้ใช้ใหม่' : 'Add New User'}
@@ -496,6 +566,7 @@ export default function UserManagement() {
             </div>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       <Card>
@@ -576,20 +647,46 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
+                        {/* Edit button - only for managers editing others */}
+                        {isManager && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              setEditingUser(user);
+                              setIsDialogOpen(true);
+                              setLoadingEmail(true);
+                              try {
+                                const { data, error } = await supabase.functions.invoke('get-user-email', {
+                                  body: { userId: user.user_id },
+                                });
+                                if (!error && data?.email) {
+                                  setEditingUser(prev => prev ? { ...prev, email: data.email } : null);
+                                  setOriginalEmail(data.email);
+                                }
+                              } catch (err) {
+                                console.error('Error fetching email:', err);
+                              } finally {
+                                setLoadingEmail(false);
+                              }
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {/* Password change button */}
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={async () => {
-                            setEditingUser(user);
-                            setIsDialogOpen(true);
                             setLoadingEmail(true);
                             try {
                               const { data, error } = await supabase.functions.invoke('get-user-email', {
                                 body: { userId: user.user_id },
                               });
                               if (!error && data?.email) {
-                                setEditingUser(prev => prev ? { ...prev, email: data.email } : null);
-                                setOriginalEmail(data.email);
+                                setPasswordUser({ ...user, email: data.email });
+                                setIsPasswordDialogOpen(true);
                               }
                             } catch (err) {
                               console.error('Error fetching email:', err);
@@ -598,9 +695,10 @@ export default function UserManagement() {
                             }
                           }}
                         >
-                          <Pencil className="h-4 w-4" />
+                          <KeyRound className="h-4 w-4" />
                         </Button>
-                        {user.role !== 'admin' && (
+                        {/* Delete button - only for managers, not for admins */}
+                        {isManager && user.role !== 'admin' && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -776,6 +874,56 @@ export default function UserManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Password Change Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={(open) => {
+        setIsPasswordDialogOpen(open);
+        if (!open) {
+          setPasswordUser(null);
+          setNewPassword('');
+          setConfirmPassword('');
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change Password'}
+            </DialogTitle>
+          </DialogHeader>
+          {passwordUser && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>{t('email')}</Label>
+                <div className="flex items-center h-10 px-3 border rounded-md bg-muted">
+                  <span className="text-muted-foreground">{passwordUser.email}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{language === 'th' ? 'รหัสผ่านใหม่' : 'New Password'} *</Label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{language === 'th' ? 'ยืนยันรหัสผ่าน' : 'Confirm Password'} *</Label>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+              <Button onClick={handleChangePassword} className="w-full" disabled={changingPassword}>
+                {changingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {language === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change Password'}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

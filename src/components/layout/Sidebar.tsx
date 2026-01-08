@@ -70,7 +70,7 @@ export function Sidebar() {
       label: t('users'),
       href: '/users',
       icon: Users,
-      roles: ['admin', 'supervisor', 'guest'],
+      roles: ['admin', 'supervisor', 'executive', 'staff', 'guest'],
     },
     {
       label: t('auditLog'),
