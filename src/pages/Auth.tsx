@@ -193,7 +193,7 @@ export default function Auth() {
           <div>
             <h2 className="text-4xl font-bold leading-tight tracking-tight whitespace-pre-line">
               {language === "th"
-                ? "ขับเคลื่อนองค์กรสู่\nความยั่งยืน"
+                ? "ขับเคลื่อนองค์กรสู่ความยั่งยืน"
                 : "Driving Your Organization\nTowards Sustainability"}
             </h2>
             <p className="mt-6 text-lg text-primary-foreground/80 max-w-lg leading-relaxed">
