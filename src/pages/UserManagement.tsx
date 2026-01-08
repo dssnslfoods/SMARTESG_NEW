@@ -166,14 +166,15 @@ export default function UserManagement() {
       return;
     }
 
-    // Staff role requires company and site
-    if (newUser.role === 'staff' && (!newUser.companyId || !newUser.siteId)) {
+    // Staff, Supervisor, Executive roles require company and site
+    const rolesRequiringCompanySite = ['staff', 'supervisor', 'executive'];
+    if (rolesRequiringCompanySite.includes(newUser.role) && (!newUser.companyId || !newUser.siteId)) {
       toast({
         variant: 'destructive',
         title: t('error'),
         description: language === 'th' 
-          ? 'บทบาท Staff ต้องเลือกบริษัทและสถานที่' 
-          : 'Staff role requires company and site selection',
+          ? `บทบาท ${t(newUser.role)} ต้องเลือกบริษัทและสถานที่` 
+          : `${t(newUser.role)} role requires company and site selection`,
       });
       return;
     }
