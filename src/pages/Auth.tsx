@@ -428,7 +428,9 @@ export default function Auth() {
         </Card>
 
         <p className="mt-10 text-center text-xs text-muted-foreground/70 lg:hidden">
-          © 2026 ESG Smart Performance. All rights reserved.
+          © 2026 ESG Smart Performance | Developed by Arnon Arpaket.
+          <br />
+          All software and design assets are protected. Unauthorized use or reproduction is prohibited.
         </p>
       </div>
     </div>
