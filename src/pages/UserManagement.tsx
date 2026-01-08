@@ -268,6 +268,25 @@ export default function UserManagement() {
   };
 
   const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
+    // If trying to deactivate, check if this is the last active supervisor
+    if (currentStatus) {
+      const targetUser = users.find(u => u.user_id === userId);
+      if (targetUser?.role === 'supervisor') {
+        // Count active supervisors
+        const activeSupervisors = users.filter(u => u.role === 'supervisor' && u.is_active);
+        if (activeSupervisors.length <= 1) {
+          toast({
+            variant: 'destructive',
+            title: t('error'),
+            description: language === 'th' 
+              ? 'ไม่สามารถปิดใช้งาน supervisor คนสุดท้ายได้ ระบบต้องมี supervisor อย่างน้อย 1 คน'
+              : 'Cannot deactivate the last supervisor. At least one supervisor is required.',
+          });
+          return;
+        }
+      }
+    }
+
     setTogglingStatus(userId);
     try {
       const { error } = await supabase
