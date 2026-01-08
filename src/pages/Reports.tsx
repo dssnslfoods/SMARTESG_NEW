@@ -36,6 +36,7 @@ import {
 } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
+import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 interface Company {
   company_id: string;
@@ -266,11 +267,7 @@ export default function Reports() {
   const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))", "hsl(var(--accent))", "hsl(var(--muted-foreground))"];
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">{language === "th" ? "กำลังโหลด..." : "Loading..."}</p>
-      </div>
-    );
+    return <ReportsLoadingSkeleton />;
   }
 
   return (

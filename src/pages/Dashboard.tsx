@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '@/components/ui/pull-to-refresh';
+import { DashboardLoadingSkeleton } from '@/components/ui/loading-skeleton';
 
 interface DetailData {
   type: 'companies' | 'sites' | 'metrics' | 'pending' | 'drafts' | 'submitted';
@@ -396,6 +397,10 @@ export default function Dashboard() {
       { label: t('dataEntry'), href: '/data-entry', icon: FileInput },
     ],
   };
+
+  if (loading) {
+    return <DashboardLoadingSkeleton />;
+  }
 
   return (
     <div 
