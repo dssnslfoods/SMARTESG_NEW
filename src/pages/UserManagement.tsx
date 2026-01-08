@@ -518,16 +518,24 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Switch
-                          checked={user.is_active}
-                          disabled={togglingStatus === user.user_id}
-                          onCheckedChange={() => handleToggleStatus(user.user_id, user.is_active)}
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {user.is_active
-                            ? (language === 'th' ? 'ใช้งาน' : 'Active')
-                            : (language === 'th' ? 'ปิดใช้งาน' : 'Inactive')}
-                        </span>
+                        {user.role === 'admin' ? (
+                          <span className="text-sm text-muted-foreground">
+                            {language === 'th' ? 'ใช้งาน (ไม่สามารถเปลี่ยนได้)' : 'Active (cannot change)'}
+                          </span>
+                        ) : (
+                          <>
+                            <Switch
+                              checked={user.is_active}
+                              disabled={togglingStatus === user.user_id}
+                              onCheckedChange={() => handleToggleStatus(user.user_id, user.is_active)}
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              {user.is_active
+                                ? (language === 'th' ? 'ใช้งาน' : 'Active')
+                                : (language === 'th' ? 'ปิดใช้งาน' : 'Inactive')}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -556,17 +564,19 @@ export default function UserManagement() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            setDeletingUserId(user.user_id);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {user.role !== 'admin' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setDeletingUserId(user.user_id);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
