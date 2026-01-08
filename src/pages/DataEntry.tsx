@@ -144,6 +144,7 @@ export default function DataEntry() {
   const [filterStatus, setFilterStatus] = useState<string>("");
 
   // Form filter states
+  const [formCompany, setFormCompany] = useState<string>("");
   const [formDimension, setFormDimension] = useState<string>("");
   const [formTheme, setFormTheme] = useState<string>("");
 
@@ -203,6 +204,7 @@ export default function DataEntry() {
 
   const handleCreate = () => {
     setEditingValue(null);
+    setFormCompany('');
     setFormDimension('');
     setFormTheme('');
     
@@ -222,11 +224,18 @@ export default function DataEntry() {
     setIsDialogOpen(true);
   };
 
+  // Filter sites by selected company in form
+  const formFilteredSites = formCompany
+    ? sites.filter(s => s.company_id === formCompany)
+    : sites;
+
   const handleEdit = (value: MetricValue) => {
     const metric = metrics.find(m => m.metric_id === value.metric_id);
     const theme = themes.find(t => t.theme_id === metric?.theme_id);
+    const site = sites.find(s => s.site_id === value.site_id);
     
     setEditingValue(value);
+    setFormCompany(site?.company_id || '');
     setFormDimension(theme?.dimension_id || '');
     setFormTheme(metric?.theme_id || '');
     setFormData({
@@ -772,39 +781,69 @@ export default function DataEntry() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Staff: Show fixed company + site info (read-only) */}
+              {role === 'staff' && profile?.site_id ? (
                 <div className="space-y-2">
-                  <Label>{language === 'th' ? 'สถานที่' : 'Site'} *</Label>
-                  {role === 'staff' && profile?.site_id ? (
-                    <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm">
-                      <span className="text-foreground">
-                        {profile.company_name && (
-                          <span className="font-medium">{profile.company_name} • </span>
-                        )}
-                        {profile.site_name || getDisplayName(profile.site_id, 'site')}
-                        {profile.site_location && (
-                          <span className="text-muted-foreground ml-1">({profile.site_location})</span>
-                        )}
-                      </span>
-                    </div>
-                  ) : (
+                  <Label>{language === 'th' ? 'บริษัท / สถานที่' : 'Company / Site'}</Label>
+                  <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm">
+                    <span className="text-foreground">
+                      {profile.company_name && (
+                        <span className="font-medium">{profile.company_name} • </span>
+                      )}
+                      {profile.site_name || getDisplayName(profile.site_id, 'site')}
+                      {profile.site_location && (
+                        <span className="text-muted-foreground ml-1">({profile.site_location})</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* Supervisor/Admin: Select company first, then filter sites */
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>{language === 'th' ? 'บริษัท' : 'Company'} *</Label>
+                    <Select
+                      value={formCompany}
+                      onValueChange={(v) => {
+                        setFormCompany(v);
+                        setFormData({ ...formData, site_id: '' });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={language === 'th' ? 'เลือกบริษัท' : 'Select company'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.company_id} value={company.company_id}>
+                            {company.company_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{language === 'th' ? 'สถานที่' : 'Site'} *</Label>
                     <Select
                       value={formData.site_id}
                       onValueChange={(v) => setFormData({ ...formData, site_id: v })}
+                      disabled={!formCompany}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'th' ? 'เลือกสถานที่' : 'Select site'} />
                       </SelectTrigger>
                       <SelectContent>
-                        {sites.map((site) => (
+                        {formFilteredSites.map((site) => (
                           <SelectItem key={site.site_id} value={site.site_id}>
-                            {site.site_name}
+                            {site.site_name} {site.location && `(${site.location})`}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  )}
+                  </div>
                 </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{language === 'th' ? 'รอบระยะเวลา' : 'Period'} *</Label>
                   <Select
@@ -823,9 +862,6 @@ export default function DataEntry() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{language === 'th' ? 'มิติ ESG' : 'Dimension'}</Label>
                   <Select
