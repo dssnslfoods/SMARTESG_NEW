@@ -497,11 +497,11 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{t('users')}</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('users')}</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             {isSelfOnly 
               ? (language === 'th' ? 'จัดการบัญชีของคุณ' : 'Manage your account')
               : (language === 'th' ? 'จัดการผู้ใช้และบทบาท' : 'Manage users and roles')}
@@ -511,12 +511,12 @@ export default function UserManagement() {
         {isManager && (
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2 w-full sm:w-auto">
                 <UserPlus className="h-4 w-4" />
                 {language === 'th' ? 'เพิ่มผู้ใช้' : 'Add User'}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {language === 'th' ? 'เพิ่มผู้ใช้ใหม่' : 'Add New User'}
@@ -614,102 +614,145 @@ export default function UserManagement() {
       </div>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-4">
+        <CardHeader className="pb-3 sm:pb-6">
+          <div className="flex items-center gap-2 sm:gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder={t('search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 text-sm sm:text-base"
               />
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('fullName')}</TableHead>
-                <TableHead>{language === 'th' ? 'บทบาท' : 'Role'}</TableHead>
-                <TableHead>{t('company')}</TableHead>
-                <TableHead>{t('site')}</TableHead>
-                <TableHead>{t('status')}</TableHead>
-                <TableHead className="w-40">{language === 'th' ? 'การดำเนินการ' : 'Actions'}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.length === 0 ? (
+        <CardContent className="px-3 sm:px-6">
+          <div className="overflow-x-auto -mx-3 sm:mx-0">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    {t('noData')}
-                  </TableCell>
+                  <TableHead className="text-xs sm:text-sm">{t('fullName')}</TableHead>
+                  <TableHead className="text-xs sm:text-sm">{language === 'th' ? 'บทบาท' : 'Role'}</TableHead>
+                  <TableHead className="hidden md:table-cell text-xs sm:text-sm">{t('company')}</TableHead>
+                  <TableHead className="hidden lg:table-cell text-xs sm:text-sm">{t('site')}</TableHead>
+                  <TableHead className="hidden sm:table-cell text-xs sm:text-sm">{t('status')}</TableHead>
+                  <TableHead className="w-24 sm:w-40 text-xs sm:text-sm">{language === 'th' ? 'การดำเนินการ' : 'Actions'}</TableHead>
                 </TableRow>
-              ) : (
-                filteredUsers.map((user) => (
-                  <TableRow key={user.user_id}>
-                    <TableCell className="font-medium">
-                      {user.full_name || '-'}
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground text-sm">
+                      {t('noData')}
                     </TableCell>
-                    <TableCell>
-                      {user.role ? (
-                        <Badge className={roleColors[user.role]}>
-                          {t(user.role)}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {companies.find((c) => c.company_id === user.company_id)?.company_name || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {sites.find((s) => s.site_id === user.site_id)?.site_name || '-'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {user.role === 'admin' || !isManager ? (
-                          <span className="text-sm text-muted-foreground">
+                  </TableRow>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.user_id}>
+                      <TableCell className="font-medium text-xs sm:text-sm py-2 sm:py-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span>{user.full_name || '-'}</span>
+                          {/* Show role badge on mobile below name */}
+                          <div className="sm:hidden">
+                            {user.role ? (
+                              <Badge className={`${roleColors[user.role]} text-xs px-1.5 py-0`}>
+                                {t(user.role)}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          {/* Show status indicator on mobile */}
+                          <div className="sm:hidden text-xs text-muted-foreground">
                             {user.is_active
-                              ? (language === 'th' ? 'ใช้งาน' : 'Active')
-                              : (language === 'th' ? 'ปิดใช้งาน' : 'Inactive')}
-                            {user.role === 'admin' && (language === 'th' ? ' (ไม่สามารถเปลี่ยนได้)' : ' (cannot change)')}
-                          </span>
+                              ? (language === 'th' ? '● ใช้งาน' : '● Active')
+                              : (language === 'th' ? '○ ปิดใช้งาน' : '○ Inactive')}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {user.role ? (
+                          <Badge className={`${roleColors[user.role]} text-xs sm:text-sm`}>
+                            {t(user.role)}
+                          </Badge>
                         ) : (
-                          <>
-                            <Switch
-                              checked={user.is_active}
-                              disabled={togglingStatus === user.user_id}
-                              onCheckedChange={() => handleToggleStatus(user.user_id, user.is_active)}
-                            />
-                            <span className="text-sm text-muted-foreground">
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-xs sm:text-sm">
+                        {companies.find((c) => c.company_id === user.company_id)?.company_name || '-'}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-xs sm:text-sm">
+                        {sites.find((s) => s.site_id === user.site_id)?.site_name || '-'}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <div className="flex items-center gap-2">
+                          {user.role === 'admin' || !isManager ? (
+                            <span className="text-xs sm:text-sm text-muted-foreground">
                               {user.is_active
                                 ? (language === 'th' ? 'ใช้งาน' : 'Active')
                                 : (language === 'th' ? 'ปิดใช้งาน' : 'Inactive')}
+                              {user.role === 'admin' && (language === 'th' ? ' (ไม่สามารถเปลี่ยนได้)' : ' (cannot change)')}
                             </span>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        {/* Edit button - only for managers editing others */}
-                        {isManager && (
+                          ) : (
+                            <>
+                              <Switch
+                                checked={user.is_active}
+                                disabled={togglingStatus === user.user_id}
+                                onCheckedChange={() => handleToggleStatus(user.user_id, user.is_active)}
+                              />
+                              <span className="text-xs sm:text-sm text-muted-foreground">
+                                {user.is_active
+                                  ? (language === 'th' ? 'ใช้งาน' : 'Active')
+                                  : (language === 'th' ? 'ปิดใช้งาน' : 'Inactive')}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2 sm:py-4">
+                        <div className="flex items-center gap-0.5 sm:gap-1">
+                          {/* Edit button - only for managers editing others */}
+                          {isManager && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 sm:h-9 sm:w-9 p-0"
+                              onClick={async () => {
+                                setEditingUser(user);
+                                setIsDialogOpen(true);
+                                setLoadingEmail(true);
+                                try {
+                                  const { data, error } = await supabase.functions.invoke('get-user-email', {
+                                    body: { userId: user.user_id },
+                                  });
+                                  if (!error && data?.email) {
+                                    setEditingUser(prev => prev ? { ...prev, email: data.email } : null);
+                                    setOriginalEmail(data.email);
+                                  }
+                                } catch (err) {
+                                  console.error('Error fetching email:', err);
+                                } finally {
+                                  setLoadingEmail(false);
+                                }
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            </Button>
+                          )}
+                          {/* Password change button */}
                           <Button
                             variant="ghost"
                             size="sm"
+                            className="h-8 w-8 sm:h-9 sm:w-9 p-0"
                             onClick={async () => {
-                              setEditingUser(user);
-                              setIsDialogOpen(true);
                               setLoadingEmail(true);
                               try {
                                 const { data, error } = await supabase.functions.invoke('get-user-email', {
                                   body: { userId: user.user_id },
                                 });
                                 if (!error && data?.email) {
-                                  setEditingUser(prev => prev ? { ...prev, email: data.email } : null);
-                                  setOriginalEmail(data.email);
+                                  setPasswordUser({ ...user, email: data.email });
+                                  setIsPasswordDialogOpen(true);
                                 }
                               } catch (err) {
                                 console.error('Error fetching email:', err);
@@ -718,61 +761,38 @@ export default function UserManagement() {
                               }
                             }}
                           >
-                            <Pencil className="h-4 w-4" />
+                            <KeyRound className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </Button>
-                        )}
-                        {/* Password change button */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={async () => {
-                            setLoadingEmail(true);
-                            try {
-                              const { data, error } = await supabase.functions.invoke('get-user-email', {
-                                body: { userId: user.user_id },
-                              });
-                              if (!error && data?.email) {
-                                setPasswordUser({ ...user, email: data.email });
-                                setIsPasswordDialogOpen(true);
-                              }
-                            } catch (err) {
-                              console.error('Error fetching email:', err);
-                            } finally {
-                              setLoadingEmail(false);
-                            }
-                          }}
-                        >
-                          <KeyRound className="h-4 w-4" />
-                        </Button>
-                        {/* Delete button - only for managers, not for admins */}
-                        {isManager && user.role !== 'admin' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => {
-                              setDeletingUserId(user.user_id);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                          {/* Delete button - only for managers, not for admins */}
+                          {isManager && user.role !== 'admin' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 sm:h-9 sm:w-9 p-0 text-destructive hover:text-destructive"
+                              onClick={() => {
+                                setDeletingUserId(user.user_id);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
       {/* Edit User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">
               {language === 'th' ? 'แก้ไขผู้ใช้' : 'Edit User'}
             </DialogTitle>
           </DialogHeader>
@@ -898,25 +918,25 @@ export default function UserManagement() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[95vw] sm:max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className="text-lg sm:text-xl">
               {language === 'th' ? 'ยืนยันการลบผู้ใช้' : 'Confirm Delete User'}
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="text-sm sm:text-base">
               {language === 'th' 
                 ? 'คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้? การกระทำนี้ไม่สามารถย้อนกลับได้'
                 : 'Are you sure you want to delete this user? This action cannot be undone.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:gap-0">
+            <AlertDialogCancel disabled={deleting} className="w-full sm:w-auto">
               {t('cancel')}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteUser}
               disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="w-full sm:w-auto bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t('delete')}
@@ -934,9 +954,9 @@ export default function UserManagement() {
           setConfirmPassword('');
         }
       }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">
               {language === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change Password'}
             </DialogTitle>
           </DialogHeader>
