@@ -73,11 +73,23 @@ export default function MetricManagement() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    metric_id: '',
     metric_name: '',
     theme_id: '',
     unit: '',
   });
+
+  // Generate next metric ID
+  const generateNextId = (existingMetrics: Metric[]) => {
+    const prefix = 'MET';
+    const existingNumbers = existingMetrics
+      .map(m => {
+        const match = m.metric_id.match(/^MET(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => !isNaN(n));
+    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+    return `${prefix}${String(maxNumber + 1).padStart(3, '0')}`;
+  };
 
   useEffect(() => {
     fetchData();
@@ -100,7 +112,7 @@ export default function MetricManagement() {
   };
 
   const handleSave = async () => {
-    if (!formData.metric_id || !formData.metric_name || !formData.theme_id) {
+    if (!formData.metric_name || !formData.theme_id) {
       toast({
         variant: 'destructive',
         title: t('error'),
@@ -133,7 +145,8 @@ export default function MetricManagement() {
           afterData: { ...dataToSave, metric_id: editingMetric.metric_id },
         });
       } else {
-        const insertData = { ...dataToSave, metric_id: formData.metric_id };
+        const newId = generateNextId(metrics);
+        const insertData = { ...dataToSave, metric_id: newId };
         const { error } = await supabase.from('esg_metric').insert(insertData);
 
         if (error) throw error;
@@ -141,7 +154,7 @@ export default function MetricManagement() {
         await logActivity({
           action: 'CREATE',
           entityType: 'esg_metric',
-          entityId: formData.metric_id,
+          entityId: newId,
           afterData: insertData,
         });
       }
@@ -214,14 +227,13 @@ export default function MetricManagement() {
   };
 
   const resetForm = () => {
-    setFormData({ metric_id: '', metric_name: '', theme_id: '', unit: '' });
+    setFormData({ metric_name: '', theme_id: '', unit: '' });
     setEditingMetric(null);
   };
 
   const openEditDialog = (metric: Metric) => {
     setEditingMetric(metric);
     setFormData({
-      metric_id: metric.metric_id,
       metric_name: metric.metric_name,
       theme_id: metric.theme_id,
       unit: metric.unit || '',
@@ -279,15 +291,6 @@ export default function MetricManagement() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>{t('metricId')} *</Label>
-                  <Input
-                    value={formData.metric_id}
-                    onChange={(e) => setFormData({ ...formData, metric_id: e.target.value })}
-                    disabled={!!editingMetric}
-                    placeholder="e.g., E01-01"
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label>{t('metricName')} *</Label>
                   <Input

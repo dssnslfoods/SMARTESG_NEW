@@ -58,9 +58,21 @@ export default function DimensionManagement() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    dimension_id: '',
     dimension_name: '',
   });
+
+  // Generate next dimension ID
+  const generateNextId = (existingDimensions: Dimension[]) => {
+    const prefix = 'DIM';
+    const existingNumbers = existingDimensions
+      .map(d => {
+        const match = d.dimension_id.match(/^DIM(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => !isNaN(n));
+    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+    return `${prefix}${String(maxNumber + 1).padStart(3, '0')}`;
+  };
 
   useEffect(() => {
     fetchDimensions();
@@ -83,7 +95,7 @@ export default function DimensionManagement() {
   };
 
   const handleSave = async () => {
-    if (!formData.dimension_id || !formData.dimension_name) {
+    if (!formData.dimension_name) {
       toast({
         variant: 'destructive',
         title: t('error'),
@@ -110,8 +122,9 @@ export default function DimensionManagement() {
           afterData: { dimension_id: editingDimension.dimension_id, dimension_name: formData.dimension_name },
         });
       } else {
+        const newId = generateNextId(dimensions);
         const insertData = {
-          dimension_id: formData.dimension_id,
+          dimension_id: newId,
           dimension_name: formData.dimension_name,
         };
         const { error } = await supabase.from('esg_dimension').insert(insertData);
@@ -121,7 +134,7 @@ export default function DimensionManagement() {
         await logActivity({
           action: 'CREATE',
           entityType: 'esg_dimension',
-          entityId: formData.dimension_id,
+          entityId: newId,
           afterData: insertData,
         });
       }
@@ -194,14 +207,13 @@ export default function DimensionManagement() {
   };
 
   const resetForm = () => {
-    setFormData({ dimension_id: '', dimension_name: '' });
+    setFormData({ dimension_name: '' });
     setEditingDimension(null);
   };
 
   const openEditDialog = (dimension: Dimension) => {
     setEditingDimension(dimension);
     setFormData({
-      dimension_id: dimension.dimension_id,
       dimension_name: dimension.dimension_name,
     });
     setIsDialogOpen(true);
@@ -257,15 +269,6 @@ export default function DimensionManagement() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>{t('dimensionId')} *</Label>
-                  <Input
-                    value={formData.dimension_id}
-                    onChange={(e) => setFormData({ ...formData, dimension_id: e.target.value })}
-                    disabled={!!editingDimension}
-                    placeholder="e.g., E, S, G"
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label>{t('dimensionName')} *</Label>
                   <Input

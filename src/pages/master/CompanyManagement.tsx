@@ -61,11 +61,23 @@ export default function CompanyManagement() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    company_id: '',
     company_name: '',
     country: '',
     industry: '',
   });
+
+  // Generate next company ID
+  const generateNextId = (existingCompanies: Company[]) => {
+    const prefix = 'COMP';
+    const existingNumbers = existingCompanies
+      .map(c => {
+        const match = c.company_id.match(/^COMP(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => !isNaN(n));
+    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+    return `${prefix}${String(maxNumber + 1).padStart(3, '0')}`;
+  };
 
   useEffect(() => {
     fetchCompanies();
@@ -88,7 +100,7 @@ export default function CompanyManagement() {
   };
 
   const handleSave = async () => {
-    if (!formData.company_id || !formData.company_name) {
+    if (!formData.company_name) {
       toast({
         variant: 'destructive',
         title: t('error'),
@@ -121,7 +133,8 @@ export default function CompanyManagement() {
           afterData: { ...dataToSave, company_id: editingCompany.company_id },
         });
       } else {
-        const insertData = { ...dataToSave, company_id: formData.company_id };
+        const newId = generateNextId(companies);
+        const insertData = { ...dataToSave, company_id: newId };
         const { error } = await supabase.from('company').insert(insertData);
 
         if (error) throw error;
@@ -129,7 +142,7 @@ export default function CompanyManagement() {
         await logActivity({
           action: 'CREATE',
           entityType: 'company',
-          entityId: formData.company_id,
+          entityId: newId,
           afterData: insertData,
         });
       }
@@ -202,14 +215,13 @@ export default function CompanyManagement() {
   };
 
   const resetForm = () => {
-    setFormData({ company_id: '', company_name: '', country: '', industry: '' });
+    setFormData({ company_name: '', country: '', industry: '' });
     setEditingCompany(null);
   };
 
   const openEditDialog = (company: Company) => {
     setEditingCompany(company);
     setFormData({
-      company_id: company.company_id,
       company_name: company.company_name,
       country: company.country || '',
       industry: company.industry || '',
@@ -267,15 +279,6 @@ export default function CompanyManagement() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>{t('companyId')} *</Label>
-                  <Input
-                    value={formData.company_id}
-                    onChange={(e) => setFormData({ ...formData, company_id: e.target.value })}
-                    disabled={!!editingCompany}
-                    placeholder="e.g., COMP001"
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label>{t('companyName')} *</Label>
                   <Input
