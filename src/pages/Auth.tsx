@@ -220,7 +220,9 @@ export default function Auth() {
         </div>
 
         <p className="text-sm text-primary-foreground/50 relative z-10">
-          © 2026 ESG Smart Performance. All rights reserved.
+          © 2026 ESG Smart Performance | Developed by Arnon Arpaket.
+          <br />
+          All software and design assets are protected. Unauthorized use or reproduction is prohibited.
         </p>
       </div>
 
