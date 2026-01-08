@@ -57,9 +57,16 @@ export function Header() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 rounded-full bg-muted px-3 py-1.5">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-foreground">
-              {profile?.full_name || user?.email?.split('@')[0]}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-foreground">
+                {profile?.full_name || user?.email?.split('@')[0]}
+              </span>
+              {(profile?.company_name || profile?.site_location) && (
+                <span className="text-xs text-muted-foreground">
+                  {[profile?.company_name, profile?.site_location].filter(Boolean).join(' • ')}
+                </span>
+              )}
+            </div>
           </div>
           {role && (
             <Badge className={roleColors[role]}>

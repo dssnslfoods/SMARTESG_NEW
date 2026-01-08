@@ -11,6 +11,9 @@ interface UserProfile {
   company_id: string | null;
   site_id: string | null;
   is_active: boolean;
+  company_name?: string | null;
+  site_name?: string | null;
+  site_location?: string | null;
 }
 
 interface AuthContextType {
@@ -41,15 +44,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setRoleLoaded(false);
       
-      // Fetch profile
+      // Fetch profile with company and site details
       const { data: profileData } = await supabase
         .from('app_user_profile')
-        .select('*')
+        .select(`
+          *,
+          company:company_id(company_name),
+          site:site_id(site_name, location)
+        `)
         .eq('user_id', userId)
         .maybeSingle();
 
       if (profileData) {
-        setProfile(profileData as UserProfile);
+        const enhancedProfile: UserProfile = {
+          user_id: profileData.user_id,
+          full_name: profileData.full_name,
+          company_id: profileData.company_id,
+          site_id: profileData.site_id,
+          is_active: profileData.is_active,
+          company_name: (profileData.company as any)?.company_name ?? null,
+          site_name: (profileData.site as any)?.site_name ?? null,
+          site_location: (profileData.site as any)?.location ?? null,
+        };
+        setProfile(enhancedProfile);
       }
 
       // Fetch role
