@@ -385,17 +385,17 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">{t('dashboard')}</h1>
-        <p className="text-muted-foreground">
+      <div className="px-1">
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('dashboard')}</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">
           {language === 'th' ? 'ภาพรวมข้อมูล ESG' : 'ESG Data Overview'}
         </p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {statCards
           .filter((card) => card.roles.includes(role || ''))
           .map((card) => (
@@ -404,16 +404,16 @@ export default function Dashboard() {
               className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
               onClick={() => fetchDetailData(card.detailType, card.title)}
             >
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground line-clamp-1">
                   {card.title}
                 </CardTitle>
-                <card.icon className={`h-4 w-4 ${card.color}`} />
+                <card.icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${card.color} shrink-0`} />
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold">{card.value}</div>
-                  <Eye className="h-4 w-4 text-muted-foreground" />
+                  <div className="text-xl sm:text-2xl font-bold">{card.value}</div>
+                  <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 </div>
               </CardContent>
             </Card>
@@ -422,21 +422,21 @@ export default function Dashboard() {
 
       {/* Staff-specific cards */}
       {role === 'staff' && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2">
           <Card 
             className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
             onClick={() => fetchDetailData('drafts', language === 'th' ? 'รายการร่างของฉัน' : 'My Drafts')}
           >
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground line-clamp-1">
                 {language === 'th' ? 'รายการร่างของฉัน' : 'My Drafts'}
               </CardTitle>
-              <FileInput className="h-4 w-4 text-muted-foreground" />
+              <FileInput className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
               <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{stats.myDrafts}</div>
-                <Eye className="h-4 w-4 text-muted-foreground" />
+                <div className="text-xl sm:text-2xl font-bold">{stats.myDrafts}</div>
+                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
               </div>
             </CardContent>
           </Card>
@@ -444,16 +444,16 @@ export default function Dashboard() {
             className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
             onClick={() => fetchDetailData('submitted', language === 'th' ? 'รายการที่ส่งแล้ว' : 'My Submissions')}
           >
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground line-clamp-1">
                 {language === 'th' ? 'รายการที่ส่งแล้ว' : 'My Submissions'}
               </CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
+              <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
               <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{stats.mySubmitted}</div>
-                <Eye className="h-4 w-4 text-muted-foreground" />
+                <div className="text-xl sm:text-2xl font-bold">{stats.mySubmitted}</div>
+                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
               </div>
             </CardContent>
           </Card>
@@ -463,70 +463,77 @@ export default function Dashboard() {
       {/* User Roles Table (Admin only) */}
       {role === 'admin' && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
               {language === 'th' ? 'ตารางสิทธิ์ผู้ใช้งาน' : 'User Roles Table'}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               {language === 'th' ? 'รายการ Role ทั้งหมดในระบบ' : 'All user roles in the system'}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
             {userRoles.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
+              <p className="text-muted-foreground text-xs sm:text-sm">
                 {language === 'th' ? 'ไม่พบข้อมูล Role' : 'No roles found'}
               </p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{language === 'th' ? 'ชื่อผู้ใช้' : 'User Name'}</TableHead>
-                    <TableHead>{language === 'th' ? 'User ID' : 'User ID'}</TableHead>
-                    <TableHead>{language === 'th' ? 'บทบาท' : 'Role'}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {userRoles.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.full_name}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{item.user_id}</TableCell>
-                      <TableCell>
-                        {item.role === 'admin' && (
-                          <Badge className="bg-destructive text-destructive-foreground gap-1.5">
-                            <Crown className="h-3 w-3" />
-                            {item.role}
-                          </Badge>
-                        )}
-                        {item.role === 'executive' && (
-                          <Badge className="bg-primary text-primary-foreground gap-1.5">
-                            <Briefcase className="h-3 w-3" />
-                            {item.role}
-                          </Badge>
-                        )}
-                        {item.role === 'supervisor' && (
-                          <Badge className="bg-accent text-accent-foreground border border-border gap-1.5">
-                            <UserCheck className="h-3 w-3" />
-                            {item.role}
-                          </Badge>
-                        )}
-                        {item.role === 'staff' && (
-                          <Badge className="bg-secondary text-secondary-foreground gap-1.5">
-                            <User className="h-3 w-3" />
-                            {item.role}
-                          </Badge>
-                        )}
-                        {item.role === 'guest' && (
-                          <Badge className="bg-muted text-muted-foreground gap-1.5">
-                            <UserX className="h-3 w-3" />
-                            {item.role}
-                          </Badge>
-                        )}
-                      </TableCell>
+              <div className="overflow-x-auto -mx-4 sm:mx-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs sm:text-sm">{language === 'th' ? 'ชื่อผู้ใช้' : 'User Name'}</TableHead>
+                      <TableHead className="text-xs sm:text-sm hidden sm:table-cell">{language === 'th' ? 'User ID' : 'User ID'}</TableHead>
+                      <TableHead className="text-xs sm:text-sm">{language === 'th' ? 'บทบาท' : 'Role'}</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {userRoles.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium text-xs sm:text-sm py-2 sm:py-4">{item.full_name}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground hidden sm:table-cell">{item.user_id}</TableCell>
+                        <TableCell className="py-2 sm:py-4">
+                          {item.role === 'admin' && (
+                            <Badge className="bg-destructive text-destructive-foreground gap-1 sm:gap-1.5 text-xs">
+                              <Crown className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                              <span className="hidden sm:inline">{item.role}</span>
+                              <span className="sm:hidden">A</span>
+                            </Badge>
+                          )}
+                          {item.role === 'executive' && (
+                            <Badge className="bg-primary text-primary-foreground gap-1 sm:gap-1.5 text-xs">
+                              <Briefcase className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                              <span className="hidden sm:inline">{item.role}</span>
+                              <span className="sm:hidden">E</span>
+                            </Badge>
+                          )}
+                          {item.role === 'supervisor' && (
+                            <Badge className="bg-accent text-accent-foreground border border-border gap-1 sm:gap-1.5 text-xs">
+                              <UserCheck className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                              <span className="hidden sm:inline">{item.role}</span>
+                              <span className="sm:hidden">SV</span>
+                            </Badge>
+                          )}
+                          {item.role === 'staff' && (
+                            <Badge className="bg-secondary text-secondary-foreground gap-1 sm:gap-1.5 text-xs">
+                              <User className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                              <span className="hidden sm:inline">{item.role}</span>
+                              <span className="sm:hidden">S</span>
+                            </Badge>
+                          )}
+                          {item.role === 'guest' && (
+                            <Badge className="bg-muted text-muted-foreground gap-1 sm:gap-1.5 text-xs">
+                              <UserX className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                              <span className="hidden sm:inline">{item.role}</span>
+                              <span className="sm:hidden">G</span>
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -534,16 +541,16 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <Card>
-        <CardHeader>
-          <CardTitle>{t('quickActions')}</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">{t('quickActions')}</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             {language === 'th' ? 'การดำเนินการที่ใช้บ่อย' : 'Frequently used actions'}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3">
             {role && quickActions[role]?.map((action) => (
-              <Button key={action.href} variant="outline" asChild>
+              <Button key={action.href} variant="outline" asChild className="w-full sm:w-auto justify-start sm:justify-center h-10 sm:h-9 text-sm">
                 <Link to={action.href} className="gap-2">
                   <action.icon className="h-4 w-4" />
                   {action.label}
@@ -556,17 +563,17 @@ export default function Dashboard() {
 
       {/* Detail Dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[85vh] overflow-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
               {detailData?.title}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               {language === 'th' ? 'รายละเอียดข้อมูล' : 'Data details'}
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
+          <div className="mt-3 sm:mt-4 overflow-x-auto">
             {renderDetailContent()}
           </div>
         </DialogContent>
