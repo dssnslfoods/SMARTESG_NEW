@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,8 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 
 interface Company {
   company_id: string;
@@ -97,6 +99,14 @@ export default function Reports() {
   const [filterSite, setFilterSite] = useState<string>("");
   const [filterYear, setFilterYear] = useState<string>("");
   const [filterMonth, setFilterMonth] = useState<string>("");
+
+  const handleRefresh = useCallback(async () => {
+    await fetchData();
+  }, []);
+
+  const { pullDistance, isRefreshing, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
 
   useEffect(() => {
     fetchData();
@@ -264,15 +274,20 @@ export default function Reports() {
   }
 
   return (
-    <div className="space-y-6">
+    <div 
+      ref={containerRef}
+      className="space-y-6 h-full overflow-y-auto"
+    >
+      <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+      
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-            <BarChart3 className="h-8 w-8 text-primary" />
+          <h1 className="text-xl sm:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+            <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
             {language === "th" ? "รายงานสนับสนุนการตัดสินใจ" : "ESG Dashboard Performance"}
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             {language === "th" ? "ภาพรวมและวิเคราะห์ข้อมูล ESG" : "ESG Data Overview & Analytics"}
           </p>
         </div>

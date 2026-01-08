@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -38,6 +38,8 @@ import {
   User,
   UserX,
 } from 'lucide-react';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { PullToRefreshIndicator } from '@/components/ui/pull-to-refresh';
 
 interface DetailData {
   type: 'companies' | 'sites' | 'metrics' | 'pending' | 'drafts' | 'submitted';
@@ -78,6 +80,17 @@ export default function Dashboard() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailData, setDetailData] = useState<DetailData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    await fetchStats();
+    if (role === 'admin') {
+      await fetchUserRoles();
+    }
+  }, [role]);
+
+  const { pullDistance, isRefreshing, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
 
   useEffect(() => {
     fetchStats();
@@ -385,7 +398,12 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div 
+      ref={containerRef} 
+      className="space-y-4 sm:space-y-6 h-full overflow-y-auto"
+    >
+      <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+      
       {/* Page Header */}
       <div className="px-1">
         <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('dashboard')}</h1>
