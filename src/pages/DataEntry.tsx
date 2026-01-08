@@ -40,7 +40,18 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3 } from "lucide-react";
+import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3, CheckSquare, Square } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Site {
   site_id: string;
@@ -119,6 +130,10 @@ export default function DataEntry() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingValue, setEditingValue] = useState<MetricValue | null>(null);
+  
+  // Selection states
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Filter states
   const [filterCompany, setFilterCompany] = useState<string>("");
@@ -246,9 +261,73 @@ export default function DataEntry() {
         title: language === 'th' ? 'สำเร็จ' : 'Success',
         description: language === 'th' ? 'ลบข้อมูลสำเร็จ' : 'Data deleted successfully',
       });
+      setSelectedIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(valueId);
+        return newSet;
+      });
       fetchAllData();
     }
   };
+
+  // Bulk selection handlers
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredValues.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredValues.map(v => v.value_id)));
+    }
+  };
+
+  const handleSelectOne = (valueId: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(valueId)) {
+        newSet.delete(valueId);
+      } else {
+        newSet.add(valueId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    const idsToDelete = Array.from(selectedIds);
+    const valuesToDelete = metricValues.filter(v => idsToDelete.includes(v.value_id));
+    
+    const { error } = await supabase
+      .from('metric_value')
+      .delete()
+      .in('value_id', idsToDelete);
+
+    if (error) {
+      toast({
+        title: language === 'th' ? 'เกิดข้อผิดพลาด' : 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      // Log each deletion
+      for (const value of valuesToDelete) {
+        await logActivity({
+          action: 'DELETE',
+          entityType: 'metric_value',
+          entityId: value.value_id,
+          beforeData: value,
+        });
+      }
+      toast({
+        title: language === 'th' ? 'สำเร็จ' : 'Success',
+        description: language === 'th' 
+          ? `ลบข้อมูล ${idsToDelete.length} รายการสำเร็จ` 
+          : `${idsToDelete.length} records deleted successfully`,
+      });
+      setSelectedIds(new Set());
+      setIsDeleteDialogOpen(false);
+      fetchAllData();
+    }
+  };
+
 
   const handleSubmit = async () => {
     if (!formData.site_id || !formData.period_id || !formData.metric_id) {
@@ -358,6 +437,9 @@ export default function DataEntry() {
     }
     return true;
   });
+
+  const isAllSelected = filteredValues.length > 0 && selectedIds.size === filteredValues.length;
+  const isPartialSelected = selectedIds.size > 0 && selectedIds.size < filteredValues.length;
 
   const getDisplayName = (id: string, type: 'site' | 'period' | 'metric' | 'dimension' | 'theme' | 'company') => {
     switch (type) {
@@ -565,12 +647,30 @@ export default function DataEntry() {
         {/* Data Table */}
         <Card>
           <CardHeader>
-            <CardTitle>
-              {language === 'th' ? 'รายการข้อมูล' : 'Data Records'}
-              <Badge variant="secondary" className="ml-2">
-                {filteredValues.length} {language === 'th' ? 'รายการ' : 'records'}
-              </Badge>
-            </CardTitle>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <CardTitle className="flex items-center gap-2">
+                {language === 'th' ? 'รายการข้อมูล' : 'Data Records'}
+                <Badge variant="secondary">
+                  {filteredValues.length} {language === 'th' ? 'รายการ' : 'records'}
+                </Badge>
+                {selectedIds.size > 0 && (
+                  <Badge variant="outline">
+                    {language === 'th' ? `เลือก ${selectedIds.size} รายการ` : `${selectedIds.size} selected`}
+                  </Badge>
+                )}
+              </CardTitle>
+              {selectedIds.size > 0 && (
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {language === 'th' ? `ลบที่เลือก (${selectedIds.size})` : `Delete Selected (${selectedIds.size})`}
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -586,6 +686,14 @@ export default function DataEntry() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={isAllSelected}
+                          onCheckedChange={handleSelectAll}
+                          aria-label={language === 'th' ? 'เลือกทั้งหมด' : 'Select all'}
+                          className={isPartialSelected ? 'data-[state=checked]:bg-primary/50' : ''}
+                        />
+                      </TableHead>
                       <TableHead>{language === 'th' ? 'สถานที่' : 'Site'}</TableHead>
                       <TableHead>{language === 'th' ? 'รอบระยะเวลา' : 'Period'}</TableHead>
                       <TableHead>{language === 'th' ? 'ตัวชี้วัด' : 'Metric'}</TableHead>
@@ -596,7 +704,14 @@ export default function DataEntry() {
                   </TableHeader>
                   <TableBody>
                     {filteredValues.map((value) => (
-                      <TableRow key={value.value_id}>
+                      <TableRow key={value.value_id} data-state={selectedIds.has(value.value_id) ? 'selected' : undefined}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(value.value_id)}
+                            onCheckedChange={() => handleSelectOne(value.value_id)}
+                            aria-label={language === 'th' ? 'เลือกรายการ' : 'Select row'}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           {getDisplayName(value.site_id, 'site')}
                         </TableCell>
@@ -808,6 +923,30 @@ export default function DataEntry() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Bulk Delete Confirmation Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {language === 'th' ? 'ยืนยันการลบข้อมูล' : 'Confirm Deletion'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {language === 'th' 
+                  ? `คุณต้องการลบข้อมูลที่เลือก ${selectedIds.size} รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้`
+                  : `Are you sure you want to delete ${selectedIds.size} selected records? This action cannot be undone.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>
+                {language === 'th' ? 'ยกเลิก' : 'Cancel'}
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                {language === 'th' ? 'ลบ' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }
