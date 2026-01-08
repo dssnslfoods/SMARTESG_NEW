@@ -74,6 +74,13 @@ export function Header({ onMenuToggle }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-3">
+        {/* Role Badge - Always visible */}
+        {role && roleInfo && (
+          <Badge className={`${roleInfo.className} text-[10px] sm:text-xs px-2 py-0.5`}>
+            {t(role)}
+          </Badge>
+        )}
+
         {/* Language Switcher */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -92,21 +99,14 @@ export function Header({ onMenuToggle }: HeaderProps) {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* User Info & Role Badge - Hidden on very small screens */}
-        <div className="hidden xs:flex items-center gap-2 sm:gap-3 rounded-full bg-muted/50 pl-2 sm:pl-4 pr-1 py-1">
-          <div className="hidden sm:flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-              <User className="h-3.5 w-3.5 text-primary" />
-            </div>
-            <span className="text-sm font-medium text-foreground">
-              {profile?.full_name || user?.email?.split('@')[0]}
-            </span>
+        {/* User Info - Hidden on small screens */}
+        <div className="hidden sm:flex items-center gap-2 rounded-full bg-muted/50 pl-3 pr-1 py-1">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
+            <User className="h-3.5 w-3.5 text-primary" />
           </div>
-          {role && roleInfo && (
-            <Badge className={`${roleInfo.className} text-[10px] sm:text-xs`}>
-              {t(role)}
-            </Badge>
-          )}
+          <span className="text-sm font-medium text-foreground">
+            {profile?.full_name || user?.email?.split('@')[0]}
+          </span>
         </div>
 
         {/* Logout Button */}
