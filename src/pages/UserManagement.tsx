@@ -669,9 +669,12 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {user.role === 'admin' ? (
+                        {user.role === 'admin' || !isManager ? (
                           <span className="text-sm text-muted-foreground">
-                            {language === 'th' ? 'ใช้งาน (ไม่สามารถเปลี่ยนได้)' : 'Active (cannot change)'}
+                            {user.is_active
+                              ? (language === 'th' ? 'ใช้งาน' : 'Active')
+                              : (language === 'th' ? 'ปิดใช้งาน' : 'Inactive')}
+                            {user.role === 'admin' && (language === 'th' ? ' (ไม่สามารถเปลี่ยนได้)' : ' (cannot change)')}
                           </span>
                         ) : (
                           <>
@@ -872,15 +875,18 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between">
-                <Label>{language === 'th' ? 'สถานะใช้งาน' : 'Active Status'}</Label>
-                <Switch
-                  checked={editingUser.is_active}
-                  onCheckedChange={(checked) =>
-                    setEditingUser({ ...editingUser, is_active: checked })
-                  }
-                />
-              </div>
+              {isManager && (
+                <div className="flex items-center justify-between">
+                  <Label>{language === 'th' ? 'สถานะใช้งาน' : 'Active Status'}</Label>
+                  <Switch
+                    checked={editingUser.is_active}
+                    disabled={editingUser.role === 'admin'}
+                    onCheckedChange={(checked) =>
+                      setEditingUser({ ...editingUser, is_active: checked })
+                    }
+                  />
+                </div>
+              )}
               <Button onClick={handleEditUser} className="w-full" disabled={saving}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {t('save')}
