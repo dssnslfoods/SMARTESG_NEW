@@ -251,6 +251,20 @@ export default function UserManagement() {
   const handleEditUser = async () => {
     if (!editingUser) return;
     
+    // Staff, Supervisor, Executive roles require company and site
+    const rolesRequiringCompanySite = ['staff', 'supervisor', 'executive'];
+    if (editingUser.role && rolesRequiringCompanySite.includes(editingUser.role) && 
+        (!editingUser.company_id || !editingUser.site_id)) {
+      toast({
+        variant: 'destructive',
+        title: t('error'),
+        description: language === 'th' 
+          ? `บทบาท ${t(editingUser.role)} ต้องเลือกบริษัทและสถานที่` 
+          : `${t(editingUser.role)} role requires company and site selection`,
+      });
+      return;
+    }
+    
     setSaving(true);
     try {
       // Update email if changed
