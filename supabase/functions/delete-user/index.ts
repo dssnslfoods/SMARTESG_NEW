@@ -49,8 +49,8 @@ serve(async (req) => {
 
     if (roleError || !roleData || !["admin", "supervisor"].includes(roleData.role)) {
       return new Response(
-        JSON.stringify({ error: "Forbidden: Only admin and supervisor can delete users" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Forbidden: Only admin and supervisor can delete users" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -80,8 +80,8 @@ serve(async (req) => {
 
     if (targetRoleData?.role === "admin") {
       return new Response(
-        JSON.stringify({ error: "Cannot delete admin users" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Cannot delete admin users" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -94,8 +94,11 @@ serve(async (req) => {
 
       if (supervisorCount !== null && supervisorCount <= 1) {
         return new Response(
-          JSON.stringify({ error: "Cannot delete the last supervisor. At least one supervisor is required." }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({
+            success: false,
+            error: "Cannot delete the last supervisor. At least one supervisor is required.",
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }

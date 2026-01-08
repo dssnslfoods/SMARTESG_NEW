@@ -324,6 +324,16 @@ export default function UserManagement() {
         body: { userId: deletingUserId },
       });
 
+      // Business-rule errors are returned as 200 with { success:false, error }
+      if (data?.success === false) {
+        toast({
+          variant: 'destructive',
+          title: t('error'),
+          description: data.error,
+        });
+        return;
+      }
+
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
