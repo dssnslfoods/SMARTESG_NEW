@@ -27,10 +27,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Pencil, Search, UserPlus } from 'lucide-react';
+import { Loader2, Pencil, Search, UserPlus, Trash2 } from 'lucide-react';
 
 type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest';
 
@@ -90,6 +100,10 @@ export default function UserManagement() {
     siteId: '',
   });
   const [addingUser, setAddingUser] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -253,6 +267,66 @@ export default function UserManagement() {
     }
   };
 
+  const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
+    setTogglingStatus(userId);
+    try {
+      const { error } = await supabase
+        .from('app_user_profile')
+        .update({ is_active: !currentStatus })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: t('success'),
+        description: language === 'th' 
+          ? (currentStatus ? 'ปิดใช้งานผู้ใช้สำเร็จ' : 'เปิดใช้งานผู้ใช้สำเร็จ')
+          : (currentStatus ? 'User deactivated successfully' : 'User activated successfully'),
+      });
+
+      fetchData();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: t('error'),
+        description: error.message,
+      });
+    } finally {
+      setTogglingStatus(null);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deletingUserId) return;
+
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: deletingUserId },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: t('success'),
+        description: language === 'th' ? 'ลบผู้ใช้สำเร็จ' : 'User deleted successfully',
+      });
+
+      setIsDeleteDialogOpen(false);
+      setDeletingUserId(null);
+      fetchData();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: t('error'),
+        description: error.message,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const filteredUsers = users.filter((user) =>
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.user_id.includes(searchTerm)
@@ -411,7 +485,7 @@ export default function UserManagement() {
                 <TableHead>{t('company')}</TableHead>
                 <TableHead>{t('site')}</TableHead>
                 <TableHead>{t('status')}</TableHead>
-                <TableHead className="w-24"></TableHead>
+                <TableHead className="w-40">{language === 'th' ? 'การดำเนินการ' : 'Actions'}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -443,37 +517,57 @@ export default function UserManagement() {
                       {sites.find((s) => s.site_id === user.site_id)?.site_name || '-'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={user.is_active ? 'default' : 'secondary'}>
-                        {user.is_active
-                          ? (language === 'th' ? 'ใช้งาน' : 'Active')
-                          : (language === 'th' ? 'ปิดใช้งาน' : 'Inactive')}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={user.is_active}
+                          disabled={togglingStatus === user.user_id}
+                          onCheckedChange={() => handleToggleStatus(user.user_id, user.is_active)}
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {user.is_active
+                            ? (language === 'th' ? 'ใช้งาน' : 'Active')
+                            : (language === 'th' ? 'ปิดใช้งาน' : 'Inactive')}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={async () => {
-                          setEditingUser(user);
-                          setIsDialogOpen(true);
-                          setLoadingEmail(true);
-                          try {
-                            const { data, error } = await supabase.functions.invoke('get-user-email', {
-                              body: { userId: user.user_id },
-                            });
-                            if (!error && data?.email) {
-                              setEditingUser(prev => prev ? { ...prev, email: data.email } : null);
-                              setOriginalEmail(data.email);
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            setEditingUser(user);
+                            setIsDialogOpen(true);
+                            setLoadingEmail(true);
+                            try {
+                              const { data, error } = await supabase.functions.invoke('get-user-email', {
+                                body: { userId: user.user_id },
+                              });
+                              if (!error && data?.email) {
+                                setEditingUser(prev => prev ? { ...prev, email: data.email } : null);
+                                setOriginalEmail(data.email);
+                              }
+                            } catch (err) {
+                              console.error('Error fetching email:', err);
+                            } finally {
+                              setLoadingEmail(false);
                             }
-                          } catch (err) {
-                            console.error('Error fetching email:', err);
-                          } finally {
-                            setLoadingEmail(false);
-                          }
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            setDeletingUserId(user.user_id);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -600,6 +694,35 @@ export default function UserManagement() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {language === 'th' ? 'ยืนยันการลบผู้ใช้' : 'Confirm Delete User'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === 'th' 
+                ? 'คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้? การกระทำนี้ไม่สามารถย้อนกลับได้'
+                : 'Are you sure you want to delete this user? This action cannot be undone.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>
+              {t('cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t('delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
