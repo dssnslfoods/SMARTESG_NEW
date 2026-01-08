@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { PullToRefreshIndicator } from '@/components/ui/pull-to-refresh';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -118,6 +120,14 @@ export default function UserManagement() {
   const isManager = currentUserRole === 'admin' || currentUserRole === 'supervisor';
   // Check if current user is staff or executive (can only manage self)
   const isSelfOnly = currentUserRole === 'executive' || currentUserRole === 'staff';
+
+  const handleRefresh = useCallback(async () => {
+    await fetchData();
+  }, []);
+
+  const { pullDistance, isRefreshing, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
 
   useEffect(() => {
     fetchData();
@@ -497,7 +507,12 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div 
+      ref={containerRef}
+      className="space-y-4 sm:space-y-6 h-full overflow-y-auto"
+    >
+      <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+      
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('users')}</h1>
