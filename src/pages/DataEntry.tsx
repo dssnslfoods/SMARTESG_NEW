@@ -52,6 +52,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DataEntryLoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 interface Site {
   site_id: string;
@@ -491,6 +492,10 @@ export default function DataEntry() {
     };
     return labels[status]?.[language === 'th' ? 'th' : 'en'] || status;
   };
+
+  if (loading) {
+    return <DataEntryLoadingSkeleton />;
+  }
 
   return (
     <div className="space-y-6">
