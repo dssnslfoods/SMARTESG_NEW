@@ -151,7 +151,8 @@ export default function Auth() {
     {
       icon: BarChart3,
       title: language === "th" ? "รายงาน ESG" : "ESG Reporting",
-      description: language === "th" ? "ติดตามผลการดำเนินงานด้านความยั่งยืน" : "Track sustainability performance metrics",
+      description:
+        language === "th" ? "ติดตามผลการดำเนินงานด้านความยั่งยืน" : "Track sustainability performance metrics",
     },
     {
       icon: Shield,
@@ -175,7 +176,7 @@ export default function Auth() {
           <div className="absolute bottom-32 right-20 h-80 w-80 rounded-full bg-primary-foreground/10 blur-3xl" />
           <div className="absolute top-1/2 left-1/3 h-48 w-48 rounded-full bg-primary-foreground/15 blur-2xl" />
         </div>
-        
+
         <div className="relative z-10">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-foreground/20 backdrop-blur-sm shadow-lg ring-1 ring-primary-foreground/10">
@@ -191,21 +192,19 @@ export default function Auth() {
         <div className="space-y-10 relative z-10">
           <div>
             <h2 className="text-4xl font-bold leading-tight tracking-tight whitespace-pre-line">
-              {language === "th" 
-                ? "ขับเคลื่อนองค์กรสู่\nความยั่งยืน" 
+              {language === "th"
+                ? "ขับเคลื่อนองค์กรสู่\nความยั่งยืน"
                 : "Driving Your Organization\nTowards Sustainability"}
             </h2>
             <p className="mt-6 text-lg text-primary-foreground/80 max-w-lg leading-relaxed">
-              {language === "th"
-                ? "แพลตฟอร์มจัดการข้อมูล ESG ระดับองค์กร สำหรับการรายงานและวิเคราะห์ผลการดำเนินงานด้านสิ่งแวดล้อม สังคม และธรรมาภิบาล"
-                : "Enterprise ESG data management platform for reporting and analyzing environmental, social, and governance performance."}
+              {language === "th" ? "บริษัท เอ็นเอสแอล ฟู้ดส์ จำกัด (มหาชน)" : "NSL FOODS Public Company Limited"}
             </p>
           </div>
 
           <div className="space-y-4">
             {features.map((feature, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className="flex items-start gap-4 rounded-2xl bg-primary-foreground/10 p-5 backdrop-blur-sm border border-primary-foreground/10 transition-all duration-300 hover:bg-primary-foreground/15 hover:translate-x-1"
               >
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-foreground/20 shadow-sm">
@@ -229,16 +228,22 @@ export default function Auth() {
       <div className="flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-background to-muted/30 p-8 lg:p-16 relative">
         {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-[0.02] pointer-events-none">
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: "radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)",
+              backgroundSize: "40px 40px",
+            }}
+          />
         </div>
-        
+
         {/* Language Switcher */}
         <div className="absolute right-8 top-8">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="gap-2 bg-background/80 backdrop-blur-sm border-border/50 hover:bg-background hover:border-border transition-all duration-200 shadow-sm"
               >
                 <Globe className="h-4 w-4 text-muted-foreground" />
@@ -277,20 +282,18 @@ export default function Auth() {
                   {language === "th" ? "ยินดีต้อนรับ" : "Welcome"}
                 </CardTitle>
                 <CardDescription className="text-muted-foreground">
-                  {language === "th" 
-                    ? "เข้าสู่ระบบหรือสร้างบัญชีใหม่" 
-                    : "Sign in or create a new account"}
+                  {language === "th" ? "เข้าสู่ระบบหรือสร้างบัญชีใหม่" : "Sign in or create a new account"}
                 </CardDescription>
               </div>
               <TabsList className="grid w-full grid-cols-2 h-11 p-1 bg-muted/50">
-                <TabsTrigger 
-                  value="login" 
+                <TabsTrigger
+                  value="login"
                   className="text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
                 >
                   {t("login")}
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="signup" 
+                <TabsTrigger
+                  value="signup"
                   className="text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
                 >
                   {t("signup")}
@@ -333,9 +336,9 @@ export default function Auth() {
                     {errors.password && <p className="text-xs text-destructive mt-1.5">{errors.password}</p>}
                   </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 mt-2" 
+                  <Button
+                    type="submit"
+                    className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 mt-2"
                     disabled={isLoading}
                   >
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -405,12 +408,14 @@ export default function Auth() {
                       disabled={isLoading}
                       className="h-12 px-4 bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                     />
-                    {errors.confirmPassword && <p className="text-xs text-destructive mt-1.5">{errors.confirmPassword}</p>}
+                    {errors.confirmPassword && (
+                      <p className="text-xs text-destructive mt-1.5">{errors.confirmPassword}</p>
+                    )}
                   </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 mt-2" 
+                  <Button
+                    type="submit"
+                    className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 mt-2"
                     disabled={isLoading}
                   >
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
