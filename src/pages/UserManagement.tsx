@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,6 +77,7 @@ const roleColors: Record<AppRole, string> = {
 
 export default function UserManagement() {
   const { t, language } = useLanguage();
+  const { role: currentUserRole } = useAuth();
   const { toast } = useToast();
   
   const [users, setUsers] = useState<UserWithRole[]>([]);
@@ -356,7 +358,12 @@ export default function UserManagement() {
     }
   };
 
-  const filteredUsers = users.filter((user) =>
+  // Filter users: supervisors cannot see admin accounts
+  const visibleUsers = currentUserRole === 'supervisor' 
+    ? users.filter(u => u.role !== 'admin')
+    : users;
+
+  const filteredUsers = visibleUsers.filter((user) =>
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.user_id.includes(searchTerm)
   );
