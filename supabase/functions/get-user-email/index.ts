@@ -49,14 +49,6 @@ serve(async (req) => {
     
     const isAdmin = roleData?.role === "admin";
     const isSupervisor = roleData?.role === "supervisor";
-    
-    if (!roleData || (!isAdmin && !isSupervisor)) {
-      console.log("User is not admin or supervisor:", caller.id, roleData);
-      return new Response(
-        JSON.stringify({ error: "Forbidden - Only admins and supervisors can view user emails" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     const { userId } = await req.json();
 
@@ -64,6 +56,17 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Missing required field: userId" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Allow users to fetch their own email, or admin/supervisor to fetch any email
+    const isSelf = caller.id === userId;
+    
+    if (!isSelf && !isAdmin && !isSupervisor) {
+      console.log("User is not admin or supervisor and trying to access other user:", caller.id, roleData);
+      return new Response(
+        JSON.stringify({ error: "Forbidden - You can only view your own email" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
