@@ -227,7 +227,7 @@ export default function Auth() {
       </div>
 
       {/* Right Panel - Auth Forms */}
-      <div className="flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-background to-muted/30 p-8 lg:p-16 relative">
+      <div className="flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4 py-6 sm:p-8 lg:p-16 relative min-h-screen">
         {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-[0.02] pointer-events-none">
           <div
@@ -240,7 +240,7 @@ export default function Auth() {
         </div>
 
         {/* Language Switcher */}
-        <div className="absolute right-8 top-8">
+        <div className="absolute right-4 top-4 sm:right-8 sm:top-8">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -266,49 +266,49 @@ export default function Auth() {
         </div>
 
         {/* Mobile Logo */}
-        <div className="mb-10 text-center lg:hidden">
-          <div className="mb-5 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-xl shadow-primary/20">
-            <Leaf className="h-8 w-8 text-primary-foreground" />
+        <div className="mb-6 sm:mb-10 text-center lg:hidden mt-8 sm:mt-0">
+          <div className="mb-3 sm:mb-5 inline-flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-primary shadow-xl shadow-primary/20">
+            <Leaf className="h-7 w-7 sm:h-8 sm:w-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">{t("appName")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">{t("appName")}</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             {language === "th" ? "ระบบจัดการความยั่งยืน" : "Sustainability Platform"}
           </p>
         </div>
 
         <Card className="w-full max-w-[420px] border border-border/50 shadow-2xl shadow-black/5 bg-card/95 backdrop-blur-sm relative z-10">
           <Tabs defaultValue="login">
-            <CardHeader className="space-y-4 pb-4 pt-8 px-8">
-              <div className="text-center space-y-2">
-                <CardTitle className="text-2xl font-bold tracking-tight">
+            <CardHeader className="space-y-3 sm:space-y-4 pb-3 sm:pb-4 pt-6 sm:pt-8 px-4 sm:px-8">
+              <div className="text-center space-y-1.5 sm:space-y-2">
+                <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">
                   {language === "th" ? "ยินดีต้อนรับ" : "Welcome"}
                 </CardTitle>
-                <CardDescription className="text-muted-foreground">
+                <CardDescription className="text-muted-foreground text-xs sm:text-sm">
                   {language === "th" ? "เข้าสู่ระบบหรือสร้างบัญชีใหม่" : "Sign in or create a new account"}
                 </CardDescription>
               </div>
-              <TabsList className="grid w-full grid-cols-2 h-11 p-1 bg-muted/50">
+              <TabsList className="grid w-full grid-cols-2 h-10 sm:h-11 p-1 bg-muted/50">
                 <TabsTrigger
                   value="login"
-                  className="text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
+                  className="text-xs sm:text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
                 >
                   {t("login")}
                 </TabsTrigger>
                 <TabsTrigger
                   value="signup"
-                  className="text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
+                  className="text-xs sm:text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
                 >
                   {t("signup")}
                 </TabsTrigger>
               </TabsList>
             </CardHeader>
 
-            <CardContent className="pt-2 pb-8 px-8">
+            <CardContent className="pt-2 pb-6 sm:pb-8 px-4 sm:px-8">
               {/* Login Form */}
               <TabsContent value="login" className="mt-0">
-                <form onSubmit={handleLogin} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-sm font-medium text-foreground">
+                <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="login-email" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("email")}
                     </Label>
                     <Input
@@ -318,13 +318,13 @@ export default function Auth() {
                       value={loginForm.email}
                       onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                       disabled={isLoading}
-                      className="h-12 px-4 bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-muted-foreground/50"
+                      className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-muted-foreground/50"
                     />
-                    {errors.email && <p className="text-xs text-destructive mt-1.5">{errors.email}</p>}
+                    {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password" className="text-sm font-medium text-foreground">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="login-password" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("password")}
                     </Label>
                     <Input
@@ -333,14 +333,14 @@ export default function Auth() {
                       value={loginForm.password}
                       onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                       disabled={isLoading}
-                      className="h-12 px-4 bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                      className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                     />
-                    {errors.password && <p className="text-xs text-destructive mt-1.5">{errors.password}</p>}
+                    {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                   </div>
 
                   <Button
                     type="submit"
-                    className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 mt-2"
+                    className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 mt-2"
                     disabled={isLoading}
                   >
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -351,9 +351,9 @@ export default function Auth() {
 
               {/* Signup Form */}
               <TabsContent value="signup" className="mt-0">
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name" className="text-sm font-medium text-foreground">
+                <form onSubmit={handleSignup} className="space-y-3 sm:space-y-4">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="signup-name" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("fullName")}
                     </Label>
                     <Input
@@ -362,13 +362,13 @@ export default function Auth() {
                       value={signupForm.fullName}
                       onChange={(e) => setSignupForm({ ...signupForm, fullName: e.target.value })}
                       disabled={isLoading}
-                      className="h-12 px-4 bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                      className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                     />
-                    {errors.fullName && <p className="text-xs text-destructive mt-1.5">{errors.fullName}</p>}
+                    {errors.fullName && <p className="text-xs text-destructive mt-1">{errors.fullName}</p>}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-sm font-medium text-foreground">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="signup-email" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("email")}
                     </Label>
                     <Input
@@ -378,13 +378,13 @@ export default function Auth() {
                       value={signupForm.email}
                       onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
                       disabled={isLoading}
-                      className="h-12 px-4 bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-muted-foreground/50"
+                      className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-muted-foreground/50"
                     />
-                    {errors.email && <p className="text-xs text-destructive mt-1.5">{errors.email}</p>}
+                    {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-sm font-medium text-foreground">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="signup-password" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("password")}
                     </Label>
                     <Input
@@ -393,13 +393,13 @@ export default function Auth() {
                       value={signupForm.password}
                       onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
                       disabled={isLoading}
-                      className="h-12 px-4 bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                      className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                     />
-                    {errors.password && <p className="text-xs text-destructive mt-1.5">{errors.password}</p>}
+                    {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-confirm" className="text-sm font-medium text-foreground">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="signup-confirm" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("confirmPassword")}
                     </Label>
                     <Input
@@ -408,16 +408,16 @@ export default function Auth() {
                       value={signupForm.confirmPassword}
                       onChange={(e) => setSignupForm({ ...signupForm, confirmPassword: e.target.value })}
                       disabled={isLoading}
-                      className="h-12 px-4 bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                      className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                     />
                     {errors.confirmPassword && (
-                      <p className="text-xs text-destructive mt-1.5">{errors.confirmPassword}</p>
+                      <p className="text-xs text-destructive mt-1">{errors.confirmPassword}</p>
                     )}
                   </div>
 
                   <Button
                     type="submit"
-                    className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 mt-2"
+                    className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 mt-2"
                     disabled={isLoading}
                   >
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -429,7 +429,7 @@ export default function Auth() {
           </Tabs>
         </Card>
 
-        <p className="mt-10 text-center text-xs text-muted-foreground/70 lg:hidden">
+        <p className="mt-6 sm:mt-10 text-center text-[10px] sm:text-xs text-muted-foreground/70 lg:hidden px-4">
           © 2026 ESG Smart Performance | Developed by Arnon Arpaket.
           <br />
           All software and design assets are protected. Unauthorized use or reproduction is prohibited.
