@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3, CheckSquare, Square } from "lucide-react";
+import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3, CheckSquare, Square, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
@@ -767,9 +767,18 @@ export default function DataEntry() {
 
         {/* Add/Edit Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
+          <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
+            <DialogHeader className="relative">
+              {/* Mobile close button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-8 w-8 sm:hidden text-muted-foreground hover:text-foreground"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+              <DialogTitle className="pr-8 sm:pr-0">
                 {editingValue
                   ? (language === 'th' ? 'แก้ไขข้อมูล' : 'Edit Data')
                   : (language === 'th' ? 'เพิ่มข้อมูลใหม่' : 'Add New Data')}
