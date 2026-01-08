@@ -220,10 +220,27 @@ export default function UserManagement() {
       });
       fetchData();
     } catch (error: any) {
+      // Translate common error messages
+      let errorMessage = error.message;
+      if (error.message?.includes('email address has already been registered') || 
+          error.message?.includes('email_exists')) {
+        errorMessage = language === 'th' 
+          ? 'อีเมลนี้มีอยู่ในระบบแล้ว กรุณาใช้อีเมลอื่น' 
+          : 'This email is already registered. Please use a different email.';
+      } else if (error.message?.includes('Invalid email')) {
+        errorMessage = language === 'th' 
+          ? 'รูปแบบอีเมลไม่ถูกต้อง' 
+          : 'Invalid email format';
+      } else if (error.message?.includes('Password')) {
+        errorMessage = language === 'th' 
+          ? 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' 
+          : 'Password must be at least 6 characters';
+      }
+      
       toast({
         variant: 'destructive',
         title: t('error'),
-        description: error.message,
+        description: errorMessage,
       });
     } finally {
       setAddingUser(false);
