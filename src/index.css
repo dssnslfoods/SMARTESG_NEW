@@ -1,154 +1,165 @@
-@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:wght@400;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* Sustainability World Design System 
+   Professional ESG & Sustainability Enterprise Platform
+   All colors MUST be HSL.
 */
 
 @layer base {
   :root {
-    --background: 0 0% 96%;
-    --foreground: 0 0% 9%;
+    /* Background & Surface - Light, airy, natural */
+    --background: 100 20% 98%;
+    --foreground: 150 10% 15%;
 
-    --card: 0 0% 98%;
-    --card-foreground: 0 0% 9%;
+    /* Card surfaces - Clean, elevated */
+    --card: 0 0% 100%;
+    --card-foreground: 150 10% 15%;
 
-    --popover: 0 0% 89%;
-    --popover-foreground: 0 0% 9%;
+    /* Popover & Dropdown */
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 10% 15%;
 
-    --primary: 161 93% 30%;
-    --primary-foreground: 151 80% 95%;
+    /* Primary - Natural ESG Green (refined, softer) */
+    --primary: 158 45% 32%;
+    --primary-foreground: 100 30% 98%;
 
-    --secondary: 0 0% 32%;
-    --secondary-foreground: 0 0% 98%;
+    /* Secondary - Muted Stone/Earth */
+    --secondary: 40 15% 92%;
+    --secondary-foreground: 150 10% 25%;
 
-    --muted: 0 0% 63%;
-    --muted-foreground: 0 0% 9%;
+    /* Muted - Soft neutral */
+    --muted: 100 10% 92%;
+    --muted-foreground: 150 8% 45%;
 
-    --accent: 166 76% 96%;
-    --accent-foreground: 173 80% 40%;
+    /* Accent - Light sustainability green */
+    --accent: 155 40% 94%;
+    --accent-foreground: 158 45% 28%;
 
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 0 85% 97%;
+    /* Destructive - Muted coral red */
+    --destructive: 4 60% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 83%;
-    --input: 0 0% 83%;
-    --ring: 161 93% 30%;
+    /* Borders - Soft, subtle */
+    --border: 100 10% 88%;
+    --input: 100 10% 88%;
+    --ring: 158 45% 32%;
 
-    --radius: 0.75rem;
+    /* Radius - Rounded, modern */
+    --radius: 0.625rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Sidebar - Clean, supportive */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 150 10% 25%;
+    --sidebar-primary: 158 45% 32%;
+    --sidebar-primary-foreground: 100 30% 98%;
+    --sidebar-accent: 155 40% 94%;
+    --sidebar-accent-foreground: 158 45% 28%;
+    --sidebar-border: 100 10% 90%;
+    --sidebar-ring: 158 45% 32%;
 
-    --sidebar-foreground: 0 0% 9%;
+    /* Chart colors - Calm ESG palette */
+    --chart-1: 158 45% 45%;
+    --chart-2: 170 50% 50%;
+    --chart-3: 140 45% 55%;
+    --chart-4: 45 60% 55%;
+    --chart-5: 200 35% 50%;
 
-    --sidebar-primary: 161 93% 30%;
+    --sidebar: 0 0% 100%;
 
-    --sidebar-primary-foreground: 151 80% 95%;
+    /* Typography */
+    --font-sans: 'Inter', 'Source Sans 3', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-serif: 'Libre Caslon Text', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-    --sidebar-accent: 0 0% 32%;
+    /* Shadows - Calm, soft elevation */
+    --shadow-2xs: 0 1px 2px 0 hsl(150 10% 20% / 0.03);
+    --shadow-xs: 0 1px 3px 0 hsl(150 10% 20% / 0.04);
+    --shadow-sm: 0 1px 3px 0 hsl(150 10% 20% / 0.06), 0 1px 2px -1px hsl(150 10% 20% / 0.04);
+    --shadow: 0 2px 6px -1px hsl(150 10% 20% / 0.08), 0 2px 4px -2px hsl(150 10% 20% / 0.04);
+    --shadow-md: 0 4px 8px -2px hsl(150 10% 20% / 0.08), 0 2px 4px -2px hsl(150 10% 20% / 0.04);
+    --shadow-lg: 0 8px 16px -4px hsl(150 10% 20% / 0.1), 0 4px 8px -4px hsl(150 10% 20% / 0.04);
+    --shadow-xl: 0 16px 32px -8px hsl(150 10% 20% / 0.12), 0 8px 16px -8px hsl(150 10% 20% / 0.04);
+    --shadow-2xl: 0 24px 48px -12px hsl(150 10% 20% / 0.16);
 
-    --sidebar-accent-foreground: 0 0% 98%;
-
-    --sidebar-border: 0 0% 83%;
-
-    --sidebar-ring: 161 93% 30%;
-
-    --chart-1: 158 64% 51%;
-
-    --chart-2: 141 69% 58%;
-
-    --chart-3: 172 66% 50%;
-
-    --chart-4: 82 77% 55%;
-
-    --chart-5: 0 0% 45%;
-
-    --sidebar: 0 0% 98%;
-
-    --font-sans: 'Work Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
-
-    --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
-
-    --font-mono: 'Inconsolata', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-
-    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+    /* Status colors - Calm, professional */
+    --success: 152 55% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 85% 55%;
+    --warning-foreground: 30 80% 15%;
+    --info: 200 75% 50%;
+    --info-foreground: 0 0% 100%;
 
     --tracking-normal: 0em;
-
     --spacing: 0.25rem;
   }
 
   .dark {
-    --background: 0 0% 9%;
-    --foreground: 0 0% 98%;
+    --background: 150 10% 8%;
+    --foreground: 100 10% 95%;
 
-    --card: 0 0% 14%;
-    --card-foreground: 0 0% 98%;
+    --card: 150 10% 11%;
+    --card-foreground: 100 10% 95%;
 
-    --popover: 0 0% 25%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 150 10% 14%;
+    --popover-foreground: 100 10% 95%;
 
-    --primary: 158 64% 51%;
-    --primary-foreground: 165 91% 9%;
+    --primary: 158 50% 45%;
+    --primary-foreground: 150 20% 5%;
 
-    --secondary: 0 0% 45%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 150 8% 20%;
+    --secondary-foreground: 100 10% 90%;
 
-    --muted: 0 0% 45%;
-    --muted-foreground: 0 0% 98%;
+    --muted: 150 8% 18%;
+    --muted-foreground: 100 8% 60%;
 
-    --accent: 178 84% 10%;
-    --accent-foreground: 172 66% 50%;
+    --accent: 158 35% 18%;
+    --accent-foreground: 155 50% 70%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 85% 97%;
+    --destructive: 4 55% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 32%;
-    --input: 0 0% 32%;
-    --ring: 158 64% 51%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 158 64% 51%;
-    --sidebar-primary-foreground: 165 91% 9%;
-    --sidebar-accent: 172 66% 50%;
-    --sidebar-accent-foreground: 178 84% 10%;
-    --sidebar-border: 0 0% 32%;
-    --sidebar-ring: 158 64% 51%;
-    --chart-1: 156 71% 66%;
-    --chart-2: 141 76% 73%;
-    --chart-3: 170 76% 64%;
-    --chart-4: 81 84% 67%;
-    --chart-5: 0 0% 45%;
-    --sidebar: 0 0% 14%;
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
-    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+    --border: 150 8% 22%;
+    --input: 150 8% 22%;
+    --ring: 158 50% 45%;
+
+    --sidebar-background: 150 10% 9%;
+    --sidebar-foreground: 100 10% 90%;
+    --sidebar-primary: 158 50% 45%;
+    --sidebar-primary-foreground: 150 20% 5%;
+    --sidebar-accent: 158 35% 18%;
+    --sidebar-accent-foreground: 155 50% 70%;
+    --sidebar-border: 150 8% 20%;
+    --sidebar-ring: 158 50% 45%;
+
+    --chart-1: 158 55% 55%;
+    --chart-2: 170 55% 55%;
+    --chart-3: 140 50% 60%;
+    --chart-4: 45 65% 60%;
+    --chart-5: 200 40% 55%;
+
+    --sidebar: 150 10% 11%;
+
+    --shadow-2xs: 0 1px 2px 0 hsl(0 0% 0% / 0.2);
+    --shadow-xs: 0 1px 3px 0 hsl(0 0% 0% / 0.25);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.3), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow: 0 2px 6px -1px hsl(0 0% 0% / 0.35), 0 2px 4px -2px hsl(0 0% 0% / 0.2);
+    --shadow-md: 0 4px 8px -2px hsl(0 0% 0% / 0.35), 0 2px 4px -2px hsl(0 0% 0% / 0.2);
+    --shadow-lg: 0 8px 16px -4px hsl(0 0% 0% / 0.4), 0 4px 8px -4px hsl(0 0% 0% / 0.2);
+    --shadow-xl: 0 16px 32px -8px hsl(0 0% 0% / 0.45), 0 8px 16px -8px hsl(0 0% 0% / 0.2);
+    --shadow-2xl: 0 24px 48px -12px hsl(0 0% 0% / 0.5);
+
+    --success: 152 50% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 80% 50%;
+    --warning-foreground: 30 80% 10%;
+    --info: 200 70% 55%;
+    --info-foreground: 0 0% 100%;
   }
 }
 
@@ -158,6 +169,153 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Smooth transitions for all interactive elements */
+  button, a, input, select, textarea {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  /* Better focus states */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Improved text rendering */
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight;
+  }
+
+  /* Table improvements */
+  table {
+    @apply w-full;
+  }
+}
+
+@layer components {
+  /* Page container - centered with max-width */
+  .page-container {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Section spacing */
+  .section-spacing {
+    @apply space-y-8;
+  }
+
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-md hover:border-primary/20;
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm transition-all duration-200 hover:shadow-md hover:border-primary/30;
+  }
+
+  /* KPI value */
+  .kpi-value {
+    @apply text-3xl font-bold tracking-tight text-foreground;
+  }
+
+  /* KPI label */
+  .kpi-label {
+    @apply text-sm font-medium text-muted-foreground;
+  }
+
+  /* Status badge variants */
+  .badge-success {
+    @apply bg-[hsl(var(--success)/0.15)] text-[hsl(var(--success))] border-[hsl(var(--success)/0.3)];
+  }
+
+  .badge-warning {
+    @apply bg-[hsl(var(--warning)/0.15)] text-[hsl(var(--warning))] border-[hsl(var(--warning)/0.3)];
+  }
+
+  .badge-info {
+    @apply bg-[hsl(var(--info)/0.15)] text-[hsl(var(--info))] border-[hsl(var(--info)/0.3)];
+  }
+
+  /* Form section */
+  .form-section {
+    @apply space-y-4 rounded-lg border bg-card/50 p-6;
+  }
+
+  /* Table row hover */
+  .table-row-hover {
+    @apply transition-colors hover:bg-muted/50;
+  }
+
+  /* Empty state */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 text-center;
+  }
+
+  .empty-state-icon {
+    @apply mb-4 h-12 w-12 text-muted-foreground/50;
+  }
+
+  .empty-state-title {
+    @apply text-lg font-medium text-foreground;
+  }
+
+  .empty-state-description {
+    @apply mt-1 text-sm text-muted-foreground;
+  }
+}
+
+@layer utilities {
+  /* Subtle gradient backgrounds */
+  .bg-gradient-subtle {
+    background: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted)/0.3) 100%);
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply bg-background/80 backdrop-blur-sm;
+  }
+
+  /* Text gradient */
+  .text-gradient-primary {
+    @apply bg-gradient-to-r from-primary to-[hsl(var(--chart-2))] bg-clip-text text-transparent;
+  }
+
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Loading skeleton shimmer */
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted)/0.6) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 }
