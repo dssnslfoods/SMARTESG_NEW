@@ -12,8 +12,10 @@ export function MainLayout({ children }: MainLayoutProps) {
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
+        <main className="flex-1 overflow-y-auto bg-gradient-subtle">
+          <div className="mx-auto max-w-7xl px-6 py-8">
+            {children}
+          </div>
         </main>
       </div>
     </div>
