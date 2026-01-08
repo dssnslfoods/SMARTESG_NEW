@@ -66,8 +66,8 @@ serve(async (req) => {
     // Prevent self-deletion
     if (userId === authUser.id) {
       return new Response(
-        JSON.stringify({ error: "Cannot delete your own account" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Cannot delete your own account" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
