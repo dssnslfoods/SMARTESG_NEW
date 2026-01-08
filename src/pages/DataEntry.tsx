@@ -778,9 +778,12 @@ export default function DataEntry() {
                   {role === 'staff' && profile?.site_id ? (
                     <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm">
                       <span className="text-foreground">
+                        {profile.company_name && (
+                          <span className="font-medium">{profile.company_name} • </span>
+                        )}
                         {profile.site_name || getDisplayName(profile.site_id, 'site')}
                         {profile.site_location && (
-                          <span className="text-muted-foreground ml-2">({profile.site_location})</span>
+                          <span className="text-muted-foreground ml-1">({profile.site_location})</span>
                         )}
                       </span>
                     </div>
