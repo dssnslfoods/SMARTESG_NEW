@@ -94,7 +94,9 @@ export default function Reports() {
 
   // Filters
   const [filterCompany, setFilterCompany] = useState<string>("");
+  const [filterSite, setFilterSite] = useState<string>("");
   const [filterYear, setFilterYear] = useState<string>("");
+  const [filterMonth, setFilterMonth] = useState<string>("");
 
   useEffect(() => {
     fetchData();
@@ -138,6 +140,11 @@ export default function Reports() {
   // Get unique years
   const uniqueYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
 
+  // Get unique months for selected year
+  const uniqueMonths = filterYear
+    ? periods.filter((p) => p.year === parseInt(filterYear)).sort((a, b) => a.month - b.month)
+    : [];
+
   // Filter sites by company
   const filteredSites = filterCompany ? sites.filter((s) => s.company_id === filterCompany) : sites;
 
@@ -147,9 +154,16 @@ export default function Reports() {
       const site = sites.find((s) => s.site_id === v.site_id);
       if (site?.company_id !== filterCompany) return false;
     }
+    if (filterSite) {
+      if (v.site_id !== filterSite) return false;
+    }
     if (filterYear) {
       const period = periods.find((p) => p.period_id === v.period_id);
       if (period?.year !== parseInt(filterYear)) return false;
+    }
+    if (filterMonth) {
+      const period = periods.find((p) => p.period_id === v.period_id);
+      if (period?.month !== parseInt(filterMonth)) return false;
     }
     return true;
   });
@@ -266,10 +280,16 @@ export default function Reports() {
         {/* Filters */}
         <div className="flex flex-wrap gap-4">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">{language === "th" ? "บริษัท" : "Company"}</Label>
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              <Building2 className="h-3 w-3" />
+              {language === "th" ? "บริษัท" : "Company"}
+            </Label>
             <Select
               value={filterCompany || "__all__"}
-              onValueChange={(v) => setFilterCompany(v === "__all__" ? "" : v)}
+              onValueChange={(v) => {
+                setFilterCompany(v === "__all__" ? "" : v);
+                setFilterSite("");
+              }}
             >
               <SelectTrigger className="w-40">
                 <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
@@ -285,8 +305,40 @@ export default function Reports() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">{language === "th" ? "ปี" : "Year"}</Label>
-            <Select value={filterYear || "__all__"} onValueChange={(v) => setFilterYear(v === "__all__" ? "" : v)}>
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              {language === "th" ? "สถานที่" : "Location"}
+            </Label>
+            <Select
+              value={filterSite || "__all__"}
+              onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}
+              disabled={!filterCompany}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                {filteredSites.map((s) => (
+                  <SelectItem key={s.site_id} value={s.site_id}>
+                    {s.site_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {language === "th" ? "ปี" : "Year"}
+            </Label>
+            <Select
+              value={filterYear || "__all__"}
+              onValueChange={(v) => {
+                setFilterYear(v === "__all__" ? "" : v);
+                setFilterMonth("");
+              }}
+            >
               <SelectTrigger className="w-28">
                 <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
               </SelectTrigger>
@@ -295,6 +347,29 @@ export default function Reports() {
                 {uniqueYears.map((year) => (
                   <SelectItem key={year} value={year.toString()}>
                     {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {language === "th" ? "เดือน" : "Month"}
+            </Label>
+            <Select
+              value={filterMonth || "__all__"}
+              onValueChange={(v) => setFilterMonth(v === "__all__" ? "" : v)}
+              disabled={!filterYear}
+            >
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                {uniqueMonths.map((p) => (
+                  <SelectItem key={p.period_id} value={p.month.toString()}>
+                    {p.month_name}
                   </SelectItem>
                 ))}
               </SelectContent>
