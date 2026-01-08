@@ -657,23 +657,30 @@ export default function UserManagement() {
               </div>
               <div className="space-y-2">
                 <Label>{language === 'th' ? 'บทบาท' : 'Role'}</Label>
-                <Select
-                  value={editingUser.role || ''}
-                  onValueChange={(value: AppRole) =>
-                    setEditingUser({ ...editingUser, role: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={language === 'th' ? 'เลือกบทบาท' : 'Select role'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">{t('admin')}</SelectItem>
-                    <SelectItem value="executive">{t('executive')}</SelectItem>
-                    <SelectItem value="supervisor">{t('supervisor')}</SelectItem>
-                    <SelectItem value="staff">{t('staff')}</SelectItem>
-                    <SelectItem value="guest">{t('guest')}</SelectItem>
-                  </SelectContent>
-                </Select>
+                {editingUser.role === 'admin' ? (
+                  <div className="flex items-center h-10 px-3 border rounded-md bg-muted">
+                    <span className="text-muted-foreground">
+                      {t('admin')} {language === 'th' ? '(ไม่สามารถเปลี่ยนได้)' : '(cannot change)'}
+                    </span>
+                  </div>
+                ) : (
+                  <Select
+                    value={editingUser.role || ''}
+                    onValueChange={(value: AppRole) =>
+                      setEditingUser({ ...editingUser, role: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={language === 'th' ? 'เลือกบทบาท' : 'Select role'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="executive">{t('executive')}</SelectItem>
+                      <SelectItem value="supervisor">{t('supervisor')}</SelectItem>
+                      <SelectItem value="staff">{t('staff')}</SelectItem>
+                      <SelectItem value="guest">{t('guest')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>{t('company')}</Label>
