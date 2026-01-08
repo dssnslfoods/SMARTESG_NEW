@@ -72,10 +72,22 @@ export default function ThemeManagement() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    theme_id: '',
     theme_name: '',
     dimension_id: '',
   });
+
+  // Generate next theme ID
+  const generateNextId = (existingThemes: Theme[]) => {
+    const prefix = 'THM';
+    const existingNumbers = existingThemes
+      .map(t => {
+        const match = t.theme_id.match(/^THM(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => !isNaN(n));
+    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+    return `${prefix}${String(maxNumber + 1).padStart(3, '0')}`;
+  };
 
   useEffect(() => {
     fetchData();
@@ -98,7 +110,7 @@ export default function ThemeManagement() {
   };
 
   const handleSave = async () => {
-    if (!formData.theme_id || !formData.theme_name || !formData.dimension_id) {
+    if (!formData.theme_name || !formData.dimension_id) {
       toast({
         variant: 'destructive',
         title: t('error'),
@@ -130,7 +142,8 @@ export default function ThemeManagement() {
           afterData: { ...dataToSave, theme_id: editingTheme.theme_id },
         });
       } else {
-        const insertData = { ...dataToSave, theme_id: formData.theme_id };
+        const newId = generateNextId(themes);
+        const insertData = { ...dataToSave, theme_id: newId };
         const { error } = await supabase.from('esg_theme').insert(insertData);
 
         if (error) throw error;
@@ -138,7 +151,7 @@ export default function ThemeManagement() {
         await logActivity({
           action: 'CREATE',
           entityType: 'esg_theme',
-          entityId: formData.theme_id,
+          entityId: newId,
           afterData: insertData,
         });
       }
@@ -211,14 +224,13 @@ export default function ThemeManagement() {
   };
 
   const resetForm = () => {
-    setFormData({ theme_id: '', theme_name: '', dimension_id: '' });
+    setFormData({ theme_name: '', dimension_id: '' });
     setEditingTheme(null);
   };
 
   const openEditDialog = (theme: Theme) => {
     setEditingTheme(theme);
     setFormData({
-      theme_id: theme.theme_id,
       theme_name: theme.theme_name,
       dimension_id: theme.dimension_id,
     });
@@ -275,15 +287,6 @@ export default function ThemeManagement() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>{t('themeId')} *</Label>
-                  <Input
-                    value={formData.theme_id}
-                    onChange={(e) => setFormData({ ...formData, theme_id: e.target.value })}
-                    disabled={!!editingTheme}
-                    placeholder="e.g., E01"
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label>{t('themeName')} *</Label>
                   <Input

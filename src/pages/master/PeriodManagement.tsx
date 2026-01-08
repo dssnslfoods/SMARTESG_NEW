@@ -75,11 +75,15 @@ export default function PeriodManagement() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    period_id: '',
     year: new Date().getFullYear(),
     month: 1,
     month_name: monthNames[1][language === 'th' ? 'th' : 'en'],
   });
+
+  // Generate next period ID based on year-month
+  const generatePeriodId = (year: number, month: number) => {
+    return `${year}-${String(month).padStart(2, '0')}`;
+  };
 
   const handleMonthChange = (month: number) => {
     const validMonth = Math.min(12, Math.max(1, month));
@@ -112,7 +116,7 @@ export default function PeriodManagement() {
   };
 
   const handleSave = async () => {
-    if (!formData.period_id || !formData.month_name) {
+    if (!formData.month_name) {
       toast({
         variant: 'destructive',
         title: t('error'),
@@ -145,7 +149,8 @@ export default function PeriodManagement() {
           afterData: { ...dataToSave, period_id: editingPeriod.period_id },
         });
       } else {
-        const insertData = { ...dataToSave, period_id: formData.period_id };
+        const newId = generatePeriodId(formData.year, formData.month);
+        const insertData = { ...dataToSave, period_id: newId };
         const { error } = await supabase.from('reporting_period').insert(insertData);
 
         if (error) throw error;
@@ -153,7 +158,7 @@ export default function PeriodManagement() {
         await logActivity({
           action: 'CREATE',
           entityType: 'reporting_period',
-          entityId: formData.period_id,
+          entityId: newId,
           afterData: insertData,
         });
       }
@@ -226,14 +231,13 @@ export default function PeriodManagement() {
   };
 
   const resetForm = () => {
-    setFormData({ period_id: '', year: new Date().getFullYear(), month: 1, month_name: '' });
+    setFormData({ year: new Date().getFullYear(), month: 1, month_name: '' });
     setEditingPeriod(null);
   };
 
   const openEditDialog = (period: Period) => {
     setEditingPeriod(period);
     setFormData({
-      period_id: period.period_id,
       year: period.year,
       month: period.month,
       month_name: period.month_name,
@@ -292,15 +296,6 @@ export default function PeriodManagement() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>{t('periodId')} *</Label>
-                  <Input
-                    value={formData.period_id}
-                    onChange={(e) => setFormData({ ...formData, period_id: e.target.value })}
-                    disabled={!!editingPeriod}
-                    placeholder="e.g., 2024-01"
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label>{t('year')} *</Label>
                   <Input

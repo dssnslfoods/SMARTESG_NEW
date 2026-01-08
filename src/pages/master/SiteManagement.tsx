@@ -73,11 +73,23 @@ export default function SiteManagement() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    site_id: '',
     site_name: '',
     company_id: '',
     location: '',
   });
+
+  // Generate next site ID
+  const generateNextId = (existingSites: Site[]) => {
+    const prefix = 'SITE';
+    const existingNumbers = existingSites
+      .map(s => {
+        const match = s.site_id.match(/^SITE(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => !isNaN(n));
+    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+    return `${prefix}${String(maxNumber + 1).padStart(3, '0')}`;
+  };
 
   useEffect(() => {
     fetchData();
@@ -100,7 +112,7 @@ export default function SiteManagement() {
   };
 
   const handleSave = async () => {
-    if (!formData.site_id || !formData.site_name || !formData.company_id) {
+    if (!formData.site_name || !formData.company_id) {
       toast({
         variant: 'destructive',
         title: t('error'),
@@ -133,7 +145,8 @@ export default function SiteManagement() {
           afterData: { ...dataToSave, site_id: editingSite.site_id },
         });
       } else {
-        const insertData = { ...dataToSave, site_id: formData.site_id };
+        const newId = generateNextId(sites);
+        const insertData = { ...dataToSave, site_id: newId };
         const { error } = await supabase.from('site').insert(insertData);
 
         if (error) throw error;
@@ -141,7 +154,7 @@ export default function SiteManagement() {
         await logActivity({
           action: 'CREATE',
           entityType: 'site',
-          entityId: formData.site_id,
+          entityId: newId,
           afterData: insertData,
         });
       }
@@ -214,14 +227,13 @@ export default function SiteManagement() {
   };
 
   const resetForm = () => {
-    setFormData({ site_id: '', site_name: '', company_id: '', location: '' });
+    setFormData({ site_name: '', company_id: '', location: '' });
     setEditingSite(null);
   };
 
   const openEditDialog = (site: Site) => {
     setEditingSite(site);
     setFormData({
-      site_id: site.site_id,
       site_name: site.site_name,
       company_id: site.company_id,
       location: site.location || '',
@@ -279,15 +291,6 @@ export default function SiteManagement() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>{t('siteId')} *</Label>
-                  <Input
-                    value={formData.site_id}
-                    onChange={(e) => setFormData({ ...formData, site_id: e.target.value })}
-                    disabled={!!editingSite}
-                    placeholder="e.g., SITE001"
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label>{t('siteName')} *</Label>
                   <Input
