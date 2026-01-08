@@ -8,7 +8,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Globe, User, LogOut, Building2 } from 'lucide-react';
+import { Globe, User, LogOut, Building2, Menu } from 'lucide-react';
+
+interface HeaderProps {
+  onMenuToggle?: () => void;
+}
 
 const roleConfig = {
   admin: { 
@@ -33,7 +37,7 @@ const roleConfig = {
   },
 };
 
-export function Header() {
+export function Header({ onMenuToggle }: HeaderProps) {
   const { user, profile, role, signOut } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
@@ -44,14 +48,24 @@ export function Header() {
   const roleInfo = role ? roleConfig[role] : null;
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-card/80 backdrop-blur-sm px-6">
-      <div className="flex items-center gap-4">
+    <header className="flex h-14 sm:h-16 items-center justify-between border-b border-border bg-card/80 backdrop-blur-sm px-3 sm:px-6">
+      <div className="flex items-center gap-2 sm:gap-4">
+        {/* Mobile Menu Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden h-9 w-9"
+          onClick={onMenuToggle}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+
         <div className="flex flex-col">
-          <h1 className="text-base font-semibold text-foreground">
+          <h1 className="text-sm sm:text-base font-semibold text-foreground line-clamp-1">
             {t('welcome')}, {profile?.full_name || user?.email?.split('@')[0]}
           </h1>
           {(profile?.company_name || profile?.site_location) && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               <Building2 className="h-3 w-3" />
               <span>{[profile?.company_name, profile?.site_location].filter(Boolean).join(' • ')}</span>
             </div>
@@ -59,13 +73,13 @@ export function Header() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         {/* Language Switcher */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="sm" className="gap-1 sm:gap-2 text-muted-foreground hover:text-foreground h-8 sm:h-9 px-2 sm:px-3">
               <Globe className="h-4 w-4" />
-              <span className="text-sm">{language === 'th' ? 'TH' : 'EN'}</span>
+              <span className="text-xs sm:text-sm">{language === 'th' ? 'TH' : 'EN'}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-32">
@@ -78,9 +92,9 @@ export function Header() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* User Info & Role Badge */}
-        <div className="flex items-center gap-3 rounded-full bg-muted/50 pl-4 pr-1 py-1">
-          <div className="flex items-center gap-2">
+        {/* User Info & Role Badge - Hidden on very small screens */}
+        <div className="hidden xs:flex items-center gap-2 sm:gap-3 rounded-full bg-muted/50 pl-2 sm:pl-4 pr-1 py-1">
+          <div className="hidden sm:flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
               <User className="h-3.5 w-3.5 text-primary" />
             </div>
@@ -89,7 +103,7 @@ export function Header() {
             </span>
           </div>
           {role && roleInfo && (
-            <Badge className={roleInfo.className}>
+            <Badge className={`${roleInfo.className} text-[10px] sm:text-xs`}>
               {t(role)}
             </Badge>
           )}
@@ -100,10 +114,10 @@ export function Header() {
           variant="ghost"
           size="sm"
           onClick={handleLogout}
-          className="gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          className="gap-1 sm:gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 sm:h-9 px-2 sm:px-3"
         >
           <LogOut className="h-4 w-4" />
-          <span className="hidden sm:inline">{language === 'th' ? 'ออกจากระบบ' : 'Logout'}</span>
+          <span className="hidden sm:inline text-xs sm:text-sm">{language === 'th' ? 'ออกจากระบบ' : 'Logout'}</span>
         </Button>
       </div>
     </header>
