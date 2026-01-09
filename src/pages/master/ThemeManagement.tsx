@@ -67,6 +67,7 @@ export default function ThemeManagement() {
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterDimension, setFilterDimension] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
@@ -238,11 +239,13 @@ export default function ThemeManagement() {
     setIsDialogOpen(true);
   };
 
-  const filteredThemes = themes.filter(
-    (t) =>
+  const filteredThemes = themes.filter((t) => {
+    const matchesSearch =
       t.theme_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.theme_id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      t.theme_id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDimension = filterDimension === 'all' || t.dimension_id === filterDimension;
+    return matchesSearch && matchesDimension;
+  });
 
   if (loading) {
     return <MasterDataLoadingSkeleton />;
@@ -321,8 +324,8 @@ export default function ThemeManagement() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="relative flex-1 w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder={t('search')}
@@ -331,6 +334,19 @@ export default function ThemeManagement() {
                   className="pl-10"
                 />
               </div>
+              <Select value={filterDimension} onValueChange={setFilterDimension}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder={language === 'th' ? 'กรองตามมิติ' : 'Filter by dimension'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{language === 'th' ? 'ทุกมิติ' : 'All Dimensions'}</SelectItem>
+                  {dimensions.map((d) => (
+                    <SelectItem key={d.dimension_id} value={d.dimension_id}>
+                      {d.dimension_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardHeader>
           <CardContent>
