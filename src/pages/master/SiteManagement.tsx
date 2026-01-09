@@ -347,7 +347,6 @@ export default function SiteManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('siteId')}</TableHead>
                   <TableHead>{t('siteName')}</TableHead>
                   <TableHead>{t('company')}</TableHead>
                   <TableHead>{t('location')}</TableHead>
@@ -357,14 +356,13 @@ export default function SiteManagement() {
               <TableBody>
                 {filteredSites.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
                       {t('noData')}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredSites.map((site) => (
                     <TableRow key={site.site_id}>
-                      <TableCell className="font-mono text-sm">{site.site_id}</TableCell>
                       <TableCell className="font-medium">{site.site_name}</TableCell>
                       <TableCell>
                         {companies.find((c) => c.company_id === site.company_id)?.company_name || '-'}
