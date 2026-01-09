@@ -68,6 +68,7 @@ export default function MetricManagement() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterTheme, setFilterTheme] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingMetric, setEditingMetric] = useState<Metric | null>(null);
@@ -242,11 +243,13 @@ export default function MetricManagement() {
     setIsDialogOpen(true);
   };
 
-  const filteredMetrics = metrics.filter(
-    (m) =>
+  const filteredMetrics = metrics.filter((m) => {
+    const matchesSearch =
       m.metric_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.metric_id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      m.metric_id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTheme = filterTheme === 'all' || m.theme_id === filterTheme;
+    return matchesSearch && matchesTheme;
+  });
 
   if (loading) {
     return <MasterDataLoadingSkeleton />;
@@ -333,8 +336,8 @@ export default function MetricManagement() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="relative flex-1 w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder={t('search')}
@@ -343,6 +346,19 @@ export default function MetricManagement() {
                   className="pl-10"
                 />
               </div>
+              <Select value={filterTheme} onValueChange={setFilterTheme}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder={language === 'th' ? 'กรองตามหัวข้อ' : 'Filter by theme'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{language === 'th' ? 'ทุกหัวข้อ' : 'All Themes'}</SelectItem>
+                  {themes.map((theme) => (
+                    <SelectItem key={theme.theme_id} value={theme.theme_id}>
+                      {theme.theme_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardHeader>
           <CardContent>
