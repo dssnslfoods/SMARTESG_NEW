@@ -301,7 +301,6 @@ export default function DimensionManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('dimensionId')}</TableHead>
                   <TableHead>{t('dimensionName')}</TableHead>
                   <TableHead className="w-24"></TableHead>
                 </TableRow>
@@ -309,14 +308,13 @@ export default function DimensionManagement() {
               <TableBody>
                 {filteredDimensions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground">
+                    <TableCell colSpan={2} className="text-center text-muted-foreground">
                       {t('noData')}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredDimensions.map((dimension) => (
                     <TableRow key={dimension.dimension_id}>
-                      <TableCell className="font-mono text-sm">{dimension.dimension_id}</TableCell>
                       <TableCell className="font-medium">{dimension.dimension_name}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">

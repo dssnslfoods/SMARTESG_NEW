@@ -353,7 +353,6 @@ export default function ThemeManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('themeId')}</TableHead>
                   <TableHead>{t('themeName')}</TableHead>
                   <TableHead>{t('dimension')}</TableHead>
                   <TableHead className="w-24"></TableHead>
@@ -362,14 +361,13 @@ export default function ThemeManagement() {
               <TableBody>
                 {filteredThemes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={3} className="text-center text-muted-foreground">
                       {t('noData')}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredThemes.map((theme) => (
                     <TableRow key={theme.theme_id}>
-                      <TableCell className="font-mono text-sm">{theme.theme_id}</TableCell>
                       <TableCell className="font-medium">{theme.theme_name}</TableCell>
                       <TableCell>
                         {dimensions.find((d) => d.dimension_id === theme.dimension_id)?.dimension_name || '-'}

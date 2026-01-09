@@ -365,7 +365,6 @@ export default function MetricManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('metricId')}</TableHead>
                   <TableHead>{t('metricName')}</TableHead>
                   <TableHead>{t('theme')}</TableHead>
                   <TableHead>{t('unit')}</TableHead>
@@ -375,14 +374,13 @@ export default function MetricManagement() {
               <TableBody>
                 {filteredMetrics.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
                       {t('noData')}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredMetrics.map((metric) => (
                     <TableRow key={metric.metric_id}>
-                      <TableCell className="font-mono text-sm">{metric.metric_id}</TableCell>
                       <TableCell className="font-medium">{metric.metric_name}</TableCell>
                       <TableCell>
                         {themes.find((t) => t.theme_id === metric.theme_id)?.theme_name || '-'}

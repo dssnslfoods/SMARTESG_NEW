@@ -324,7 +324,6 @@ export default function CompanyManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('companyId')}</TableHead>
                   <TableHead>{t('companyName')}</TableHead>
                   <TableHead>{t('industry')}</TableHead>
                   <TableHead>{t('country')}</TableHead>
@@ -334,14 +333,13 @@ export default function CompanyManagement() {
               <TableBody>
                 {filteredCompanies.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
                       {t('noData')}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredCompanies.map((company) => (
                     <TableRow key={company.company_id}>
-                      <TableCell className="font-mono text-sm">{company.company_id}</TableCell>
                       <TableCell className="font-medium">{company.company_name}</TableCell>
                       <TableCell>{company.industry || '-'}</TableCell>
                       <TableCell>{company.country || '-'}</TableCell>
