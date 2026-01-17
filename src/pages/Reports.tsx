@@ -1167,6 +1167,20 @@ export default function Reports() {
                     </p>
                   </div>
                 </div>
+
+                {/* Trend Analytics */}
+                {trendChartData.length >= 2 && (
+                  <div className="mt-4">
+                    <TrendAnalytics 
+                      trendData={trendChartData.map((d, i) => ({
+                        ...d,
+                        month: chartPeriods[i]?.month || (i + 1),
+                        year: chartPeriods[i]?.year || new Date().getFullYear(),
+                      }))} 
+                      color="hsl(var(--primary))" 
+                    />
+                  </div>
+                )}
               </div>
             ) : (
               <div className="h-72 flex items-center justify-center text-muted-foreground">
