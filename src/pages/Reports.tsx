@@ -28,7 +28,6 @@ import {
   Eye,
 } from "lucide-react";
 import { useReportSections } from "@/hooks/useReportSections";
-import { SectionToggle } from "@/components/reports/SectionToggle";
 import {
   BarChart,
   Bar,
@@ -153,7 +152,7 @@ export default function Reports() {
   const [trendMonthFilter, setTrendMonthFilter] = useState<string>("__all__");
 
   // Report sections visibility
-  const { sections, toggleSection, setAllVisible, isSectionVisible } = useReportSections();
+  const { isSectionVisible } = useReportSections();
 
   const handleRefresh = useCallback(async () => {
     await fetchData();
@@ -490,19 +489,12 @@ export default function Reports() {
             {language === "th" 
               ? "ภาพรวมประสิทธิภาพความยั่งยืนขององค์กร" 
               : "Enterprise Sustainability Performance Overview"}
-          </p>
+        </p>
         </div>
-        
-        {/* Section Toggle Button */}
-        <SectionToggle
-          sections={sections}
-          onToggle={toggleSection}
-          onShowAll={() => setAllVisible(true)}
-          onHideAll={() => setAllVisible(false)}
-        />
+      </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground flex items-center gap-1">
               <Building2 className="h-3 w-3" />
@@ -599,9 +591,7 @@ export default function Reports() {
               </SelectContent>
             </Select>
           </div>
-        </div>
       </div>
-
       {/* Executive Summary Row */}
       {isSectionVisible("summary") && (
       <div id="section-summary" className="grid grid-cols-1 lg:grid-cols-4 gap-4 scroll-mt-4">
