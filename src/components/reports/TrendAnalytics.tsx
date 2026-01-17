@@ -17,6 +17,10 @@ interface TrendAnalyticsProps {
   trendData: TrendDataPoint[];
   color?: string;
   compact?: boolean;
+  /** Which metric to analyze for MoM/QoQ/YoY/YTD/Trend. Defaults to records. */
+  measure?: "records" | "totalValue" | "avgValue";
+  /** Optional unit label for value-based measures (e.g., kg, tCO2e). */
+  unitLabel?: string;
 }
 
 interface AnalyticsResult {
@@ -27,12 +31,26 @@ interface AnalyticsResult {
   isNeutral: boolean;
 }
 
-export function TrendAnalytics({ trendData, color = "hsl(var(--primary))", compact = false }: TrendAnalyticsProps) {
+export function TrendAnalytics({
+  trendData,
+  color = "hsl(var(--primary))",
+  compact = false,
+  measure = "records",
+  unitLabel,
+}: TrendAnalyticsProps) {
   const { language } = useLanguage();
 
   if (trendData.length < 2) {
     return null;
   }
+
+  const getValue = (d: TrendDataPoint | undefined) => {
+    if (!d) return 0;
+    const v = d[measure];
+    return typeof v === "number" && Number.isFinite(v) ? v : 0;
+  };
+
+  const valueNoun = unitLabel ? unitLabel : (language === "th" ? "รายการ" : "records");
 
   // Get current month data (last in array)
   const currentData = trendData[trendData.length - 1];
@@ -40,15 +58,16 @@ export function TrendAnalytics({ trendData, color = "hsl(var(--primary))", compa
 
   // Calculate MoM (Month over Month)
   const calculateMoM = (): AnalyticsResult => {
-    if (!currentData || !previousData) {
-      return { value: 0, change: 0, changePercent: 0, isPositive: false, isNeutral: true };
-    }
-    const change = currentData.records - previousData.records;
-    const changePercent = previousData.records > 0 
-      ? Math.round((change / previousData.records) * 100) 
-      : currentData.records > 0 ? 100 : 0;
+    const current = getValue(currentData);
+    const previous = getValue(previousData);
+
+    const change = current - previous;
+    const changePercent = previous > 0
+      ? Math.round((change / previous) * 100)
+      : current > 0 ? 100 : 0;
+
     return {
-      value: currentData.records,
+      value: current,
       change,
       changePercent,
       isPositive: change > 0,
@@ -56,19 +75,19 @@ export function TrendAnalytics({ trendData, color = "hsl(var(--primary))", compa
     };
   };
 
-  // Calculate QoQ (Quarter over Quarter) - compare last 3 months vs previous 3 months
+  // Calculate QoQ (Quarter over Quarter) - compare last 3 points vs previous 3 points
   const calculateQoQ = (): AnalyticsResult | null => {
     if (trendData.length < 6) return null;
 
     const lastQuarter = trendData.slice(-3);
     const previousQuarter = trendData.slice(-6, -3);
 
-    const lastQuarterTotal = lastQuarter.reduce((sum, d) => sum + d.records, 0);
-    const prevQuarterTotal = previousQuarter.reduce((sum, d) => sum + d.records, 0);
+    const lastQuarterTotal = lastQuarter.reduce((sum, d) => sum + getValue(d), 0);
+    const prevQuarterTotal = previousQuarter.reduce((sum, d) => sum + getValue(d), 0);
 
     const change = lastQuarterTotal - prevQuarterTotal;
-    const changePercent = prevQuarterTotal > 0 
-      ? Math.round((change / prevQuarterTotal) * 100) 
+    const changePercent = prevQuarterTotal > 0
+      ? Math.round((change / prevQuarterTotal) * 100)
       : lastQuarterTotal > 0 ? 100 : 0;
 
     return {
@@ -84,20 +103,22 @@ export function TrendAnalytics({ trendData, color = "hsl(var(--primary))", compa
   const calculateYoY = (): AnalyticsResult | null => {
     if (!currentData) return null;
 
-    // Find same month from previous year
     const sameMonthLastYear = trendData.find(
-      d => d.month === currentData.month && d.year === currentData.year - 1
+      (d) => d.month === currentData.month && d.year === currentData.year - 1
     );
 
     if (!sameMonthLastYear) return null;
 
-    const change = currentData.records - sameMonthLastYear.records;
-    const changePercent = sameMonthLastYear.records > 0 
-      ? Math.round((change / sameMonthLastYear.records) * 100) 
-      : currentData.records > 0 ? 100 : 0;
+    const current = getValue(currentData);
+    const previous = getValue(sameMonthLastYear);
+
+    const change = current - previous;
+    const changePercent = previous > 0
+      ? Math.round((change / previous) * 100)
+      : current > 0 ? 100 : 0;
 
     return {
-      value: currentData.records,
+      value: current,
       change,
       changePercent,
       isPositive: change > 0,
@@ -106,20 +127,29 @@ export function TrendAnalytics({ trendData, color = "hsl(var(--primary))", compa
   };
 
   // Calculate YTD (Year to Date) total
-  const calculateYTD = (): { total: number; avgPerMonth: number; peakMonth: string; peakValue: number; monthCount: number } => {
-    const latestYear = Math.max(...trendData.map(d => d.year));
-    const ytdData = trendData.filter(d => d.year === latestYear);
-    
-    const total = ytdData.reduce((sum, d) => sum + d.records, 0);
-    const avgPerMonth = ytdData.length > 0 ? Math.round(total / ytdData.length) : 0;
-    
-    const peakData = ytdData.reduce((max, d) => d.records > max.records ? d : max, ytdData[0] || { name: "-", records: 0 });
-    
+  const calculateYTD = (): {
+    total: number;
+    avgPerMonth: number;
+    peakMonth: string;
+    peakValue: number;
+    monthCount: number;
+  } => {
+    const latestYear = Math.max(...trendData.map((d) => d.year));
+    const ytdData = trendData.filter((d) => d.year === latestYear);
+
+    const total = ytdData.reduce((sum, d) => sum + getValue(d), 0);
+    const avgPerMonth = ytdData.length > 0 ? Math.round((total / ytdData.length) * 100) / 100 : 0;
+
+    const peakData = ytdData.reduce(
+      (max, d) => (getValue(d) > getValue(max) ? d : max),
+      ytdData[0] || ({ name: "-", records: 0, totalValue: 0, avgValue: 0, submitted: 0, month: 1, year: latestYear } as TrendDataPoint)
+    );
+
     return {
       total,
       avgPerMonth,
       peakMonth: peakData?.name || "-",
-      peakValue: peakData?.records || 0,
+      peakValue: getValue(peakData),
       monthCount: ytdData.length,
     };
   };
@@ -130,16 +160,19 @@ export function TrendAnalytics({ trendData, color = "hsl(var(--primary))", compa
 
     const n = trendData.length;
     const xSum = trendData.reduce((sum, _, i) => sum + i, 0);
-    const ySum = trendData.reduce((sum, d) => sum + d.records, 0);
-    const xySum = trendData.reduce((sum, d, i) => sum + i * d.records, 0);
+    const ySum = trendData.reduce((sum, d) => sum + getValue(d), 0);
+    const xySum = trendData.reduce((sum, d, i) => sum + i * getValue(d), 0);
     const x2Sum = trendData.reduce((sum, _, i) => sum + i * i, 0);
 
-    const slope = (n * xySum - xSum * ySum) / (n * x2Sum - xSum * xSum);
-    const avgValue = ySum / n;
-    const strength = avgValue > 0 ? Math.abs(Math.round((slope / avgValue) * 100)) : 0;
+    const denominator = (n * x2Sum - xSum * xSum);
+    if (denominator === 0) return { direction: "stable", strength: 0 };
+
+    const slope = (n * xySum - xSum * ySum) / denominator;
+    const avg = ySum / n;
+    const strength = avg > 0 ? Math.abs(Math.round((slope / avg) * 100)) : 0;
 
     return {
-      direction: slope > 0.1 ? "up" : slope < -0.1 ? "down" : "stable",
+      direction: slope > 0.0001 ? "up" : slope < -0.0001 ? "down" : "stable",
       strength: Math.min(strength, 100),
     };
   };
@@ -384,14 +417,14 @@ export function TrendAnalytics({ trendData, color = "hsl(var(--primary))", compa
             </div>
             <div className="flex items-baseline gap-1.5">
               <span className="text-2xl font-bold tracking-tight" style={{ color }}>
-                {ytd.total}
+                {ytd.total.toLocaleString()}
               </span>
               <span className="text-xs text-muted-foreground">
-                {language === "th" ? "รายการ" : "records"}
+                {valueNoun}
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">
-              {language === "th" ? `เฉลี่ย ${ytd.avgPerMonth} ต่อเดือน` : `Avg ${ytd.avgPerMonth} per month`}
+              {language === "th" ? `เฉลี่ย ${ytd.avgPerMonth.toLocaleString()} ต่อเดือน` : `Avg ${ytd.avgPerMonth.toLocaleString()} per month`}
             </p>
           </div>
         </div>
@@ -448,7 +481,7 @@ export function TrendAnalytics({ trendData, color = "hsl(var(--primary))", compa
               {language === "th" ? "ข้อมูลทั้งหมด:" : "Total Data:"}
             </span>
             <span className="text-sm font-semibold" style={{ color }}>
-              {trendData.reduce((sum, d) => sum + d.records, 0)} {language === "th" ? "รายการ" : "records"}
+              {trendData.reduce((sum, d) => sum + getValue(d), 0).toLocaleString()} {valueNoun}
             </span>
           </div>
           <div className="h-4 w-px bg-border" />
