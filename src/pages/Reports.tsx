@@ -1050,6 +1050,8 @@ export default function Reports() {
                   ? period.month_name.slice(0, 3) 
                   : `${period.month_name.slice(0, 3)} ${period.year}`,
                 period: `${period.month_name} ${period.year}`,
+                month: period.month,
+                year: period.year,
                 records: periodValues.length,
                 totalValue: Math.round(totalValue * 100) / 100,
                 avgValue: periodValues.length > 0 ? Math.round((totalValue / periodValues.length) * 100) / 100 : 0,
@@ -1172,11 +1174,7 @@ export default function Reports() {
                 {trendChartData.length >= 2 && (
                   <div className="mt-4">
                     <TrendAnalytics 
-                      trendData={trendChartData.map((d, i) => ({
-                        ...d,
-                        month: chartPeriods[i]?.month || (i + 1),
-                        year: chartPeriods[i]?.year || new Date().getFullYear(),
-                      }))} 
+                      trendData={trendChartData} 
                       color="hsl(var(--primary))" 
                     />
                   </div>
