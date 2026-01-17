@@ -155,6 +155,7 @@ export default function Reports() {
 
   // Interactive trend chart filters
   const [trendThemeFilter, setTrendThemeFilter] = useState<string>("__all__");
+  const [trendMetricFilter, setTrendMetricFilter] = useState<string>("__all__");
   const [trendYearFilter, setTrendYearFilter] = useState<string>("__all__");
   const [trendMonthFilter, setTrendMonthFilter] = useState<string>("__all__");
 
@@ -755,18 +756,21 @@ export default function Reports() {
           </CardTitle>
           <CardDescription>
             {language === "th" 
-              ? "เลือกหัวข้อ ปี และเดือน เพื่อดูแนวโน้มข้อมูล" 
-              : "Select theme, year, and month to view data trends"}
+              ? "เลือกหัวข้อ ตัวชี้วัด ปี และเดือน เพื่อดูแนวโน้มข้อมูล" 
+              : "Select theme, metric, year, and month to view data trends"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {/* Trend Chart Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="space-y-2">
               <Label className="text-sm font-medium">
                 {language === "th" ? "หัวข้อ" : "Theme"}
               </Label>
-              <Select value={trendThemeFilter} onValueChange={setTrendThemeFilter}>
+              <Select value={trendThemeFilter} onValueChange={(val) => {
+                setTrendThemeFilter(val);
+                setTrendMetricFilter("__all__"); // Reset metric when theme changes
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All Themes"} />
                 </SelectTrigger>
@@ -782,6 +786,32 @@ export default function Reports() {
                       </SelectItem>
                     );
                   })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                {language === "th" ? "ตัวชี้วัด" : "Metric"}
+              </Label>
+              <Select 
+                value={trendMetricFilter} 
+                onValueChange={setTrendMetricFilter}
+                disabled={trendThemeFilter === "__all__"}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All Metrics"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">
+                    {language === "th" ? "ทั้งหมด" : "All Metrics"}
+                  </SelectItem>
+                  {metrics
+                    .filter((m) => trendThemeFilter === "__all__" || m.theme_id === trendThemeFilter)
+                    .map((metric) => (
+                      <SelectItem key={metric.metric_id} value={metric.metric_id}>
+                        {metric.metric_name} {metric.unit ? `(${metric.unit})` : ""}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -856,7 +886,10 @@ export default function Reports() {
 
               // Get relevant metrics
               let relevantMetricIds: string[] = [];
-              if (trendThemeFilter === "__all__") {
+              if (trendMetricFilter !== "__all__") {
+                // Specific metric selected
+                relevantMetricIds = [trendMetricFilter];
+              } else if (trendThemeFilter === "__all__") {
                 relevantMetricIds = metrics.map((m) => m.metric_id);
               } else {
                 relevantMetricIds = metrics
