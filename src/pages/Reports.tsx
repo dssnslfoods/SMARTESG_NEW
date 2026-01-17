@@ -869,52 +869,30 @@ export default function Reports() {
 
           {/* Trend Chart */}
           {(() => {
-            // Calculate trend data based on filters
-            const trendChartData = (() => {
-              // Filter periods
-              let chartPeriods = [...periods];
-              if (trendYearFilter !== "__all__") {
-                chartPeriods = chartPeriods.filter((p) => p.year === parseInt(trendYearFilter));
-              }
-              if (trendMonthFilter !== "__all__") {
-                chartPeriods = chartPeriods.filter((p) => p.month === parseInt(trendMonthFilter));
-              }
-              chartPeriods = chartPeriods.sort((a, b) => {
-                if (a.year !== b.year) return a.year - b.year;
-                return a.month - b.month;
-              });
+            // Filter periods
+            let chartPeriods = [...periods];
+            if (trendYearFilter !== "__all__") {
+              chartPeriods = chartPeriods.filter((p) => p.year === parseInt(trendYearFilter));
+            }
+            if (trendMonthFilter !== "__all__") {
+              chartPeriods = chartPeriods.filter((p) => p.month === parseInt(trendMonthFilter));
+            }
+            chartPeriods = chartPeriods.sort((a, b) => {
+              if (a.year !== b.year) return a.year - b.year;
+              return a.month - b.month;
+            });
 
-              // Get relevant metrics
-              let relevantMetricIds: string[] = [];
-              if (trendMetricFilter !== "__all__") {
-                // Specific metric selected
-                relevantMetricIds = [trendMetricFilter];
-              } else if (trendThemeFilter === "__all__") {
-                relevantMetricIds = metrics.map((m) => m.metric_id);
-              } else {
-                relevantMetricIds = metrics
-                  .filter((m) => m.theme_id === trendThemeFilter)
-                  .map((m) => m.metric_id);
-              }
+            // Get relevant metrics
+            let relevantMetrics: typeof metrics = [];
+            if (trendMetricFilter !== "__all__") {
+              relevantMetrics = metrics.filter((m) => m.metric_id === trendMetricFilter);
+            } else if (trendThemeFilter === "__all__") {
+              relevantMetrics = metrics;
+            } else {
+              relevantMetrics = metrics.filter((m) => m.theme_id === trendThemeFilter);
+            }
 
-              return chartPeriods.map((period) => {
-                const periodValues = filteredValues.filter(
-                  (v) => v.period_id === period.period_id && relevantMetricIds.includes(v.metric_id)
-                );
-                const totalValue = periodValues.reduce((sum, v) => sum + v.value, 0);
-                
-                return {
-                  name: trendYearFilter !== "__all__" 
-                    ? period.month_name.slice(0, 3) 
-                    : `${period.month_name.slice(0, 3)} ${period.year}`,
-                  period: `${period.month_name} ${period.year}`,
-                  records: periodValues.length,
-                  totalValue: Math.round(totalValue * 100) / 100,
-                  avgValue: periodValues.length > 0 ? Math.round((totalValue / periodValues.length) * 100) / 100 : 0,
-                  submitted: periodValues.filter((v) => v.status === "submitted").length,
-                };
-              }).filter((d) => d.records > 0);
-            })();
+            const showMultipleMetrics = trendMetricFilter === "__all__" && trendThemeFilter !== "__all__" && relevantMetrics.length > 1;
 
             const selectedThemeData = trendThemeFilter !== "__all__" 
               ? themes.find((t) => t.theme_id === trendThemeFilter)
@@ -924,8 +902,141 @@ export default function Reports() {
               ? metrics.find((m) => m.metric_id === trendMetricFilter)
               : null;
 
-            // Get unit: from selected metric, or if theme selected show mixed units indicator
             const displayUnit = selectedMetricData?.unit || "";
+
+            // Chart colors for multiple metrics
+            const metricColors = [
+              "hsl(var(--chart-1))",
+              "hsl(var(--chart-2))",
+              "hsl(var(--chart-3))",
+              "hsl(var(--chart-4))",
+              "hsl(var(--chart-5))",
+              "hsl(var(--primary))",
+            ];
+
+            if (showMultipleMetrics) {
+              // Multiple metrics mode - show separate line for each metric
+              const multiMetricData = chartPeriods.map((period) => {
+                const dataPoint: Record<string, string | number> = {
+                  name: trendYearFilter !== "__all__" 
+                    ? period.month_name.slice(0, 3) 
+                    : `${period.month_name.slice(0, 3)} ${period.year}`,
+                  period: `${period.month_name} ${period.year}`,
+                };
+
+                relevantMetrics.forEach((metric) => {
+                  const metricValues = filteredValues.filter(
+                    (v) => v.period_id === period.period_id && v.metric_id === metric.metric_id
+                  );
+                  const totalValue = metricValues.reduce((sum, v) => sum + v.value, 0);
+                  dataPoint[metric.metric_id] = Math.round(totalValue * 100) / 100;
+                });
+
+                return dataPoint;
+              }).filter((d) => {
+                // Keep only periods that have at least one metric value
+                return relevantMetrics.some((m) => (d[m.metric_id] as number) > 0);
+              });
+
+              const hasData = multiMetricData.length > 0;
+
+              return hasData ? (
+                <div className="space-y-4">
+                  {selectedThemeData && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                      <Badge variant="outline" className="bg-primary/10">
+                        {selectedThemeData.theme_name}
+                      </Badge>
+                      <span>•</span>
+                      <span>{relevantMetrics.length} {language === "th" ? "ตัวชี้วัด" : "metrics"}</span>
+                    </div>
+                  )}
+                  <ResponsiveContainer width="100%" height={350}>
+                    <LineChart data={multiMetricData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="name" className="text-xs" />
+                      <YAxis className="text-xs" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--popover))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                        formatter={(value: number, name: string) => {
+                          const metric = relevantMetrics.find((m) => m.metric_id === name);
+                          const metricName = metric?.metric_name || name;
+                          const unit = metric?.unit || "";
+                          return [`${value.toLocaleString()}${unit ? ` ${unit}` : ""}`, metricName];
+                        }}
+                      />
+                      <Legend 
+                        formatter={(value) => {
+                          const metric = relevantMetrics.find((m) => m.metric_id === value);
+                          return metric ? `${metric.metric_name}${metric.unit ? ` (${metric.unit})` : ""}` : value;
+                        }}
+                      />
+                      {relevantMetrics.map((metric, index) => (
+                        <Line
+                          key={metric.metric_id}
+                          type="monotone"
+                          dataKey={metric.metric_id}
+                          name={metric.metric_id}
+                          stroke={metricColors[index % metricColors.length]}
+                          strokeWidth={2}
+                          dot={{ fill: metricColors[index % metricColors.length], strokeWidth: 2, r: 4 }}
+                          connectNulls
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+
+                  {/* Metric Summary Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pt-4 border-t">
+                    {relevantMetrics.map((metric, index) => {
+                      const metricTotal = multiMetricData.reduce((sum, d) => sum + ((d[metric.metric_id] as number) || 0), 0);
+                      return (
+                        <div key={metric.metric_id} className="p-3 rounded-lg bg-muted/50 border">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: metricColors[index % metricColors.length] }}
+                            />
+                            <span className="text-xs text-muted-foreground truncate">{metric.metric_name}</span>
+                          </div>
+                          <p className="text-lg font-bold">
+                            {metricTotal.toLocaleString()}
+                            {metric.unit && <span className="text-xs font-normal ml-1">{metric.unit}</span>}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-72 flex items-center justify-center text-muted-foreground">
+                  {language === "th" ? "ไม่มีข้อมูลสำหรับตัวกรองที่เลือก" : "No data for selected filters"}
+                </div>
+              );
+            }
+
+            // Single metric or aggregated mode
+            const trendChartData = chartPeriods.map((period) => {
+              const periodValues = filteredValues.filter(
+                (v) => v.period_id === period.period_id && relevantMetrics.some((m) => m.metric_id === v.metric_id)
+              );
+              const totalValue = periodValues.reduce((sum, v) => sum + v.value, 0);
+              
+              return {
+                name: trendYearFilter !== "__all__" 
+                  ? period.month_name.slice(0, 3) 
+                  : `${period.month_name.slice(0, 3)} ${period.year}`,
+                period: `${period.month_name} ${period.year}`,
+                records: periodValues.length,
+                totalValue: Math.round(totalValue * 100) / 100,
+                avgValue: periodValues.length > 0 ? Math.round((totalValue / periodValues.length) * 100) / 100 : 0,
+                submitted: periodValues.filter((v) => v.status === "submitted").length,
+              };
+            }).filter((d) => d.records > 0);
 
             return trendChartData.length > 0 ? (
               <div className="space-y-4">
@@ -970,7 +1081,6 @@ export default function Reports() {
                       }}
                       formatter={(value: number, name: string) => {
                         const formattedValue = typeof value === "number" ? value.toLocaleString() : value;
-                        // Add unit for totalValue and avgValue if metric is selected
                         if (displayUnit && (name === (language === "th" ? "ค่ารวม" : "Total Value"))) {
                           return [`${formattedValue} ${displayUnit}`, name];
                         }
