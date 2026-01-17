@@ -771,11 +771,11 @@ export default function Reports() {
                 setTrendMetricFilter("__all__"); // Reset metric when theme changes
               }}>
                 <SelectTrigger>
-                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All Themes"} />
+                  <SelectValue placeholder={language === "th" ? "เลือกหัวข้อ" : "Select Theme"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">
-                    {language === "th" ? "ทั้งหมด" : "All Themes"}
+                    {language === "th" ? "เลือกหัวข้อ" : "Select Theme"}
                   </SelectItem>
                   {themes.map((theme) => {
                     const dimension = dimensions.find((d) => d.dimension_id === theme.dimension_id);
