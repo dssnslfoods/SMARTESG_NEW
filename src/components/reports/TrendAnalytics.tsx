@@ -253,7 +253,7 @@ export function TrendAnalytics({ trendData, color = "hsl(var(--primary))", compa
           </span>
         </div>
         <p className="text-[10px] text-muted-foreground">
-          {language === "th" ? `เฉลี่ย ${ytd.avgPerMonth}/เดือน` : `Avg ${ytd.avgPerMonth}/month`}
+          {language === "th" ? `เฉลี่ย ${ytd.avgPerMonth} ต่อเดือน` : `Avg ${ytd.avgPerMonth} per month`}
         </p>
       </div>
 
