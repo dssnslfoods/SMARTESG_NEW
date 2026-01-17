@@ -868,6 +868,27 @@ export default function Reports() {
 
           {/* Trend Chart */}
           {(() => {
+            // Show prompt when no theme is selected
+            if (trendThemeFilter === "__all__") {
+              return (
+                <div className="h-72 flex flex-col items-center justify-center text-center gap-4 bg-muted/30 rounded-lg border-2 border-dashed border-muted-foreground/20">
+                  <div className="p-4 rounded-full bg-primary/10">
+                    <TrendingUp className="h-10 w-10 text-primary" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {language === "th" ? "เลือกหัวข้อที่ต้องการ" : "Select a Theme"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground max-w-sm">
+                      {language === "th" 
+                        ? "กรุณาเลือกหัวข้อ ESG จากตัวกรองด้านบนเพื่อดูกราฟแนวโน้มข้อมูล" 
+                        : "Please select an ESG theme from the filter above to view the trend chart"}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
             // Filter periods
             let chartPeriods = [...periods];
             if (trendYearFilter !== "__all__") {
@@ -885,13 +906,11 @@ export default function Reports() {
             let relevantMetrics: typeof metrics = [];
             if (trendMetricFilter !== "__all__") {
               relevantMetrics = metrics.filter((m) => m.metric_id === trendMetricFilter);
-            } else if (trendThemeFilter === "__all__") {
-              relevantMetrics = metrics;
             } else {
               relevantMetrics = metrics.filter((m) => m.theme_id === trendThemeFilter);
             }
 
-            const showMultipleMetrics = trendMetricFilter === "__all__" && trendThemeFilter !== "__all__" && relevantMetrics.length > 1;
+            const showMultipleMetrics = trendMetricFilter === "__all__" && relevantMetrics.length > 1;
 
             const selectedThemeData = trendThemeFilter !== "__all__" 
               ? themes.find((t) => t.theme_id === trendThemeFilter)
