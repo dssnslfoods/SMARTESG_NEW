@@ -488,16 +488,16 @@ export default function Reports() {
 
       {/* Executive Summary Row */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Overall ESG Score */}
+        {/* Data Entry Success */}
         <Card className="lg:col-span-1 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Target className="h-5 w-5 text-primary" />
-              {language === "th" ? "คะแนนรวม ESG" : "Overall ESG Score"}
+              {language === "th" ? "ลงข้อมูลสำเร็จ" : "Data Entry Success"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center relative">
               <ResponsiveContainer width={140} height={140}>
                 <RadialBarChart
                   cx="50%"
@@ -516,7 +516,7 @@ export default function Reports() {
                   />
                 </RadialBarChart>
               </ResponsiveContainer>
-              <div className="absolute flex flex-col items-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-3xl font-bold text-primary">{overallScore}%</span>
                 <span className="text-xs text-muted-foreground">
                   {language === "th" ? "สำเร็จ" : "Complete"}
