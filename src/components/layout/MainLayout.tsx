@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -9,6 +10,9 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Enable realtime notifications for data changes
+  useRealtimeNotifications();
 
   return (
     <div className="flex h-screen bg-background">
