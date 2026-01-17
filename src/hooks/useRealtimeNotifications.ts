@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotifications } from '@/contexts/NotificationsContext';
 
 interface MetricValuePayload {
   value_id: string;
@@ -18,6 +19,7 @@ export function useRealtimeNotifications() {
   const { toast } = useToast();
   const { language } = useLanguage();
   const { user, role } = useAuth();
+  const { addNotification } = useNotifications();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
@@ -41,12 +43,13 @@ export function useRealtimeNotifications() {
           // Don't notify for own submissions
           if (newRecord.submitted_by === user.id) return;
 
-          toast({
-            title: language === 'th' ? '📊 ข้อมูลใหม่' : '📊 New Data',
-            description: language === 'th' 
-              ? `มีการบันทึกข้อมูลใหม่ (${newRecord.status === 'draft' ? 'ร่าง' : 'ส่งแล้ว'})`
-              : `New data entry recorded (${newRecord.status})`,
-          });
+          const title = language === 'th' ? '📊 ข้อมูลใหม่' : '📊 New Data';
+          const description = language === 'th' 
+            ? `มีการบันทึกข้อมูลใหม่ (${newRecord.status === 'draft' ? 'ร่าง' : 'ส่งแล้ว'})`
+            : `New data entry recorded (${newRecord.status})`;
+
+          toast({ title, description });
+          addNotification({ title, description, type: 'info' });
         }
       )
       .on(
@@ -73,25 +76,31 @@ export function useRealtimeNotifications() {
             const toStatus = statusLabels[newRecord.status] || { th: newRecord.status, en: newRecord.status };
 
             let icon = '🔄';
-            if (newRecord.status === 'approved') icon = '✅';
-            if (newRecord.status === 'rejected') icon = '❌';
-            if (newRecord.status === 'submitted') icon = '📤';
+            let notifType: 'info' | 'success' | 'warning' | 'error' = 'info';
+            if (newRecord.status === 'approved') { icon = '✅'; notifType = 'success'; }
+            if (newRecord.status === 'rejected') { icon = '❌'; notifType = 'error'; }
+            if (newRecord.status === 'submitted') { icon = '📤'; notifType = 'info'; }
+
+            const title = language === 'th' ? `${icon} สถานะเปลี่ยนแปลง` : `${icon} Status Changed`;
+            const description = language === 'th'
+              ? `สถานะเปลี่ยนจาก "${fromStatus.th}" เป็น "${toStatus.th}"`
+              : `Status changed from "${fromStatus.en}" to "${toStatus.en}"`;
 
             toast({
-              title: language === 'th' ? `${icon} สถานะเปลี่ยนแปลง` : `${icon} Status Changed`,
-              description: language === 'th'
-                ? `สถานะเปลี่ยนจาก "${fromStatus.th}" เป็น "${toStatus.th}"`
-                : `Status changed from "${fromStatus.en}" to "${toStatus.en}"`,
+              title,
+              description,
               variant: newRecord.status === 'rejected' ? 'destructive' : 'default',
             });
+            addNotification({ title, description, type: notifType });
           } else {
             // Value updated but status didn't change
-            toast({
-              title: language === 'th' ? '📝 ข้อมูลถูกแก้ไข' : '📝 Data Updated',
-              description: language === 'th' 
-                ? 'มีการแก้ไขข้อมูลในระบบ'
-                : 'Data has been updated in the system',
-            });
+            const title = language === 'th' ? '📝 ข้อมูลถูกแก้ไข' : '📝 Data Updated';
+            const description = language === 'th' 
+              ? 'มีการแก้ไขข้อมูลในระบบ'
+              : 'Data has been updated in the system';
+
+            toast({ title, description });
+            addNotification({ title, description, type: 'info' });
           }
         }
       )
@@ -103,13 +112,13 @@ export function useRealtimeNotifications() {
           table: 'metric_value',
         },
         () => {
-          toast({
-            title: language === 'th' ? '🗑️ ข้อมูลถูกลบ' : '🗑️ Data Deleted',
-            description: language === 'th' 
-              ? 'มีการลบข้อมูลออกจากระบบ'
-              : 'Data has been removed from the system',
-            variant: 'destructive',
-          });
+          const title = language === 'th' ? '🗑️ ข้อมูลถูกลบ' : '🗑️ Data Deleted';
+          const description = language === 'th' 
+            ? 'มีการลบข้อมูลออกจากระบบ'
+            : 'Data has been removed from the system';
+
+          toast({ title, description, variant: 'destructive' });
+          addNotification({ title, description, type: 'error' });
         }
       )
       .subscribe();
@@ -121,5 +130,5 @@ export function useRealtimeNotifications() {
         supabase.removeChannel(channelRef.current);
       }
     };
-  }, [user, role, language, toast]);
+  }, [user, role, language, toast, addNotification]);
 }
