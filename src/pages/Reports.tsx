@@ -20,25 +20,15 @@ import {
   Users,
   Shield,
   Calendar,
-  Droplets,
-  Zap,
-  Trash2,
-  Factory,
   Globe,
   CheckCircle2,
   Clock,
   Target,
-  TrendingDown,
-  ArrowUp,
-  ArrowDown,
-  Minus,
   ChevronRight,
   Eye,
-  X,
-  Menu,
-  PanelLeftClose,
-  PanelLeft,
 } from "lucide-react";
+import { useReportSections } from "@/hooks/useReportSections";
+import { SectionToggle } from "@/components/reports/SectionToggle";
 import {
   BarChart,
   Bar,
@@ -162,28 +152,8 @@ export default function Reports() {
   const [trendYearFilter, setTrendYearFilter] = useState<string>("__all__");
   const [trendMonthFilter, setTrendMonthFilter] = useState<string>("__all__");
 
-  // Side menu state
-  const [sideMenuOpen, setSideMenuOpen] = useState(true);
-  const [activeSection, setActiveSection] = useState<string>("summary");
-
-  // Section definitions
-  const sections = [
-    { id: "summary", label: language === "th" ? "สรุปภาพรวม" : "Executive Summary", icon: Target },
-    { id: "dimensions", label: language === "th" ? "มิติ ESG" : "ESG Dimensions", icon: Globe },
-    { id: "trend", label: language === "th" ? "กราฟแนวโน้ม" : "Trend Chart", icon: TrendingUp },
-    { id: "themes", label: language === "th" ? "แนวโน้มหัวข้อ" : "Theme Trends", icon: Leaf },
-    { id: "top-data", label: language === "th" ? "หัวข้อ & ตัวชี้วัด" : "Themes & Metrics", icon: Activity },
-    { id: "sites", label: language === "th" ? "สถานที่" : "Site Performance", icon: Building2 },
-    { id: "comparison", label: language === "th" ? "เปรียบเทียบมิติ" : "Dimension Comparison", icon: BarChart3 },
-  ];
-
-  const scrollToSection = (sectionId: string) => {
-    setActiveSection(sectionId);
-    const element = document.getElementById(`section-${sectionId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
+  // Report sections visibility
+  const { sections, toggleSection, setAllVisible, isSectionVisible } = useReportSections();
 
   const handleRefresh = useCallback(async () => {
     await fetchData();
@@ -506,91 +476,30 @@ export default function Reports() {
   }
 
   return (
-    <div ref={containerRef} className="flex h-full overflow-hidden">
-      {/* Side Menu */}
-      <div
-        className={`${
-          sideMenuOpen ? "w-56" : "w-0 md:w-14"
-        } flex-shrink-0 transition-all duration-300 border-r bg-card overflow-hidden`}
-      >
-        <div className="p-3 flex flex-col h-full">
-          {/* Menu Header */}
-          <div className="flex items-center justify-between mb-4">
-            {sideMenuOpen && (
-              <span className="font-semibold text-sm">
-                {language === "th" ? "เมนู" : "Menu"}
-              </span>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setSideMenuOpen(!sideMenuOpen)}
-            >
-              {sideMenuOpen ? (
-                <PanelLeftClose className="h-4 w-4" />
-              ) : (
-                <PanelLeft className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+    <div ref={containerRef} className="space-y-6 pb-8">
+      <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
-          {/* Menu Items */}
-          <nav className="space-y-1 flex-1">
-            {sections.map((section) => {
-              const Icon = section.icon;
-              const isActive = activeSection === section.id;
-              return (
-                <button
-                  key={section.id}
-                  onClick={() => scrollToSection(section.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                  title={section.label}
-                >
-                  <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? "" : ""}`} />
-                  {sideMenuOpen && (
-                    <span className="truncate">{section.label}</span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            {language === "th" ? "Executive ESG Dashboard" : "Executive ESG Dashboard"}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {language === "th" 
+              ? "ภาพรวมประสิทธิภาพความยั่งยืนขององค์กร" 
+              : "Enterprise Sustainability Performance Overview"}
+          </p>
         </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto pb-8">
-        <div className="space-y-6 p-4 md:p-6">
-          <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
-
-          {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="flex items-center gap-3">
-              {/* Mobile menu toggle */}
-              <Button
-                variant="outline"
-                size="icon"
-                className="md:hidden h-9 w-9"
-                onClick={() => setSideMenuOpen(!sideMenuOpen)}
-              >
-                <Menu className="h-4 w-4" />
-              </Button>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                  {language === "th" ? "Executive ESG Dashboard" : "Executive ESG Dashboard"}
-                </h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {language === "th" 
-                    ? "ภาพรวมประสิทธิภาพความยั่งยืนขององค์กร" 
-                    : "Enterprise Sustainability Performance Overview"}
-                </p>
-              </div>
-            </div>
+        
+        {/* Section Toggle Button */}
+        <SectionToggle
+          sections={sections}
+          onToggle={toggleSection}
+          onShowAll={() => setAllVisible(true)}
+          onHideAll={() => setAllVisible(false)}
+        />
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3">
@@ -694,6 +603,7 @@ export default function Reports() {
       </div>
 
       {/* Executive Summary Row */}
+      {isSectionVisible("summary") && (
       <div id="section-summary" className="grid grid-cols-1 lg:grid-cols-4 gap-4 scroll-mt-4">
         {/* Data Entry Success */}
         <Card className="lg:col-span-1 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
@@ -783,8 +693,10 @@ export default function Reports() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* ESG Dimensions Overview */}
+      {isSectionVisible("dimensions") && (
       <Card id="section-dimensions" className="scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -841,8 +753,10 @@ export default function Reports() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Interactive Trend Chart */}
+      {isSectionVisible("trend") && (
       <Card id="section-trend" className="scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -1252,8 +1166,10 @@ export default function Reports() {
           })()}
         </CardContent>
       </Card>
+      )}
 
       {/* Theme Trend Charts with Drill-down */}
+      {isSectionVisible("themes") && (
       <Card id="section-themes" className="scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -1357,8 +1273,10 @@ export default function Reports() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Themes & Metrics Section */}
+      {isSectionVisible("top-data") && (
       <div id="section-top-data" className="grid grid-cols-1 lg:grid-cols-2 gap-6 scroll-mt-4">
         {/* Top Themes by Records */}
         <Card>
@@ -1451,8 +1369,10 @@ export default function Reports() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Site Performance */}
+      {isSectionVisible("sites") && (
       <Card id="section-sites" className="scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -1502,8 +1422,10 @@ export default function Reports() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Dimension Bar Chart */}
+      {isSectionVisible("comparison") && (
       <Card id="section-comparison" className="scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -1547,6 +1469,7 @@ export default function Reports() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Drill-down Dialog */}
       <Dialog open={drilldownDialogOpen} onOpenChange={setDrilldownDialogOpen}>
@@ -1720,8 +1643,6 @@ export default function Reports() {
           )}
         </DialogContent>
       </Dialog>
-        </div>
-      </div>
     </div>
   );
 }
