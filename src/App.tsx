@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ReportSectionsProvider } from "@/contexts/ReportSectionsContext";
+import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -27,8 +28,9 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <LanguageProvider>
-        <ReportSectionsProvider>
-          <TooltipProvider>
+        <NotificationsProvider>
+          <ReportSectionsProvider>
+            <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -126,8 +128,9 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
-          </TooltipProvider>
-        </ReportSectionsProvider>
+            </TooltipProvider>
+          </ReportSectionsProvider>
+        </NotificationsProvider>
       </LanguageProvider>
     </AuthProvider>
   </QueryClientProvider>

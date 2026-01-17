@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Globe, User, LogOut, Building2, Menu } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
   onMenuToggle?: () => void;
@@ -80,6 +81,9 @@ export function Header({ onMenuToggle }: HeaderProps) {
             {t(role)}
           </Badge>
         )}
+
+        {/* Notification Bell */}
+        <NotificationBell />
 
         {/* Language Switcher */}
         <DropdownMenu>
