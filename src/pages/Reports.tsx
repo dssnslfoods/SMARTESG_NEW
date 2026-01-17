@@ -635,126 +635,64 @@ export default function Reports() {
         </CardContent>
       </Card>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              {language === "th" ? `แนวโน้มรายเดือน ${selectedYear || ""}` : `Monthly Trend ${selectedYear || ""}`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {monthlyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={monthlyData}>
-                  <defs>
-                    <linearGradient id="colorSubmitted" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorDraft" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="submitted"
-                    name={language === "th" ? "ส่งแล้ว" : "Submitted"}
-                    stroke="hsl(var(--primary))"
-                    fill="url(#colorSubmitted)"
-                    strokeWidth={2}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="draft"
-                    name={language === "th" ? "ร่าง" : "Draft"}
-                    stroke="hsl(var(--muted-foreground))"
-                    fill="url(#colorDraft)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-72 flex items-center justify-center text-muted-foreground">
-                {language === "th" ? "ไม่มีข้อมูล" : "No data"}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Status Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              {language === "th" ? "สถานะข้อมูล" : "Data Status Distribution"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-8">
-              {statusData.length > 0 ? (
-                <>
-                  <ResponsiveContainer width="50%" height={200}>
-                    <PieChart>
-                      <Pie
-                        data={statusData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {statusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="flex-1 space-y-4">
-                    {statusData.map((status, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: status.color }}
-                          />
-                          <span className="text-sm">{status.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-semibold">{status.value}</span>
-                          <span className="text-xs text-muted-foreground ml-2">
-                            ({totalRecords > 0 ? Math.round((status.value / totalRecords) * 100) : 0}%)
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="w-full h-48 flex items-center justify-center text-muted-foreground">
-                  {language === "th" ? "ไม่มีข้อมูล" : "No data"}
-                </div>
-              )}
+      {/* Monthly Trend Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            {language === "th" ? `แนวโน้มรายเดือน ${selectedYear || ""}` : `Monthly Trend ${selectedYear || ""}`}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {monthlyData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={monthlyData}>
+                <defs>
+                  <linearGradient id="colorSubmitted" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="colorDraft" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" className="text-xs" />
+                <YAxis className="text-xs" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                  }}
+                />
+                <Legend />
+                <Area
+                  type="monotone"
+                  dataKey="submitted"
+                  name={language === "th" ? "ส่งแล้ว" : "Submitted"}
+                  stroke="hsl(var(--primary))"
+                  fill="url(#colorSubmitted)"
+                  strokeWidth={2}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="draft"
+                  name={language === "th" ? "ร่าง" : "Draft"}
+                  stroke="hsl(var(--muted-foreground))"
+                  fill="url(#colorDraft)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-72 flex items-center justify-center text-muted-foreground">
+              {language === "th" ? "ไม่มีข้อมูล" : "No data"}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Themes & Metrics Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
