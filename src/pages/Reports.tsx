@@ -623,8 +623,8 @@ export default function Reports() {
                 </RadialBarChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-3xl font-bold text-primary">{overallScore}%</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xl font-bold text-primary">{overallScore}%</span>
+                <span className="text-[10px] text-muted-foreground">
                   {language === "th" ? "สำเร็จ" : "Complete"}
                 </span>
               </div>
