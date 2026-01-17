@@ -1175,7 +1175,9 @@ export default function Reports() {
                   <div className="mt-4">
                     <TrendAnalytics 
                       trendData={trendChartData} 
-                      color="hsl(var(--primary))" 
+                      color="hsl(var(--primary))"
+                      measure="totalValue"
+                      unitLabel={displayUnit || undefined}
                     />
                   </div>
                 )}
