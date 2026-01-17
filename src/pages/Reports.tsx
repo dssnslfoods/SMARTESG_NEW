@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   BarChart3,
   TrendingUp,
@@ -16,6 +17,18 @@ import {
   Users,
   Shield,
   Calendar,
+  Droplets,
+  Zap,
+  Trash2,
+  Factory,
+  Globe,
+  CheckCircle2,
+  Clock,
+  Target,
+  TrendingDown,
+  ArrowUp,
+  ArrowDown,
+  Minus,
 } from "lucide-react";
 import {
   BarChart,
@@ -33,6 +46,8 @@ import {
   Line,
   AreaChart,
   Area,
+  RadialBarChart,
+  RadialBar,
 } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
@@ -82,6 +97,32 @@ interface EsgTheme {
   theme_name: string;
   dimension_id: string;
 }
+
+// Dimension icons mapping
+const getDimensionIcon = (dimensionName: string) => {
+  const name = dimensionName.toLowerCase();
+  if (name.includes("environment") || name.includes("สิ่งแวดล้อม")) return Leaf;
+  if (name.includes("social") || name.includes("สังคม")) return Users;
+  if (name.includes("governance") || name.includes("ธรรมาภิบาล")) return Shield;
+  return Globe;
+};
+
+// Dimension colors
+const getDimensionColor = (dimensionName: string) => {
+  const name = dimensionName.toLowerCase();
+  if (name.includes("environment") || name.includes("สิ่งแวดล้อม")) return "hsl(var(--chart-1))";
+  if (name.includes("social") || name.includes("สังคม")) return "hsl(var(--chart-2))";
+  if (name.includes("governance") || name.includes("ธรรมาภิบาล")) return "hsl(var(--chart-4))";
+  return "hsl(var(--chart-5))";
+};
+
+const getDimensionBgColor = (dimensionName: string) => {
+  const name = dimensionName.toLowerCase();
+  if (name.includes("environment") || name.includes("สิ่งแวดล้อม")) return "bg-emerald-500/10";
+  if (name.includes("social") || name.includes("สังคม")) return "bg-cyan-500/10";
+  if (name.includes("governance") || name.includes("ธรรมาภิบาล")) return "bg-amber-500/10";
+  return "bg-blue-500/10";
+};
 
 export default function Reports() {
   const { language } = useLanguage();
@@ -185,17 +226,27 @@ export default function Reports() {
   const submittedCount = filteredValues.filter((v) => v.status === "submitted").length;
   const completionRate = totalRecords > 0 ? Math.round((submittedCount / totalRecords) * 100) : 0;
 
-  // Data by dimension
+  // Data by dimension with enhanced metrics
   const dimensionData = dimensions.map((dim) => {
     const dimThemes = themes.filter((t) => t.dimension_id === dim.dimension_id);
     const dimMetrics = metrics.filter((m) => dimThemes.some((t) => t.theme_id === m.theme_id));
     const dimValues = filteredValues.filter((v) => dimMetrics.some((m) => m.metric_id === v.metric_id));
 
+    const submitted = dimValues.filter((v) => v.status === "submitted").length;
+    const total = dimValues.length;
+    const rate = total > 0 ? Math.round((submitted / total) * 100) : 0;
+
     return {
+      dimension_id: dim.dimension_id,
       name: dim.dimension_name,
       total: dimValues.length,
-      submitted: dimValues.filter((v) => v.status === "submitted").length,
+      submitted,
       draft: dimValues.filter((v) => v.status === "draft").length,
+      rate,
+      themeCount: dimThemes.length,
+      metricCount: dimMetrics.length,
+      totalValue: dimValues.reduce((sum, v) => sum + v.value, 0),
+      avgValue: dimValues.length > 0 ? dimValues.reduce((sum, v) => sum + v.value, 0) / dimValues.length : 0,
     };
   });
 
@@ -229,21 +280,25 @@ export default function Reports() {
       };
     });
 
-  // Data by site
-  const siteData = filteredSites
-    .map((site) => {
-      const siteValues = filteredValues.filter((v) => v.site_id === site.site_id);
-      return {
-        name: site.site_name.length > 15 ? site.site_name.slice(0, 15) + "..." : site.site_name,
-        fullName: site.site_name,
-        submitted: siteValues.filter((v) => v.status === "submitted").length,
-        draft: siteValues.filter((v) => v.status === "draft").length,
-        total: siteValues.length,
-      };
-    })
-    .filter((s) => s.total > 0)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10);
+  // Theme data with hierarchy
+  const themeData = themes.map((theme) => {
+    const themeMetrics = metrics.filter((m) => m.theme_id === theme.theme_id);
+    const themeValues = filteredValues.filter((v) => themeMetrics.some((m) => m.metric_id === v.metric_id));
+    const dimension = dimensions.find((d) => d.dimension_id === theme.dimension_id);
+
+    return {
+      theme_id: theme.theme_id,
+      name: theme.theme_name,
+      dimension_id: theme.dimension_id,
+      dimensionName: dimension?.dimension_name || "",
+      metricCount: themeMetrics.length,
+      recordCount: themeValues.length,
+      submittedCount: themeValues.filter((v) => v.status === "submitted").length,
+      completionRate: themeValues.length > 0
+        ? Math.round((themeValues.filter((v) => v.status === "submitted").length / themeValues.length) * 100)
+        : 0,
+    };
+  }).filter(t => t.recordCount > 0).sort((a, b) => b.recordCount - a.recordCount);
 
   // Top metrics by value count
   const topMetrics = metrics
@@ -252,45 +307,86 @@ export default function Reports() {
       const theme = themes.find((t) => t.theme_id === metric.theme_id);
       const dimension = dimensions.find((d) => d.dimension_id === theme?.dimension_id);
       return {
-        name: metric.metric_name.length > 20 ? metric.metric_name.slice(0, 20) + "..." : metric.metric_name,
-        fullName: metric.metric_name,
+        metric_id: metric.metric_id,
+        name: metric.metric_name,
+        unit: metric.unit,
+        theme: theme?.theme_name || "",
         dimension: dimension?.dimension_name || "",
         count: metricVals.length,
-        avgValue:
-          metricVals.length > 0 ? Math.round(metricVals.reduce((sum, v) => sum + v.value, 0) / metricVals.length) : 0,
+        totalValue: metricVals.reduce((sum, v) => sum + v.value, 0),
+        avgValue: metricVals.length > 0 
+          ? metricVals.reduce((sum, v) => sum + v.value, 0) / metricVals.length 
+          : 0,
+        submittedCount: metricVals.filter((v) => v.status === "submitted").length,
       };
     })
     .filter((m) => m.count > 0)
     .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
+    .slice(0, 8);
 
-  const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))", "hsl(var(--accent))", "hsl(var(--muted-foreground))"];
+  // Site performance data
+  const sitePerformance = filteredSites
+    .map((site) => {
+      const siteValues = filteredValues.filter((v) => v.site_id === site.site_id);
+      const company = companies.find((c) => c.company_id === site.company_id);
+      return {
+        site_id: site.site_id,
+        name: site.site_name,
+        company: company?.company_name || "",
+        submitted: siteValues.filter((v) => v.status === "submitted").length,
+        draft: siteValues.filter((v) => v.status === "draft").length,
+        total: siteValues.length,
+        completionRate: siteValues.length > 0
+          ? Math.round((siteValues.filter((v) => v.status === "submitted").length / siteValues.length) * 100)
+          : 0,
+      };
+    })
+    .filter((s) => s.total > 0)
+    .sort((a, b) => b.completionRate - a.completionRate)
+    .slice(0, 6);
+
+  // Radial chart data for overall ESG score
+  const overallScore = completionRate;
+  const radialData = [
+    {
+      name: "Score",
+      value: overallScore,
+      fill: "hsl(var(--primary))",
+    },
+  ];
+
+  const COLORS = [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))",
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))",
+  ];
 
   if (loading) {
     return <ReportsLoadingSkeleton />;
   }
 
   return (
-    <div 
-      ref={containerRef}
-      className="space-y-6 h-full overflow-y-auto"
-    >
+    <div ref={containerRef} className="space-y-6 h-full overflow-y-auto pb-8">
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
-      
+
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-xl sm:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
             <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-            {language === "th" ? "รายงานสนับสนุนการตัดสินใจ" : "ESG Dashboard Performance"}
+            {language === "th" ? "Executive ESG Dashboard" : "Executive ESG Dashboard"}
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            {language === "th" ? "ภาพรวมและวิเคราะห์ข้อมูล ESG" : "ESG Data Overview & Analytics"}
+            {language === "th" 
+              ? "ภาพรวมประสิทธิภาพความยั่งยืนขององค์กร" 
+              : "Enterprise Sustainability Performance Overview"}
           </p>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground flex items-center gap-1">
               <Building2 className="h-3 w-3" />
@@ -303,7 +399,7 @@ export default function Reports() {
                 setFilterSite("");
               }}
             >
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-36 h-9">
                 <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
               </SelectTrigger>
               <SelectContent>
@@ -326,7 +422,7 @@ export default function Reports() {
               onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}
               disabled={!filterCompany}
             >
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-36 h-9">
                 <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
               </SelectTrigger>
               <SelectContent>
@@ -351,7 +447,7 @@ export default function Reports() {
                 setFilterMonth("");
               }}
             >
-              <SelectTrigger className="w-28">
+              <SelectTrigger className="w-24 h-9">
                 <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
               </SelectTrigger>
               <SelectContent>
@@ -374,7 +470,7 @@ export default function Reports() {
               onValueChange={(v) => setFilterMonth(v === "__all__" ? "" : v)}
               disabled={!filterYear}
             >
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-28 h-9">
                 <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
               </SelectTrigger>
               <SelectContent>
@@ -390,171 +486,189 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+      {/* Executive Summary Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* Overall ESG Score */}
+        <Card className="lg:col-span-1 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2 text-primary">
-              <FileText className="h-4 w-4" />
-              {language === "th" ? "ข้อมูลทั้งหมด" : "Total Records"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-primary">{totalRecords}</p>
-            <p className="text-xs text-muted-foreground mt-1">{language === "th" ? "รายการ" : "entries"}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-secondary/20 to-secondary/5 border-secondary/20">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              {language === "th" ? "ส่งแล้ว" : "Submitted"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{submittedCount}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {completionRate}% {language === "th" ? "ของทั้งหมด" : "of total"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              {language === "th" ? "ตัวชี้วัด" : "Metrics"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{metrics.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {language === "th" ? "ตัวชี้วัดที่ใช้งาน" : "active metrics"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              {language === "th" ? "สถานที่" : "Sites"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{filteredSites.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {language === "th" ? "สถานที่ที่บันทึก" : "reporting sites"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Status Pie Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              {language === "th" ? "สถานะข้อมูล" : "Data Status"}
+            <CardTitle className="text-base flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              {language === "th" ? "คะแนนรวม ESG" : "Overall ESG Score"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {statusData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={5}
+            <div className="flex items-center justify-center">
+              <ResponsiveContainer width={140} height={140}>
+                <RadialBarChart
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="60%"
+                  outerRadius="100%"
+                  barSize={12}
+                  data={radialData}
+                  startAngle={180}
+                  endAngle={-180}
+                >
+                  <RadialBar
+                    background={{ fill: "hsl(var(--muted))" }}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    labelLine={false}
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
+                    cornerRadius={6}
+                  />
+                </RadialBarChart>
               </ResponsiveContainer>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-muted-foreground">
-                {language === "th" ? "ไม่มีข้อมูล" : "No data"}
+              <div className="absolute flex flex-col items-center">
+                <span className="text-3xl font-bold text-primary">{overallScore}%</span>
+                <span className="text-xs text-muted-foreground">
+                  {language === "th" ? "สำเร็จ" : "Complete"}
+                </span>
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* Dimension Bar Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Leaf className="h-5 w-5 text-primary" />
-              {language === "th" ? "ข้อมูลตามมิติ ESG" : "Data by ESG Dimension"}
+        {/* Quick Stats */}
+        <Card className="lg:col-span-3">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              {language === "th" ? "สถิติภาพรวม" : "Quick Statistics"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {dimensionData.some((d) => d.total > 0) ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={dimensionData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" className="text-xs" />
-                  <YAxis type="category" dataKey="name" width={100} className="text-xs" tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar
-                    dataKey="submitted"
-                    name={language === "th" ? "ส่งแล้ว" : "Submitted"}
-                    fill="hsl(var(--primary))"
-                    radius={[0, 4, 4, 0]}
-                  />
-                  <Bar
-                    dataKey="draft"
-                    name={language === "th" ? "ร่าง" : "Draft"}
-                    fill="hsl(var(--muted-foreground))"
-                    radius={[0, 4, 4, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-muted-foreground">
-                {language === "th" ? "ไม่มีข้อมูล" : "No data"}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-lg bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs text-muted-foreground">
+                    {language === "th" ? "ข้อมูลทั้งหมด" : "Total Records"}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-emerald-600">{totalRecords}</p>
               </div>
-            )}
+              <div className="p-4 rounded-lg bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle2 className="h-4 w-4 text-cyan-600" />
+                  <span className="text-xs text-muted-foreground">
+                    {language === "th" ? "ส่งแล้ว" : "Submitted"}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-cyan-600">{submittedCount}</p>
+              </div>
+              <div className="p-4 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  <span className="text-xs text-muted-foreground">
+                    {language === "th" ? "ร่าง" : "Draft"}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-amber-600">{draftCount}</p>
+              </div>
+              <div className="p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="h-4 w-4 text-purple-600" />
+                  <span className="text-xs text-muted-foreground">
+                    {language === "th" ? "สถานที่" : "Sites"}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-purple-600">{filteredSites.length}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts Row 2 */}
+      {/* ESG Dimensions Overview */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Globe className="h-5 w-5 text-primary" />
+            {language === "th" ? "ภาพรวมมิติ ESG" : "ESG Dimensions Overview"}
+          </CardTitle>
+          <CardDescription>
+            {language === "th" 
+              ? "สรุปประสิทธิภาพตามมิติด้านสิ่งแวดล้อม สังคม และธรรมาภิบาล" 
+              : "Performance summary by Environmental, Social, and Governance dimensions"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {dimensionData.map((dim) => {
+              const DimIcon = getDimensionIcon(dim.name);
+              const color = getDimensionColor(dim.name);
+              const bgClass = getDimensionBgColor(dim.name);
+              
+              return (
+                <div
+                  key={dim.dimension_id}
+                  className={`p-5 rounded-xl border ${bgClass} transition-all hover:shadow-md`}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="p-2.5 rounded-lg"
+                        style={{ backgroundColor: `${color}20` }}
+                      >
+                        <DimIcon className="h-5 w-5" style={{ color }} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">{dim.name}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {dim.themeCount} {language === "th" ? "หัวข้อ" : "themes"} • {dim.metricCount} {language === "th" ? "ตัวชี้วัด" : "metrics"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-2xl font-bold" style={{ color }}>{dim.rate}%</span>
+                    </div>
+                  </div>
+                  
+                  <Progress value={dim.rate} className="h-2 mb-3" />
+                  
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{dim.submitted} {language === "th" ? "ส่งแล้ว" : "submitted"}</span>
+                    <span>{dim.total} {language === "th" ? "รายการ" : "records"}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Monthly Trend */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
+              <TrendingUp className="h-5 w-5 text-primary" />
               {language === "th" ? `แนวโน้มรายเดือน ${selectedYear || ""}` : `Monthly Trend ${selectedYear || ""}`}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {monthlyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={monthlyData}>
                   <defs>
                     <linearGradient id="colorSubmitted" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
+                    <linearGradient id="colorDraft" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0} />
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="name" className="text-xs" />
                   <YAxis className="text-xs" />
-                  <Tooltip />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                  />
                   <Legend />
                   <Area
                     type="monotone"
@@ -564,83 +678,166 @@ export default function Reports() {
                     fill="url(#colorSubmitted)"
                     strokeWidth={2}
                   />
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="draft"
                     name={language === "th" ? "ร่าง" : "Draft"}
                     stroke="hsl(var(--muted-foreground))"
+                    fill="url(#colorDraft)"
                     strokeWidth={2}
-                    dot={{ fill: "hsl(var(--muted-foreground))" }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
+              <div className="h-72 flex items-center justify-center text-muted-foreground">
                 {language === "th" ? "ไม่มีข้อมูล" : "No data"}
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Site Performance */}
+        {/* Status Distribution */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              {language === "th" ? "ข้อมูลตามสถานที่" : "Data by Site"}
+              <Shield className="h-5 w-5 text-primary" />
+              {language === "th" ? "สถานะข้อมูล" : "Data Status Distribution"}
             </CardTitle>
-            <CardDescription>{language === "th" ? "10 อันดับแรก" : "Top 10"}</CardDescription>
           </CardHeader>
           <CardContent>
-            {siteData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={siteData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis
-                    dataKey="name"
-                    className="text-xs"
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                    tick={{ fontSize: 10 }}
-                  />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-popover border rounded-lg p-2 shadow-lg">
-                            <p className="font-medium text-sm">{data.fullName}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {language === "th" ? "ส่งแล้ว" : "Submitted"}: {data.submitted}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {language === "th" ? "ร่าง" : "Draft"}: {data.draft}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="submitted"
-                    name={language === "th" ? "ส่งแล้ว" : "Submitted"}
-                    fill="hsl(var(--primary))"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="draft"
-                    name={language === "th" ? "ร่าง" : "Draft"}
-                    fill="hsl(var(--muted-foreground))"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="flex items-center gap-8">
+              {statusData.length > 0 ? (
+                <>
+                  <ResponsiveContainer width="50%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={statusData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {statusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex-1 space-y-4">
+                    {statusData.map((status, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: status.color }}
+                          />
+                          <span className="text-sm">{status.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-semibold">{status.value}</span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            ({totalRecords > 0 ? Math.round((status.value / totalRecords) * 100) : 0}%)
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="w-full h-48 flex items-center justify-center text-muted-foreground">
+                  {language === "th" ? "ไม่มีข้อมูล" : "No data"}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Themes & Metrics Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Themes by Records */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Leaf className="h-5 w-5 text-primary" />
+              {language === "th" ? "หัวข้อ ESG ที่มีข้อมูลมากที่สุด" : "Top ESG Themes by Records"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {themeData.length > 0 ? (
+              <div className="space-y-3">
+                {themeData.slice(0, 6).map((theme, index) => (
+                  <div
+                    key={theme.theme_id}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                  >
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-full font-semibold text-sm"
+                      style={{
+                        backgroundColor: `${getDimensionColor(theme.dimensionName)}20`,
+                        color: getDimensionColor(theme.dimensionName),
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{theme.name}</p>
+                      <p className="text-xs text-muted-foreground">{theme.dimensionName}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="secondary" className="font-medium">
+                        {theme.recordCount} {language === "th" ? "รายการ" : "records"}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
+              <div className="h-48 flex items-center justify-center text-muted-foreground">
+                {language === "th" ? "ไม่มีข้อมูล" : "No data"}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Top Metrics */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              {language === "th" ? "ตัวชี้วัดที่บันทึกมากที่สุด" : "Most Recorded Metrics"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topMetrics.length > 0 ? (
+              <div className="space-y-3">
+                {topMetrics.slice(0, 6).map((metric, index) => (
+                  <div
+                    key={metric.metric_id}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate" title={metric.name}>
+                        {metric.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{metric.dimension}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="secondary" className="font-medium">
+                        {metric.count} {language === "th" ? "รายการ" : "records"}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-48 flex items-center justify-center text-muted-foreground">
                 {language === "th" ? "ไม่มีข้อมูล" : "No data"}
               </div>
             )}
@@ -648,43 +845,96 @@ export default function Reports() {
         </Card>
       </div>
 
-      {/* Top Metrics Table */}
+      {/* Site Performance */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
-            {language === "th" ? "ตัวชี้วัดที่บันทึกมากที่สุด" : "Most Recorded Metrics"}
+            <Building2 className="h-5 w-5 text-primary" />
+            {language === "th" ? "ประสิทธิภาพตามสถานที่" : "Site Performance"}
           </CardTitle>
+          <CardDescription>
+            {language === "th" ? "อัตราความสำเร็จในการส่งข้อมูลแต่ละสถานที่" : "Data submission completion rate by site"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {topMetrics.length > 0 ? (
-            <div className="space-y-3">
-              {topMetrics.map((metric, index) => (
+          {sitePerformance.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sitePerformance.map((site) => (
                 <div
-                  key={index}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                  key={site.site_id}
+                  className="p-4 rounded-lg border bg-card hover:shadow-md transition-all"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
-                      {index + 1}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <div>
+                        <p className="font-medium text-sm">{site.name}</p>
+                        <p className="text-xs text-muted-foreground">{site.company}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-sm" title={metric.fullName}>
-                        {metric.fullName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{metric.dimension}</p>
-                    </div>
+                    <span className="text-lg font-bold text-primary">{site.completionRate}%</span>
                   </div>
-                  <div className="text-right">
-                    <Badge variant="secondary">
-                      {metric.count} {language === "th" ? "รายการ" : "records"}
-                    </Badge>
+                  <Progress value={site.completionRate} className="h-2 mb-2" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-primary" />
+                      {site.submitted} {language === "th" ? "ส่งแล้ว" : "submitted"}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-muted-foreground" />
+                      {site.draft} {language === "th" ? "ร่าง" : "draft"}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
             <div className="h-32 flex items-center justify-center text-muted-foreground">
+              {language === "th" ? "ไม่มีข้อมูล" : "No data"}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dimension Bar Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            {language === "th" ? "เปรียบเทียบข้อมูลตามมิติ ESG" : "ESG Dimension Comparison"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {dimensionData.some((d) => d.total > 0) ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={dimensionData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis type="number" className="text-xs" />
+                <YAxis type="category" dataKey="name" width={120} className="text-xs" tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                  }}
+                />
+                <Legend />
+                <Bar
+                  dataKey="submitted"
+                  name={language === "th" ? "ส่งแล้ว" : "Submitted"}
+                  fill="hsl(var(--primary))"
+                  radius={[0, 4, 4, 0]}
+                />
+                <Bar
+                  dataKey="draft"
+                  name={language === "th" ? "ร่าง" : "Draft"}
+                  fill="hsl(var(--muted-foreground))"
+                  radius={[0, 4, 4, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-72 flex items-center justify-center text-muted-foreground">
               {language === "th" ? "ไม่มีข้อมูล" : "No data"}
             </div>
           )}
