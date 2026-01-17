@@ -28,7 +28,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { useState } from 'react';
-import { useReportSections } from '@/hooks/useReportSections';
+import { useReportSections } from '@/contexts/ReportSectionsContext';
 import { Checkbox } from '@/components/ui/checkbox';
 
 interface SidebarProps {

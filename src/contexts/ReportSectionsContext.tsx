@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export interface ReportSection {
   id: string;
@@ -19,7 +19,16 @@ const DEFAULT_SECTIONS: ReportSection[] = [
 
 const STORAGE_KEY = 'esg-report-sections';
 
-export function useReportSections() {
+interface ReportSectionsContextValue {
+  sections: ReportSection[];
+  toggleSection: (sectionId: string) => void;
+  setAllVisible: (visible: boolean) => void;
+  isSectionVisible: (sectionId: string) => boolean;
+}
+
+const ReportSectionsContext = createContext<ReportSectionsContextValue | null>(null);
+
+export function ReportSectionsProvider({ children }: { children: ReactNode }) {
   const [sections, setSections] = useState<ReportSection[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -55,10 +64,17 @@ export function useReportSections() {
     return sections.find(s => s.id === sectionId)?.visible ?? true;
   };
 
-  return {
-    sections,
-    toggleSection,
-    setAllVisible,
-    isSectionVisible,
-  };
+  return (
+    <ReportSectionsContext.Provider value={{ sections, toggleSection, setAllVisible, isSectionVisible }}>
+      {children}
+    </ReportSectionsContext.Provider>
+  );
+}
+
+export function useReportSections() {
+  const context = useContext(ReportSectionsContext);
+  if (!context) {
+    throw new Error('useReportSections must be used within a ReportSectionsProvider');
+  }
+  return context;
 }
