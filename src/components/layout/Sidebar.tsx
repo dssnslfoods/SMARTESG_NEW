@@ -18,6 +18,8 @@ import {
   Activity,
   Leaf,
   X,
+  Settings,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,7 +28,8 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useReportSections } from '@/hooks/useReportSections';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface SidebarProps {
   onNavigate?: () => void;
@@ -38,8 +41,12 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
   const { role, signOut } = useAuth();
   const { t, language } = useLanguage();
   const [masterDataOpen, setMasterDataOpen] = useState(pathname.startsWith('/master'));
+  const [reportSettingsOpen, setReportSettingsOpen] = useState(pathname === '/reports');
+  
+  const { sections, toggleSection } = useReportSections();
 
   const isGuest = role === 'guest';
+  const isOnReportsPage = pathname === '/reports';
 
   const navItems = [
     {
@@ -129,8 +136,76 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
 
         {navItems
           .filter((item) => item.roles.includes(role || ''))
-          .map((item) => 
-            isGuest ? (
+          .map((item) => {
+            // Reports menu with sub-menu for card settings
+            if (item.href === '/reports' && !isGuest) {
+              return (
+                <div key={item.href}>
+                  <Link
+                    to={item.href}
+                    onClick={onNavigate}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      isActive(item.href)
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                    )}
+                  >
+                    <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-primary")} />
+                    {item.label}
+                  </Link>
+                  
+                  {/* Report Settings Sub-menu - only show when on reports page */}
+                  {isOnReportsPage && (
+                    <Collapsible open={reportSettingsOpen} onOpenChange={setReportSettingsOpen}>
+                      <CollapsibleTrigger asChild>
+                        <button
+                          className={cn(
+                            'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 ml-4 mt-1 text-sm transition-all duration-200',
+                            'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Settings className="h-3.5 w-3.5" />
+                            {language === 'th' ? 'จัดการ Card' : 'Manage Cards'}
+                          </div>
+                          <ChevronDown
+                            className={cn(
+                              'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200',
+                              reportSettingsOpen && 'rotate-180'
+                            )}
+                          />
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-1 pl-7 pt-1">
+                        {sections.map((section) => (
+                          <button
+                            key={section.id}
+                            onClick={() => toggleSection(section.id)}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-all hover:bg-sidebar-accent/50"
+                          >
+                            <Checkbox 
+                              checked={section.visible} 
+                              className="h-3.5 w-3.5"
+                              onCheckedChange={() => toggleSection(section.id)}
+                            />
+                            <span className={cn(
+                              "text-muted-foreground",
+                              section.visible && "text-sidebar-foreground"
+                            )}>
+                              {language === 'th' ? section.labelTh : section.labelEn}
+                            </span>
+                          </button>
+                        ))}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+                </div>
+              );
+            }
+            
+            // Regular menu items
+            return isGuest ? (
               <div
                 key={item.href}
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground cursor-not-allowed opacity-50"
@@ -153,8 +228,8 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                 <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-primary")} />
                 {item.label}
               </Link>
-            )
-          )}
+            );
+          })}
 
         {/* Master Data Section */}
         {(role === 'admin' || role === 'supervisor' || role === 'guest') && (
