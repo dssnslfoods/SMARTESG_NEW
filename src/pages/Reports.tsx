@@ -27,7 +27,7 @@ import {
   ChevronRight,
   Eye,
 } from "lucide-react";
-import { useReportSections } from "@/hooks/useReportSections";
+import { useReportSections } from "@/contexts/ReportSectionsContext";
 import {
   BarChart,
   Bar,

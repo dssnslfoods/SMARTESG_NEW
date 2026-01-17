@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ReportSectionsProvider } from "@/contexts/ReportSectionsContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -26,105 +27,107 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <LanguageProvider>
-        <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/users"
-              element={
-                <ProtectedRoute allowedRoles={["admin", "supervisor", "executive", "staff"]}>
-                  <UserManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/data-entry"
-              element={
-                <ProtectedRoute allowedRoles={["admin", "supervisor", "staff"]}>
-                  <DataEntry />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/master/companies"
-              element={
-                <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
-                  <CompanyManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/master/sites"
-              element={
-                <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
-                  <SiteManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/master/periods"
-              element={
-                <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
-                  <PeriodManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/master/dimensions"
-              element={
-                <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
-                  <DimensionManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/master/themes"
-              element={
-                <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
-                  <ThemeManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/master/metrics"
-              element={
-                <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
-                  <MetricManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/reports"
-              element={
-                <ProtectedRoute allowedRoles={["admin", "executive", "supervisor"]}>
-                  <Reports />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/audit-log"
-              element={
-                <ProtectedRoute allowedRoles={["admin"]}>
-                  <AuditLog />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-        </TooltipProvider>
+        <ReportSectionsProvider>
+          <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/users"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive", "staff"]}>
+                    <UserManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/data-entry"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor", "staff"]}>
+                    <DataEntry />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/master/companies"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                    <CompanyManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/master/sites"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                    <SiteManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/master/periods"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                    <PeriodManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/master/dimensions"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                    <DimensionManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/master/themes"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                    <ThemeManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/master/metrics"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                    <MetricManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reports"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "executive", "supervisor"]}>
+                    <Reports />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/audit-log"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AuditLog />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+          </TooltipProvider>
+        </ReportSectionsProvider>
       </LanguageProvider>
     </AuthProvider>
   </QueryClientProvider>

@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { ReportSection } from "@/hooks/useReportSections";
+import { ReportSection } from "@/contexts/ReportSectionsContext";
 
 interface SectionToggleProps {
   sections: ReportSection[];
