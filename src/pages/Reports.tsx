@@ -920,13 +920,28 @@ export default function Reports() {
               ? themes.find((t) => t.theme_id === trendThemeFilter)
               : null;
 
+            const selectedMetricData = trendMetricFilter !== "__all__"
+              ? metrics.find((m) => m.metric_id === trendMetricFilter)
+              : null;
+
+            // Get unit: from selected metric, or if theme selected show mixed units indicator
+            const displayUnit = selectedMetricData?.unit || "";
+
             return trendChartData.length > 0 ? (
               <div className="space-y-4">
-                {selectedThemeData && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Badge variant="outline" className="bg-primary/10">
-                      {selectedThemeData.theme_name}
-                    </Badge>
+                {(selectedThemeData || selectedMetricData) && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                    {selectedThemeData && (
+                      <Badge variant="outline" className="bg-primary/10">
+                        {selectedThemeData.theme_name}
+                      </Badge>
+                    )}
+                    {selectedMetricData && (
+                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700">
+                        {selectedMetricData.metric_name}
+                        {selectedMetricData.unit && ` (${selectedMetricData.unit})`}
+                      </Badge>
+                    )}
                     <span>•</span>
                     <span>{trendChartData.reduce((sum, d) => sum + d.records, 0)} {language === "th" ? "รายการ" : "records"}</span>
                   </div>
@@ -953,10 +968,14 @@ export default function Reports() {
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
-                      formatter={(value: number, name: string) => [
-                        typeof value === "number" ? value.toLocaleString() : value,
-                        name
-                      ]}
+                      formatter={(value: number, name: string) => {
+                        const formattedValue = typeof value === "number" ? value.toLocaleString() : value;
+                        // Add unit for totalValue and avgValue if metric is selected
+                        if (displayUnit && (name === (language === "th" ? "ค่ารวม" : "Total Value"))) {
+                          return [`${formattedValue} ${displayUnit}`, name];
+                        }
+                        return [formattedValue, name];
+                      }}
                     />
                     <Legend />
                     <Area
@@ -993,6 +1012,7 @@ export default function Reports() {
                   <div className="text-center">
                     <p className="text-2xl font-bold text-emerald-600">
                       {trendChartData.reduce((sum, d) => sum + d.totalValue, 0).toLocaleString()}
+                      {displayUnit && <span className="text-sm font-normal ml-1">{displayUnit}</span>}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {language === "th" ? "ค่ารวม" : "Total Value"}
@@ -1003,6 +1023,7 @@ export default function Reports() {
                       {trendChartData.length > 0 
                         ? Math.round(trendChartData.reduce((sum, d) => sum + d.avgValue, 0) / trendChartData.length).toLocaleString()
                         : 0}
+                      {displayUnit && <span className="text-sm font-normal ml-1">{displayUnit}</span>}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {language === "th" ? "ค่าเฉลี่ย" : "Average"}
