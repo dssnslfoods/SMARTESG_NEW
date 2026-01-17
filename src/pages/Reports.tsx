@@ -153,6 +153,11 @@ export default function Reports() {
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
   const [drilldownDialogOpen, setDrilldownDialogOpen] = useState(false);
 
+  // Interactive trend chart filters
+  const [trendThemeFilter, setTrendThemeFilter] = useState<string>("__all__");
+  const [trendYearFilter, setTrendYearFilter] = useState<string>("__all__");
+  const [trendMonthFilter, setTrendMonthFilter] = useState<string>("__all__");
+
   const handleRefresh = useCallback(async () => {
     await fetchData();
   }, []);
@@ -741,62 +746,251 @@ export default function Reports() {
         </CardContent>
       </Card>
 
-      {/* Monthly Trend Chart */}
+      {/* Interactive Trend Chart */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
-            {language === "th" ? `แนวโน้มรายเดือน ${selectedYear || ""}` : `Monthly Trend ${selectedYear || ""}`}
+            {language === "th" ? "กราฟแนวโน้ม" : "Trend Chart"}
           </CardTitle>
+          <CardDescription>
+            {language === "th" 
+              ? "เลือกหัวข้อ ปี และเดือน เพื่อดูแนวโน้มข้อมูล" 
+              : "Select theme, year, and month to view data trends"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {monthlyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={monthlyData}>
-                <defs>
-                  <linearGradient id="colorSubmitted" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorDraft" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="name" className="text-xs" />
-                <YAxis className="text-xs" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="submitted"
-                  name={language === "th" ? "ส่งแล้ว" : "Submitted"}
-                  stroke="hsl(var(--primary))"
-                  fill="url(#colorSubmitted)"
-                  strokeWidth={2}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="draft"
-                  name={language === "th" ? "ร่าง" : "Draft"}
-                  stroke="hsl(var(--muted-foreground))"
-                  fill="url(#colorDraft)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-72 flex items-center justify-center text-muted-foreground">
-              {language === "th" ? "ไม่มีข้อมูล" : "No data"}
+          {/* Trend Chart Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                {language === "th" ? "หัวข้อ" : "Theme"}
+              </Label>
+              <Select value={trendThemeFilter} onValueChange={setTrendThemeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All Themes"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">
+                    {language === "th" ? "ทั้งหมด" : "All Themes"}
+                  </SelectItem>
+                  {themes.map((theme) => {
+                    const dimension = dimensions.find((d) => d.dimension_id === theme.dimension_id);
+                    return (
+                      <SelectItem key={theme.theme_id} value={theme.theme_id}>
+                        {theme.theme_name} ({dimension?.dimension_name})
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                {language === "th" ? "ปี" : "Year"}
+              </Label>
+              <Select value={trendYearFilter} onValueChange={(val) => {
+                setTrendYearFilter(val);
+                setTrendMonthFilter("__all__"); // Reset month when year changes
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All Years"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">
+                    {language === "th" ? "ทั้งหมด" : "All Years"}
+                  </SelectItem>
+                  {uniqueYears.map((year) => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                {language === "th" ? "เดือน" : "Month"}
+              </Label>
+              <Select 
+                value={trendMonthFilter} 
+                onValueChange={setTrendMonthFilter}
+                disabled={trendYearFilter === "__all__"}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All Months"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">
+                    {language === "th" ? "ทั้งหมด" : "All Months"}
+                  </SelectItem>
+                  {periods
+                    .filter((p) => trendYearFilter === "__all__" || p.year === parseInt(trendYearFilter))
+                    .sort((a, b) => a.month - b.month)
+                    .map((period) => (
+                      <SelectItem key={period.period_id} value={period.month.toString()}>
+                        {period.month_name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Trend Chart */}
+          {(() => {
+            // Calculate trend data based on filters
+            const trendChartData = (() => {
+              // Filter periods
+              let chartPeriods = [...periods];
+              if (trendYearFilter !== "__all__") {
+                chartPeriods = chartPeriods.filter((p) => p.year === parseInt(trendYearFilter));
+              }
+              if (trendMonthFilter !== "__all__") {
+                chartPeriods = chartPeriods.filter((p) => p.month === parseInt(trendMonthFilter));
+              }
+              chartPeriods = chartPeriods.sort((a, b) => {
+                if (a.year !== b.year) return a.year - b.year;
+                return a.month - b.month;
+              });
+
+              // Get relevant metrics
+              let relevantMetricIds: string[] = [];
+              if (trendThemeFilter === "__all__") {
+                relevantMetricIds = metrics.map((m) => m.metric_id);
+              } else {
+                relevantMetricIds = metrics
+                  .filter((m) => m.theme_id === trendThemeFilter)
+                  .map((m) => m.metric_id);
+              }
+
+              return chartPeriods.map((period) => {
+                const periodValues = filteredValues.filter(
+                  (v) => v.period_id === period.period_id && relevantMetricIds.includes(v.metric_id)
+                );
+                const totalValue = periodValues.reduce((sum, v) => sum + v.value, 0);
+                
+                return {
+                  name: trendYearFilter !== "__all__" 
+                    ? period.month_name.slice(0, 3) 
+                    : `${period.month_name.slice(0, 3)} ${period.year}`,
+                  period: `${period.month_name} ${period.year}`,
+                  records: periodValues.length,
+                  totalValue: Math.round(totalValue * 100) / 100,
+                  avgValue: periodValues.length > 0 ? Math.round((totalValue / periodValues.length) * 100) / 100 : 0,
+                  submitted: periodValues.filter((v) => v.status === "submitted").length,
+                };
+              }).filter((d) => d.records > 0);
+            })();
+
+            const selectedThemeData = trendThemeFilter !== "__all__" 
+              ? themes.find((t) => t.theme_id === trendThemeFilter)
+              : null;
+
+            return trendChartData.length > 0 ? (
+              <div className="space-y-4">
+                {selectedThemeData && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Badge variant="outline" className="bg-primary/10">
+                      {selectedThemeData.theme_name}
+                    </Badge>
+                    <span>•</span>
+                    <span>{trendChartData.reduce((sum, d) => sum + d.records, 0)} {language === "th" ? "รายการ" : "records"}</span>
+                  </div>
+                )}
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={trendChartData}>
+                    <defs>
+                      <linearGradient id="colorTrendValue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorTrendRecords" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="name" className="text-xs" />
+                    <YAxis yAxisId="left" className="text-xs" />
+                    <YAxis yAxisId="right" orientation="right" className="text-xs" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--popover))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number, name: string) => [
+                        typeof value === "number" ? value.toLocaleString() : value,
+                        name
+                      ]}
+                    />
+                    <Legend />
+                    <Area
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="totalValue"
+                      name={language === "th" ? "ค่ารวม" : "Total Value"}
+                      stroke="hsl(var(--primary))"
+                      fill="url(#colorTrendValue)"
+                      strokeWidth={2}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="records"
+                      name={language === "th" ? "จำนวนรายการ" : "Records"}
+                      stroke="hsl(var(--chart-2))"
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--chart-2))", strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+
+                {/* Summary Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-primary">
+                      {trendChartData.reduce((sum, d) => sum + d.records, 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === "th" ? "รายการทั้งหมด" : "Total Records"}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {trendChartData.reduce((sum, d) => sum + d.totalValue, 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === "th" ? "ค่ารวม" : "Total Value"}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-cyan-600">
+                      {trendChartData.length > 0 
+                        ? Math.round(trendChartData.reduce((sum, d) => sum + d.avgValue, 0) / trendChartData.length).toLocaleString()
+                        : 0}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === "th" ? "ค่าเฉลี่ย" : "Average"}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-amber-600">
+                      {trendChartData.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === "th" ? "จุดข้อมูล" : "Data Points"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="h-72 flex items-center justify-center text-muted-foreground">
+                {language === "th" ? "ไม่มีข้อมูลสำหรับตัวกรองที่เลือก" : "No data for selected filters"}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
