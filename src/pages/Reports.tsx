@@ -6,6 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   BarChart3,
   TrendingUp,
@@ -29,6 +32,9 @@ import {
   ArrowUp,
   ArrowDown,
   Minus,
+  ChevronRight,
+  Eye,
+  X,
 } from "lucide-react";
 import {
   BarChart,
@@ -52,6 +58,7 @@ import {
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { Button } from "@/components/ui/button";
 
 interface Company {
   company_id: string;
@@ -141,6 +148,10 @@ export default function Reports() {
   const [filterSite, setFilterSite] = useState<string>("");
   const [filterYear, setFilterYear] = useState<string>("");
   const [filterMonth, setFilterMonth] = useState<string>("");
+
+  // Drill-down dialog state
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [drilldownDialogOpen, setDrilldownDialogOpen] = useState(false);
 
   const handleRefresh = useCallback(async () => {
     await fetchData();
@@ -362,6 +373,101 @@ export default function Reports() {
     "hsl(var(--chart-4))",
     "hsl(var(--chart-5))",
   ];
+
+  // Theme trend data with monthly breakdown
+  const getThemeTrendData = (themeId: string) => {
+    const theme = themes.find((t) => t.theme_id === themeId);
+    if (!theme) return [];
+
+    const themeMetrics = metrics.filter((m) => m.theme_id === themeId);
+    const themeMetricIds = themeMetrics.map((m) => m.metric_id);
+
+    // Get data for selected year or all years
+    const yearPeriods = selectedYear
+      ? periods.filter((p) => p.year === selectedYear)
+      : periods;
+
+    const sortedPeriods = [...yearPeriods].sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
+
+    return sortedPeriods.map((period) => {
+      const periodValues = filteredValues.filter(
+        (v) => v.period_id === period.period_id && themeMetricIds.includes(v.metric_id)
+      );
+      const totalValue = periodValues.reduce((sum, v) => sum + v.value, 0);
+      
+      return {
+        name: `${period.month_name.slice(0, 3)} ${period.year}`,
+        month: period.month,
+        year: period.year,
+        records: periodValues.length,
+        totalValue: Math.round(totalValue * 100) / 100,
+        avgValue: periodValues.length > 0 ? Math.round((totalValue / periodValues.length) * 100) / 100 : 0,
+        submitted: periodValues.filter((v) => v.status === "submitted").length,
+      };
+    }).filter(d => d.records > 0);
+  };
+
+  // Get theme details for drilldown
+  const getThemeDetails = (themeId: string) => {
+    const theme = themes.find((t) => t.theme_id === themeId);
+    if (!theme) return null;
+
+    const dimension = dimensions.find((d) => d.dimension_id === theme.dimension_id);
+    const themeMetrics = metrics.filter((m) => m.theme_id === themeId);
+    const themeMetricIds = themeMetrics.map((m) => m.metric_id);
+    const themeValues = filteredValues.filter((v) => themeMetricIds.includes(v.metric_id));
+
+    // Metric breakdown
+    const metricBreakdown = themeMetrics.map((metric) => {
+      const metricVals = themeValues.filter((v) => v.metric_id === metric.metric_id);
+      return {
+        metric_id: metric.metric_id,
+        name: metric.metric_name,
+        unit: metric.unit,
+        recordCount: metricVals.length,
+        totalValue: metricVals.reduce((sum, v) => sum + v.value, 0),
+        avgValue: metricVals.length > 0
+          ? metricVals.reduce((sum, v) => sum + v.value, 0) / metricVals.length
+          : 0,
+        submittedCount: metricVals.filter((v) => v.status === "submitted").length,
+      };
+    }).filter(m => m.recordCount > 0).sort((a, b) => b.recordCount - a.recordCount);
+
+    // Site breakdown
+    const siteBreakdown = sites.map((site) => {
+      const siteVals = themeValues.filter((v) => v.site_id === site.site_id);
+      const company = companies.find((c) => c.company_id === site.company_id);
+      return {
+        site_id: site.site_id,
+        name: site.site_name,
+        company: company?.company_name || "",
+        recordCount: siteVals.length,
+        totalValue: siteVals.reduce((sum, v) => sum + v.value, 0),
+        submittedCount: siteVals.filter((v) => v.status === "submitted").length,
+      };
+    }).filter(s => s.recordCount > 0).sort((a, b) => b.recordCount - a.recordCount);
+
+    return {
+      theme,
+      dimension,
+      metricBreakdown,
+      siteBreakdown,
+      totalRecords: themeValues.length,
+      submittedRecords: themeValues.filter((v) => v.status === "submitted").length,
+      trendData: getThemeTrendData(themeId),
+    };
+  };
+
+  const selectedThemeDetails = selectedTheme ? getThemeDetails(selectedTheme) : null;
+
+  // Top themes with trend data for cards
+  const themesWithTrend = themeData.slice(0, 6).map((theme) => ({
+    ...theme,
+    trendData: getThemeTrendData(theme.theme_id),
+  }));
 
   if (loading) {
     return <ReportsLoadingSkeleton />;
@@ -694,6 +800,111 @@ export default function Reports() {
         </CardContent>
       </Card>
 
+      {/* Theme Trend Charts with Drill-down */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            {language === "th" ? "แนวโน้มตามหัวข้อ ESG" : "ESG Theme Trends"}
+          </CardTitle>
+          <CardDescription>
+            {language === "th" 
+              ? "คลิกที่หัวข้อเพื่อดูรายละเอียดเพิ่มเติม" 
+              : "Click on a theme to view detailed breakdown"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {themesWithTrend.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {themesWithTrend.map((theme) => {
+                const color = getDimensionColor(theme.dimensionName);
+                const DimIcon = getDimensionIcon(theme.dimensionName);
+                
+                return (
+                  <div
+                    key={theme.theme_id}
+                    className="p-4 rounded-xl border bg-card hover:shadow-lg hover:border-primary/30 transition-all cursor-pointer group"
+                    onClick={() => {
+                      setSelectedTheme(theme.theme_id);
+                      setDrilldownDialogOpen(true);
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="p-2 rounded-lg"
+                          style={{ backgroundColor: `${color}20` }}
+                        >
+                          <DimIcon className="h-4 w-4" style={{ color }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate" title={theme.name}>
+                            {theme.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{theme.dimensionName}</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {theme.recordCount} {language === "th" ? "รายการ" : "records"}
+                      </Badge>
+                      <span className="text-sm font-semibold" style={{ color }}>
+                        {theme.completionRate}%
+                      </span>
+                    </div>
+                    
+                    {/* Mini Trend Chart */}
+                    {theme.trendData.length > 1 ? (
+                      <div className="h-16 mt-2">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={theme.trendData}>
+                            <defs>
+                              <linearGradient id={`gradient-${theme.theme_id}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                                <stop offset="95%" stopColor={color} stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <Area
+                              type="monotone"
+                              dataKey="records"
+                              stroke={color}
+                              fill={`url(#gradient-${theme.theme_id})`}
+                              strokeWidth={2}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-16 mt-2 flex items-center justify-center text-xs text-muted-foreground">
+                        {language === "th" ? "ข้อมูลไม่เพียงพอสำหรับแสดงกราฟ" : "Insufficient data for trend"}
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center justify-center mt-2 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                      <span>{language === "th" ? "คลิกเพื่อดูรายละเอียด" : "Click to view details"}</span>
+                      <ChevronRight className="h-3 w-3 ml-1" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="h-48 flex items-center justify-center text-muted-foreground">
+              {language === "th" ? "ไม่มีข้อมูล" : "No data"}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Themes & Metrics Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Themes by Records */}
@@ -710,7 +921,11 @@ export default function Reports() {
                 {themeData.slice(0, 6).map((theme, index) => (
                   <div
                     key={theme.theme_id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setSelectedTheme(theme.theme_id);
+                      setDrilldownDialogOpen(true);
+                    }}
                   >
                     <div
                       className="flex h-8 w-8 items-center justify-center rounded-full font-semibold text-sm"
@@ -725,10 +940,11 @@ export default function Reports() {
                       <p className="font-medium text-sm truncate">{theme.name}</p>
                       <p className="text-xs text-muted-foreground">{theme.dimensionName}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="font-medium">
                         {theme.recordCount} {language === "th" ? "รายการ" : "records"}
                       </Badge>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </div>
                 ))}
@@ -878,6 +1094,179 @@ export default function Reports() {
           )}
         </CardContent>
       </Card>
+
+      {/* Drill-down Dialog */}
+      <Dialog open={drilldownDialogOpen} onOpenChange={setDrilldownDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          {selectedThemeDetails && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{ backgroundColor: `${getDimensionColor(selectedThemeDetails.dimension?.dimension_name || "")}20` }}
+                  >
+                    {(() => {
+                      const DimIcon = getDimensionIcon(selectedThemeDetails.dimension?.dimension_name || "");
+                      return <DimIcon className="h-5 w-5" style={{ color: getDimensionColor(selectedThemeDetails.dimension?.dimension_name || "") }} />;
+                    })()}
+                  </div>
+                  <div>
+                    <span>{selectedThemeDetails.theme.theme_name}</span>
+                    <p className="text-sm font-normal text-muted-foreground mt-0.5">
+                      {selectedThemeDetails.dimension?.dimension_name}
+                    </p>
+                  </div>
+                </DialogTitle>
+                <DialogDescription className="flex items-center gap-4 pt-2">
+                  <Badge variant="secondary">
+                    {selectedThemeDetails.totalRecords} {language === "th" ? "รายการทั้งหมด" : "total records"}
+                  </Badge>
+                  <Badge className="bg-primary/10 text-primary border-primary/20">
+                    {selectedThemeDetails.submittedRecords} {language === "th" ? "ส่งแล้ว" : "submitted"}
+                  </Badge>
+                  <span className="text-sm">
+                    {selectedThemeDetails.totalRecords > 0 
+                      ? Math.round((selectedThemeDetails.submittedRecords / selectedThemeDetails.totalRecords) * 100) 
+                      : 0}% {language === "th" ? "สำเร็จ" : "complete"}
+                  </span>
+                </DialogDescription>
+              </DialogHeader>
+              
+              <ScrollArea className="max-h-[calc(90vh-180px)]">
+                <div className="space-y-6 pr-4">
+                  {/* Trend Chart */}
+                  {selectedThemeDetails.trendData.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        {language === "th" ? "แนวโน้มรายเดือน" : "Monthly Trend"}
+                      </h4>
+                      <div className="h-64 bg-muted/20 rounded-lg p-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={selectedThemeDetails.trendData}>
+                            <defs>
+                              <linearGradient id="drilldownGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis dataKey="name" className="text-xs" />
+                            <YAxis className="text-xs" />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "hsl(var(--popover))",
+                                border: "1px solid hsl(var(--border))",
+                                borderRadius: "8px",
+                              }}
+                            />
+                            <Legend />
+                            <Area
+                              type="monotone"
+                              dataKey="records"
+                              name={language === "th" ? "จำนวนรายการ" : "Records"}
+                              stroke="hsl(var(--primary))"
+                              fill="url(#drilldownGradient)"
+                              strokeWidth={2}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="submitted"
+                              name={language === "th" ? "ส่งแล้ว" : "Submitted"}
+                              stroke="hsl(var(--chart-2))"
+                              strokeWidth={2}
+                              dot={{ fill: "hsl(var(--chart-2))" }}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Metric Breakdown */}
+                  {selectedThemeDetails.metricBreakdown.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-primary" />
+                        {language === "th" ? "รายละเอียดตัวชี้วัด" : "Metric Breakdown"}
+                      </h4>
+                      <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>{language === "th" ? "ตัวชี้วัด" : "Metric"}</TableHead>
+                              <TableHead className="text-center">{language === "th" ? "หน่วย" : "Unit"}</TableHead>
+                              <TableHead className="text-center">{language === "th" ? "รายการ" : "Records"}</TableHead>
+                              <TableHead className="text-right">{language === "th" ? "รวม" : "Total"}</TableHead>
+                              <TableHead className="text-right">{language === "th" ? "เฉลี่ย" : "Average"}</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {selectedThemeDetails.metricBreakdown.map((metric) => (
+                              <TableRow key={metric.metric_id}>
+                                <TableCell className="font-medium">{metric.name}</TableCell>
+                                <TableCell className="text-center text-muted-foreground">
+                                  {metric.unit || "-"}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Badge variant="secondary">{metric.recordCount}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right font-mono">
+                                  {metric.totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                </TableCell>
+                                <TableCell className="text-right font-mono">
+                                  {metric.avgValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Site Breakdown */}
+                  {selectedThemeDetails.siteBreakdown.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-primary" />
+                        {language === "th" ? "รายละเอียดตามสถานที่" : "Site Breakdown"}
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {selectedThemeDetails.siteBreakdown.slice(0, 6).map((site) => {
+                          const completionRate = site.recordCount > 0
+                            ? Math.round((site.submittedCount / site.recordCount) * 100)
+                            : 0;
+                          return (
+                            <div
+                              key={site.site_id}
+                              className="p-3 rounded-lg border bg-muted/20"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div>
+                                  <p className="font-medium text-sm">{site.name}</p>
+                                  <p className="text-xs text-muted-foreground">{site.company}</p>
+                                </div>
+                                <span className="text-lg font-bold text-primary">{completionRate}%</span>
+                              </div>
+                              <Progress value={completionRate} className="h-1.5 mb-2" />
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>{site.submittedCount} {language === "th" ? "ส่งแล้ว" : "submitted"}</span>
+                                <span>{site.recordCount} {language === "th" ? "รายการ" : "records"}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
