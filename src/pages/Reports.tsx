@@ -51,6 +51,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { Button } from "@/components/ui/button";
+import { TrendAnalytics } from "@/components/reports/TrendAnalytics";
 
 interface Company {
   company_id: string;
@@ -1267,6 +1268,11 @@ export default function Reports() {
                       </div>
                     )}
                     
+                    {/* Trend Analytics */}
+                    {theme.trendData.length >= 2 && (
+                      <TrendAnalytics trendData={theme.trendData} color={color} compact />
+                    )}
+                    
                     <div className="flex items-center justify-center mt-2 text-xs text-muted-foreground group-hover:text-primary transition-colors">
                       <span>{language === "th" ? "คลิกเพื่อดูรายละเอียด" : "Click to view details"}</span>
                       <ChevronRight className="h-3 w-3 ml-1" />
@@ -1566,6 +1572,16 @@ export default function Reports() {
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>
+                      
+                      {/* Trend Analytics - Full View */}
+                      {selectedThemeDetails.trendData.length >= 2 && (
+                        <div className="mt-4">
+                          <TrendAnalytics 
+                            trendData={selectedThemeDetails.trendData} 
+                            color={getDimensionColor(selectedThemeDetails.dimension?.dimension_name || "")} 
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 
