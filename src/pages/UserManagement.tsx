@@ -570,8 +570,12 @@ export default function UserManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">{t('admin')}</SelectItem>
-                    <SelectItem value="executive">{t('executive')}</SelectItem>
+                    {currentUserRole === 'admin' && (
+                      <SelectItem value="admin">{t('admin')}</SelectItem>
+                    )}
+                    {currentUserRole === 'admin' && (
+                      <SelectItem value="executive">{t('executive')}</SelectItem>
+                    )}
                     <SelectItem value="supervisor">{t('supervisor')}</SelectItem>
                     <SelectItem value="staff">{t('staff')}</SelectItem>
                     <SelectItem value="guest">{t('guest')}</SelectItem>
@@ -858,7 +862,9 @@ export default function UserManagement() {
                       <SelectValue placeholder={language === 'th' ? 'เลือกบทบาท' : 'Select role'} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="executive">{t('executive')}</SelectItem>
+                      {currentUserRole === 'admin' && (
+                        <SelectItem value="executive">{t('executive')}</SelectItem>
+                      )}
                       <SelectItem value="supervisor">{t('supervisor')}</SelectItem>
                       <SelectItem value="staff">{t('staff')}</SelectItem>
                       <SelectItem value="guest">{t('guest')}</SelectItem>
