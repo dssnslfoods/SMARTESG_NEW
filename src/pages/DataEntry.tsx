@@ -352,6 +352,18 @@ export default function DataEntry() {
       return;
     }
 
+    if (!user?.id) {
+      toast({
+        title: language === 'th' ? 'กรุณาเข้าสู่ระบบใหม่' : 'Please sign in again',
+        description:
+          language === 'th'
+            ? 'ไม่พบข้อมูลผู้ใช้สำหรับการบันทึก กรุณาออกจากระบบและเข้าสู่ระบบใหม่อีกครั้ง'
+            : 'User session not found for saving. Please sign out and sign in again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const dataToSave = {
       value_id: formData.value_id,
       site_id: formData.site_id,
@@ -361,8 +373,9 @@ export default function DataEntry() {
       data_source: formData.data_source || null,
       remark: formData.remark || null,
       status: formData.status,
-      submitted_by: user?.id,
+      submitted_by: user.id,
     };
+
 
     let error;
     if (editingValue) {
