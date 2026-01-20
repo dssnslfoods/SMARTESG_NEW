@@ -18,25 +18,28 @@ serve(async (req) => {
 
     // Get the authorization header to identify the calling user
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "No authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Create a client with the user's token to check their permissions
+    // Create a client with the user's token
     const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Get the authenticated user
-    const { data: { user: authUser }, error: authError } = await supabaseUser.auth.getUser();
-    if (authError || !authUser) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Validate JWT and extract user id via claims (required for signing-keys)
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
+    const authUserId = claimsData?.claims?.sub;
+
+    if (claimsError || !authUserId) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Check if the user has admin or supervisor role
@@ -44,7 +47,7 @@ serve(async (req) => {
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", authUser.id)
+      .eq("user_id", authUserId)
       .single();
 
     if (roleError || !roleData || !["admin", "supervisor"].includes(roleData.role)) {
@@ -64,7 +67,7 @@ serve(async (req) => {
     }
 
     // Prevent self-deletion
-    if (userId === authUser.id) {
+    if (userId === authUserId) {
       return new Response(
         JSON.stringify({ success: false, error: "Cannot delete your own account" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
