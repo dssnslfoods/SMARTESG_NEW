@@ -65,7 +65,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       label: t('reports'),
       href: '/reports',
       icon: BarChart3,
-      roles: ['admin', 'executive', 'supervisor', 'guest'],
+      roles: ['admin', 'executive'],
     },
   ];
 
