@@ -18,6 +18,7 @@ import Environmental from "./pages/reports/Environmental";
 import Benchmarking from "./pages/reports/Benchmarking";
 import Infographic from "./pages/reports/Infographic";
 import Governance from "./pages/reports/Governance";
+import Social from "./pages/reports/Social";
 import CompanyManagement from "./pages/master/CompanyManagement";
 import SiteManagement from "./pages/master/SiteManagement";
 import PeriodManagement from "./pages/master/PeriodManagement";
@@ -159,6 +160,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "executive"]}>
                     <Governance />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reports/social"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
+                    <Social />
                   </ProtectedRoute>
                 }
               />

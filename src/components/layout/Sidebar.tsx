@@ -24,6 +24,7 @@ import {
   GitCompare,
   FileText,
   Scale,
+  Heart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -81,6 +82,12 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       label: language === 'th' ? 'สิ่งแวดล้อม' : 'Environmental',
       href: '/reports/environmental',
       icon: Leaf,
+      roles: ['admin', 'executive'],
+    },
+    {
+      label: language === 'th' ? 'สังคม' : 'Social',
+      href: '/reports/social',
+      icon: Heart,
       roles: ['admin', 'executive'],
     },
     {
