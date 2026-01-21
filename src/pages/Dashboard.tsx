@@ -376,15 +376,6 @@ export default function Dashboard() {
       roles: ['admin', 'executive', 'supervisor'],
       detailType: 'metrics' as const,
     },
-    {
-      title: language === 'th' ? 'ข้อมูลที่ส่งแล้ว' : 'Total Submitted',
-      value: stats.totalSubmitted,
-      icon: Clock,
-      iconBg: 'bg-amber-100',
-      iconColor: 'text-amber-600',
-      roles: ['admin', 'supervisor'],
-      detailType: 'submitted' as const,
-    },
   ];
 
   const quickActions = {
