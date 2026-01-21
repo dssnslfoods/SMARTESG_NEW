@@ -5,87 +5,74 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Globe, Leaf, Shield, BarChart3, Users, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Globe, Leaf, Shield, BarChart3, Users } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { z } from "zod";
-
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters")
 });
-
-const signupSchema = z
-  .object({
-    email: z.string().email("Invalid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string(),
-    fullName: z.string().min(2, "Name must be at least 2 characters"),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
-
+const signupSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string(),
+  fullName: z.string().min(2, "Name must be at least 2 characters")
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"]
+});
 export default function Auth() {
-  const { user, signIn, signUp, loading } = useAuth();
-  const { t, language, setLanguage } = useLanguage();
-  const { toast } = useToast();
-
+  const {
+    user,
+    signIn,
+    signUp,
+    loading
+  } = useAuth();
+  const {
+    t,
+    language,
+    setLanguage
+  } = useLanguage();
+  const {
+    toast
+  } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [loginForm, setLoginForm] = useState({
+    email: "",
+    password: ""
+  });
   const [signupForm, setSignupForm] = useState({
     email: "",
     password: "",
     confirmPassword: "",
-    fullName: "",
+    fullName: ""
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-
   if (loading) {
-    return (
-      <div 
-        className="flex h-screen items-center justify-center"
-        style={{
-          backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4), transparent), url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&q=80')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
+    return <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-xl shadow-lg border border-white/30">
-            <Leaf className="h-8 w-8 text-white animate-pulse" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-lg">
+            <Leaf className="h-8 w-8 text-primary-foreground animate-pulse" />
           </div>
-          <Loader2 className="h-6 w-6 animate-spin text-white" />
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
-      </div>
-    );
+      </div>;
   }
-
   if (user) {
     return <Navigate to="/dashboard" replace />;
   }
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
-
     try {
       loginSchema.parse(loginForm);
     } catch (err) {
       if (err instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
-        err.errors.forEach((error) => {
+        err.errors.forEach(error => {
           if (error.path[0]) {
             fieldErrors[error.path[0] as string] = error.message;
           }
@@ -94,39 +81,35 @@ export default function Auth() {
         return;
       }
     }
-
     setIsLoading(true);
-    const { error, inactive } = await signIn(loginForm.email, loginForm.password);
+    const {
+      error,
+      inactive
+    } = await signIn(loginForm.email, loginForm.password);
     setIsLoading(false);
-
     if (error) {
       toast({
         variant: "destructive",
         title: t("error"),
-        description: error.message,
+        description: error.message
       });
     } else if (inactive) {
       toast({
         variant: "destructive",
         title: language === "th" ? "บัญชีถูกระงับ" : "Account Inactive",
-        description:
-          language === "th"
-            ? "บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ"
-            : "Your account has been deactivated. Please contact an administrator.",
+        description: language === "th" ? "บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ" : "Your account has been deactivated. Please contact an administrator."
       });
     }
   };
-
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
-
     try {
       signupSchema.parse(signupForm);
     } catch (err) {
       if (err instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
-        err.errors.forEach((error) => {
+        err.errors.forEach(error => {
           if (error.path[0]) {
             fieldErrors[error.path[0] as string] = error.message;
           }
@@ -135,169 +118,114 @@ export default function Auth() {
         return;
       }
     }
-
     setIsLoading(true);
-    const { error } = await signUp(signupForm.email, signupForm.password, signupForm.fullName);
+    const {
+      error
+    } = await signUp(signupForm.email, signupForm.password, signupForm.fullName);
     setIsLoading(false);
-
     if (error) {
       toast({
         variant: "destructive",
         title: t("error"),
-        description: error.message,
+        description: error.message
       });
     } else {
       toast({
         title: t("success"),
-        description:
-          language === "th"
-            ? "สมัครสมาชิกสำเร็จ กรุณารอการอนุมัติบทบาทจากผู้ดูแลระบบ"
-            : "Sign up successful. Please wait for role assignment from an administrator.",
+        description: language === "th" ? "สมัครสมาชิกสำเร็จ กรุณารอการอนุมัติบทบาทจากผู้ดูแลระบบ" : "Sign up successful. Please wait for role assignment from an administrator."
       });
     }
   };
-
-  const features = [
-    {
-      icon: "📊",
-      title: language === "th" ? "รายงาน ESG" : "ESG Reporting",
-      description:
-        language === "th" ? "ติดตามผลการดำเนินงานด้านความยั่งยืน" : "Track sustainability performance metrics",
-    },
-    {
-      icon: "🏛️",
-      title: language === "th" ? "การกำกับดูแล" : "Governance",
-      description: language === "th" ? "ระบบควบคุมและตรวจสอบภายใน" : "Internal control and audit systems",
-    },
-    {
-      icon: "👥",
-      title: language === "th" ? "การมีส่วนร่วม" : "Stakeholder Engagement",
-      description: language === "th" ? "เชื่อมต่อกับผู้มีส่วนได้ส่วนเสีย" : "Connect with all stakeholders",
-    },
-  ];
-
-  return (
-    <div className="flex min-h-screen">
-      {/* Left Panel - Nature Background with Content Overlay */}
-      <div 
-        className="hidden lg:flex lg:w-[60%] flex-col justify-between relative overflow-hidden"
-        style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&q=80')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
-        {/* Dark Overlay Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between h-full p-16">
-          {/* Logo Section - Fade in from top */}
-          <div 
-            className="animate-fadeInUp"
-            style={{ animationDelay: '0.1s', animationFillMode: 'both' }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-xl shadow-lg border border-white/20">
-                <Leaf className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-white">ESG Smart Performance</h1>
-                <p className="text-sm text-white/70 font-medium">Sustainability Platform v2.0</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Heading & Features */}
-          <div className="space-y-12">
-            {/* Heading - Fade in from left */}
-            <div 
-              className="animate-fadeInLeft"
-              style={{ animationDelay: '0.2s', animationFillMode: 'both' }}
-            >
-              <h2 className="text-4xl font-bold leading-tight tracking-tight text-white">
-                {language === "th" ? "ขับเคลื่อนองค์กร" : "Driving Your Organization"}
-              </h2>
-              <h2 className="text-4xl font-bold leading-tight tracking-tight text-white">
-                {language === "th" ? "สู่" : "Towards"}
-              </h2>
-              <h2 className="text-5xl font-bold leading-tight tracking-tight text-emerald-300">
-                {language === "th" ? "ความยั่งยืน" : "Sustainability"}
-              </h2>
-              <p className="mt-6 text-lg text-white/80">
-                {language === "th" ? "บริษัท เอ็นเอสแอล ฟู้ดส์ จำกัด (มหาชน)" : "NSL FOODS Public Company Limited"}
-              </p>
-            </div>
-
-            {/* Feature Cards - Staggered fade in */}
-            <div className="space-y-4">
-              {features.map((feature, index) => (
-                <div
-                  key={index}
-                  className="flex items-start gap-4 rounded-2xl bg-white/10 backdrop-blur-md p-4 border border-white/20 transition-all duration-300 hover:bg-white/20 cursor-pointer animate-fadeInLeft"
-                  style={{ 
-                    animationDelay: `${0.3 + index * 0.1}s`,
-                    animationFillMode: 'both'
-                  }}
-                >
-                  <span className="text-2xl">{feature.icon}</span>
-                  <div>
-                    <h3 className="font-semibold text-base text-white">{feature.title}</h3>
-                    <p className="text-sm text-white/70 mt-0.5">{feature.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <p className="text-sm text-white/50">
-            © 2026 ESG Smart Performance | Developed by Arnon Arpaket
-          </p>
+  const features = [{
+    icon: BarChart3,
+    title: language === "th" ? "รายงาน ESG" : "ESG Reporting",
+    description: language === "th" ? "ติดตามผลการดำเนินงานด้านความยั่งยืน" : "Track sustainability performance metrics"
+  }, {
+    icon: Shield,
+    title: language === "th" ? "การกำกับดูแล" : "Governance",
+    description: language === "th" ? "ระบบควบคุมและตรวจสอบภายใน" : "Internal control and audit systems"
+  }, {
+    icon: Users,
+    title: language === "th" ? "การมีส่วนร่วม" : "Stakeholder Engagement",
+    description: language === "th" ? "เชื่อมต่อกับผู้มีส่วนได้ส่วนเสีย" : "Connect with all stakeholders"
+  }];
+  return <div className="flex min-h-screen">
+      {/* Left Panel - Branding */}
+      <div className="hidden lg:flex lg:w-[55%] flex-col justify-between bg-gradient-to-br from-primary via-primary to-primary/90 p-16 text-primary-foreground relative overflow-hidden">
+        {/* Decorative background elements */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-10 h-64 w-64 rounded-full bg-primary-foreground/20 blur-3xl" />
+          <div className="absolute bottom-32 right-20 h-80 w-80 rounded-full bg-primary-foreground/10 blur-3xl" />
+          <div className="absolute top-1/2 left-1/3 h-48 w-48 rounded-full bg-primary-foreground/15 blur-2xl" />
         </div>
+
+        <div className="relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-foreground/20 backdrop-blur-sm shadow-lg ring-1 ring-primary-foreground/10">
+              <Leaf className="h-8 w-8 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">ESG Smart Performance</h1>
+              <p className="text-sm text-primary-foreground/70 font-medium">Sustainability Platform v1.0</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-10 relative z-10">
+          <div>
+            <h2 className="text-4xl font-bold leading-tight tracking-tight whitespace-pre-line">
+              {language === "th" ? "ขับเคลื่อนองค์กรสู่ความยั่งยืน" : "Driving Your Organization\nTowards Sustainability"}
+            </h2>
+            <p className="mt-6 text-lg text-primary-foreground/80 max-w-lg leading-relaxed">
+              {language === "th" ? "บริษัท เอ็นเอสแอล ฟู้ดส์ จำกัด (มหาชน)" : "NSL FOODS Public Company Limited"}
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {features.map((feature, index) => <div key={index} className="flex items-start gap-4 rounded-2xl bg-primary-foreground/10 p-5 backdrop-blur-sm border border-primary-foreground/10 transition-all duration-300 hover:bg-primary-foreground/15 hover:translate-x-1 font-bold">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-foreground/20 shadow-sm">
+                  <feature.icon className="h-6 w-6" />
+                </div>
+                <div className="pt-1">
+                  <h3 className="font-semibold text-base">{feature.title}</h3>
+                  <p className="text-sm text-primary-foreground/70 mt-1">{feature.description}</p>
+                </div>
+              </div>)}
+          </div>
+        </div>
+
+        <p className="text-sm text-primary-foreground/50 relative z-10">
+          © 2026 ESG Smart Performance | Developed by Arnon Arpaket.
+          <br />
+          All software and design assets are protected. Unauthorized use or reproduction is prohibited.
+        </p>
       </div>
 
-      {/* Right Panel - Frosted Glass Login Form */}
-      <div 
-        className="flex flex-1 flex-col items-center justify-center relative min-h-screen lg:w-[40%]"
-        style={{
-          background: 'linear-gradient(to bottom right, rgba(255,255,255,0.9), rgba(255,255,255,0.7), rgba(236,253,245,0.5))',
-        }}
-      >
-        {/* Mobile: Nature Background */}
-        <div 
-          className="lg:hidden absolute inset-0 -z-10"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&q=80')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
-        >
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      {/* Right Panel - Auth Forms */}
+      <div className="flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4 py-6 sm:p-8 lg:p-16 relative min-h-screen">
+        {/* Subtle background pattern */}
+        <div className="absolute inset-0 opacity-[0.02] pointer-events-none">
+          <div className="absolute inset-0" style={{
+          backgroundImage: "radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)",
+          backgroundSize: "40px 40px"
+        }} />
         </div>
 
-        {/* Glass background for desktop */}
-        <div className="hidden lg:block absolute inset-0 bg-white/80 backdrop-blur-3xl border-l border-white/50" />
-
         {/* Language Switcher */}
-        <div className="absolute right-4 top-4 sm:right-8 sm:top-8 z-20">
+        <div className="absolute right-4 top-4 sm:right-8 sm:top-8">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 bg-white/60 backdrop-blur-sm border-gray-200/80 hover:bg-white/80 hover:border-gray-300 transition-all duration-200 shadow-sm rounded-xl"
-              >
-                <Globe className="h-4 w-4 text-gray-500" />
-                <span className="font-medium text-gray-700">{language === "th" ? "ไทย" : "EN"}</span>
+              <Button variant="outline" size="sm" className="gap-2 bg-background/80 backdrop-blur-sm border-border/50 hover:bg-background hover:border-border transition-all duration-200 shadow-sm">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{language === "th" ? "ไทย" : "EN"}</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[120px] bg-white/80 backdrop-blur-xl border-white/50 rounded-xl">
-              <DropdownMenuItem onClick={() => setLanguage("th")} className="gap-3 cursor-pointer rounded-lg">
+            <DropdownMenuContent align="end" className="min-w-[120px]">
+              <DropdownMenuItem onClick={() => setLanguage("th")} className="gap-3 cursor-pointer">
                 <span>🇹🇭</span>
                 <span>ไทย</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLanguage("en")} className="gap-3 cursor-pointer rounded-lg">
+              <DropdownMenuItem onClick={() => setLanguage("en")} className="gap-3 cursor-pointer">
                 <span>🇺🇸</span>
                 <span>English</span>
               </DropdownMenuItem>
@@ -305,284 +233,133 @@ export default function Auth() {
           </DropdownMenu>
         </div>
 
-        {/* Login Form Container */}
-        <div 
-          className="w-full max-w-[400px] px-4 lg:px-0 relative z-10 animate-fadeInRight"
-          style={{ animationDelay: '0.3s', animationFillMode: 'both' }}
-        >
-          {/* Mobile Card Wrapper */}
-          <div className="lg:bg-transparent lg:shadow-none lg:p-0 bg-white/90 backdrop-blur-2xl rounded-3xl shadow-2xl p-8 mx-0">
-            {/* Header Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 flex items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-500 shadow-2xl shadow-emerald-500/30">
-                <Leaf className="h-10 w-10 text-white" />
+        {/* Mobile Logo */}
+        <div className="mb-6 sm:mb-10 text-center lg:hidden mt-8 sm:mt-0">
+          <div className="mb-3 sm:mb-5 inline-flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-primary shadow-xl shadow-primary/20">
+            <Leaf className="h-7 w-7 sm:h-8 sm:w-8 text-primary-foreground" />
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">{t("appName")}</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            {language === "th" ? "ระบบจัดการความยั่งยืน" : "Sustainability Platform"}
+          </p>
+        </div>
+
+        <Card className="w-full max-w-[420px] border border-border/50 shadow-2xl shadow-black/5 bg-card/95 backdrop-blur-sm relative z-10">
+          <Tabs defaultValue="login">
+            <CardHeader className="space-y-3 sm:space-y-4 pb-3 sm:pb-4 pt-6 sm:pt-8 px-4 sm:px-8">
+              <div className="text-center space-y-1.5 sm:space-y-2">
+                <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">
+                  {language === "th" ? "ยินดีต้อนรับ" : "Welcome"}
+                </CardTitle>
+                <CardDescription className="text-muted-foreground text-xs sm:text-sm">
+                  {language === "th" ? "เข้าสู่ระบบหรือสร้างบัญชีใหม่" : "Sign in or create a new account"}
+                </CardDescription>
               </div>
-            </div>
-
-            {/* Welcome Text */}
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-800">
-                {language === "th" ? "ยินดีต้อนรับ" : "Welcome"}
-              </h1>
-              <p className="text-gray-500 mt-2">
-                {language === "th" ? "เข้าสู่ระบบเพื่อดำเนินการต่อ" : "Sign in to continue"}
-              </p>
-            </div>
-
-            <Tabs defaultValue="login">
-              {/* Tab Switcher */}
-              <TabsList className="grid w-full grid-cols-2 h-14 p-1.5 bg-gray-100/80 rounded-2xl mb-8">
-                <TabsTrigger
-                  value="login"
-                  className="text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-emerald-600 transition-all duration-200 rounded-xl text-gray-500 py-3"
-                >
+              <TabsList className="grid w-full grid-cols-2 h-10 sm:h-11 p-1 bg-muted/50">
+                <TabsTrigger value="login" className="text-xs sm:text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200">
                   {t("login")}
                 </TabsTrigger>
-                <TabsTrigger
-                  value="signup"
-                  className="text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-emerald-600 transition-all duration-200 rounded-xl text-gray-500 py-3"
-                >
+                <TabsTrigger value="signup" className="text-xs sm:text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200">
                   {t("signup")}
                 </TabsTrigger>
               </TabsList>
+            </CardHeader>
 
+            <CardContent className="pt-2 pb-6 sm:pb-8 px-4 sm:px-8">
               {/* Login Form */}
               <TabsContent value="login" className="mt-0">
-                <form onSubmit={handleLogin} className="space-y-6">
-                  {/* Email Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-sm font-medium text-gray-700">
+                <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="login-email" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("email")}
                     </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={loginForm.email}
-                        onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                        disabled={isLoading}
-                        className="h-14 pl-12 pr-4 text-base bg-white/70 backdrop-blur-sm border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20 transition-all duration-200 placeholder:text-gray-400 rounded-2xl"
-                      />
-                    </div>
-                    {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                    <Input id="login-email" type="email" placeholder="email@example.com" value={loginForm.email} onChange={e => setLoginForm({
+                    ...loginForm,
+                    email: e.target.value
+                  })} disabled={isLoading} className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-muted-foreground/50" />
+                    {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
                   </div>
 
-                  {/* Password Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password" className="text-sm font-medium text-gray-700">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="login-password" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("password")}
                     </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="login-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={loginForm.password}
-                        onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                        disabled={isLoading}
-                        className="h-14 pl-12 pr-12 text-base bg-white/70 backdrop-blur-sm border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20 transition-all duration-200 rounded-2xl"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+                    <Input id="login-password" type="password" value={loginForm.password} onChange={e => setLoginForm({
+                    ...loginForm,
+                    password: e.target.value
+                  })} disabled={isLoading} className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200" />
+                    {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                   </div>
 
-                  {/* Remember Me & Forgot Password */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Checkbox 
-                        id="remember" 
-                        checked={rememberMe}
-                        onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                        className="w-5 h-5 rounded-lg border-gray-300 text-emerald-500 focus:ring-emerald-500"
-                      />
-                      <Label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer">
-                        {language === "th" ? "จดจำฉัน" : "Remember me"}
-                      </Label>
-                    </div>
-                    <button
-                      type="button"
-                      className="text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
-                      onClick={() => toast({
-                        title: language === "th" ? "ลืมรหัสผ่าน" : "Forgot Password",
-                        description: language === "th" ? "กรุณาติดต่อผู้ดูแลระบบ" : "Please contact your administrator",
-                      })}
-                    >
-                      {language === "th" ? "ลืมรหัสผ่าน?" : "Forgot password?"}
-                    </button>
-                  </div>
-
-                  {/* Login Button */}
-                  <Button
-                    type="submit"
-                    className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white rounded-2xl shadow-xl shadow-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 border-0 flex items-center justify-center gap-2"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <>
-                        {language === "th" ? "เข้าสู่ระบบ" : "Sign In"}
-                        <ArrowRight className="h-5 w-5 ml-2" />
-                      </>
-                    )}
+                  <Button type="submit" className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 mt-2" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {t("login")}
                   </Button>
                 </form>
               </TabsContent>
 
               {/* Signup Form */}
               <TabsContent value="signup" className="mt-0">
-                <form onSubmit={handleSignup} className="space-y-4">
-                  {/* Full Name Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name" className="text-sm font-medium text-gray-700">
+                <form onSubmit={handleSignup} className="space-y-3 sm:space-y-4">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="signup-name" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("fullName")}
                     </Label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="signup-name"
-                        type="text"
-                        placeholder={language === "th" ? "ชื่อ-นามสกุล" : "Full Name"}
-                        value={signupForm.fullName}
-                        onChange={(e) => setSignupForm({ ...signupForm, fullName: e.target.value })}
-                        disabled={isLoading}
-                        className="h-14 pl-12 pr-4 text-base bg-white/70 backdrop-blur-sm border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20 transition-all duration-200 placeholder:text-gray-400 rounded-2xl"
-                      />
-                    </div>
-                    {errors.fullName && <p className="text-xs text-red-500 mt-1">{errors.fullName}</p>}
+                    <Input id="signup-name" type="text" value={signupForm.fullName} onChange={e => setSignupForm({
+                    ...signupForm,
+                    fullName: e.target.value
+                  })} disabled={isLoading} className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200" />
+                    {errors.fullName && <p className="text-xs text-destructive mt-1">{errors.fullName}</p>}
                   </div>
 
-                  {/* Email Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-sm font-medium text-gray-700">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="signup-email" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("email")}
                     </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={signupForm.email}
-                        onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
-                        disabled={isLoading}
-                        className="h-14 pl-12 pr-4 text-base bg-white/70 backdrop-blur-sm border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20 transition-all duration-200 placeholder:text-gray-400 rounded-2xl"
-                      />
-                    </div>
-                    {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                    <Input id="signup-email" type="email" placeholder="email@example.com" value={signupForm.email} onChange={e => setSignupForm({
+                    ...signupForm,
+                    email: e.target.value
+                  })} disabled={isLoading} className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 placeholder:text-muted-foreground/50" />
+                    {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
                   </div>
 
-                  {/* Password Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-sm font-medium text-gray-700">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="signup-password" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("password")}
                     </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="signup-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={signupForm.password}
-                        onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
-                        disabled={isLoading}
-                        className="h-14 pl-12 pr-12 text-base bg-white/70 backdrop-blur-sm border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20 transition-all duration-200 rounded-2xl"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+                    <Input id="signup-password" type="password" value={signupForm.password} onChange={e => setSignupForm({
+                    ...signupForm,
+                    password: e.target.value
+                  })} disabled={isLoading} className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200" />
+                    {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
                   </div>
 
-                  {/* Confirm Password Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-confirm-password" className="text-sm font-medium text-gray-700">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="signup-confirm" className="text-xs sm:text-sm font-medium text-foreground">
                       {t("confirmPassword")}
                     </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="signup-confirm-password"
-                        type={showConfirmPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={signupForm.confirmPassword}
-                        onChange={(e) => setSignupForm({ ...signupForm, confirmPassword: e.target.value })}
-                        disabled={isLoading}
-                        className="h-14 pl-12 pr-12 text-base bg-white/70 backdrop-blur-sm border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20 transition-all duration-200 rounded-2xl"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    {errors.confirmPassword && (
-                      <p className="text-xs text-red-500 mt-1">{errors.confirmPassword}</p>
-                    )}
+                    <Input id="signup-confirm" type="password" value={signupForm.confirmPassword} onChange={e => setSignupForm({
+                    ...signupForm,
+                    confirmPassword: e.target.value
+                  })} disabled={isLoading} className="h-11 sm:h-12 px-3 sm:px-4 text-sm sm:text-base bg-background border-border/60 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200" />
+                    {errors.confirmPassword && <p className="text-xs text-destructive mt-1">{errors.confirmPassword}</p>}
                   </div>
 
-                  {/* Signup Button */}
-                  <Button
-                    type="submit"
-                    className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white rounded-2xl shadow-xl shadow-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 border-0 flex items-center justify-center gap-2 mt-6"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <>
-                        {language === "th" ? "สมัครสมาชิก" : "Sign Up"}
-                        <ArrowRight className="h-5 w-5 ml-2" />
-                      </>
-                    )}
+                  <Button type="submit" className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 mt-2" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {t("signup")}
                   </Button>
                 </form>
               </TabsContent>
-            </Tabs>
-          </div>
-        </div>
+            </CardContent>
+          </Tabs>
+        </Card>
 
-        {/* Mobile Footer */}
-        <p className="text-xs text-white/70 lg:text-gray-400 mt-6 text-center lg:hidden relative z-10">
-          © 2026 ESG Smart Performance v2.0
+        <p className="mt-6 sm:mt-10 text-center text-[10px] sm:text-xs text-muted-foreground/70 lg:hidden px-4">
+          © 2026 ESG Smart Performance | Developed by Arnon Arpaket.
+          <br />
+          All software and design assets are protected. Unauthorized use or reproduction is prohibited.
         </p>
       </div>
-
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeInLeft {
-          from { opacity: 0; transform: translateX(-20px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes fadeInRight {
-          from { opacity: 0; transform: translateX(20px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        .animate-fadeInUp { animation: fadeInUp 0.6s ease-out forwards; }
-        .animate-fadeInLeft { animation: fadeInLeft 0.6s ease-out forwards; }
-        .animate-fadeInRight { animation: fadeInRight 0.6s ease-out forwards; }
-      `}</style>
-    </div>
-  );
+    </div>;
 }
