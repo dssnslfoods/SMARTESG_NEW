@@ -45,6 +45,8 @@ import {
   Filter,
   X,
   CalendarDays,
+  Send,
+  FileEdit,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, differenceInDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -173,6 +175,8 @@ export default function AdminAnalyticsDashboard() {
   // Calculate analytics from filtered data
   const analytics = useMemo(() => {
     const totalEntries = filteredData.length;
+    const totalSubmitted = filteredData.filter(mv => mv.status === 'submitted' || mv.status === 'approved').length;
+    const totalDrafted = filteredData.filter(mv => mv.status === 'draft').length;
 
     // User stats
     const userSubmissionMap = new Map<string, { count: number; dates: Date[] }>();
@@ -268,6 +272,8 @@ export default function AdminAnalyticsDashboard() {
 
     return {
       totalEntries,
+      totalSubmitted,
+      totalDrafted,
       userStats: userStatsArray,
       hourlyData: hourlyDataArray,
       dailyData: last30Days,
@@ -476,7 +482,7 @@ export default function AdminAnalyticsDashboard() {
       </Card>
 
       {/* Peak Stats Cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
         {/* Total Entries */}
         <Card className="bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300">
           <CardContent className="p-4">
@@ -489,6 +495,36 @@ export default function AdminAnalyticsDashboard() {
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.totalEntries}</div>
+          </CardContent>
+        </Card>
+
+        {/* Total Submitted */}
+        <Card className="bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs sm:text-sm text-gray-500">
+                {language === 'th' ? 'ส่งแล้ว' : 'Submitted'}
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-green-100 flex items-center justify-center">
+                <Send className="h-4 w-4 text-green-600" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.totalSubmitted}</div>
+          </CardContent>
+        </Card>
+
+        {/* Total Drafted */}
+        <Card className="bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs sm:text-sm text-gray-500">
+                {language === 'th' ? 'ฉบับร่าง' : 'Drafted'}
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-amber-100 flex items-center justify-center">
+                <FileEdit className="h-4 w-4 text-amber-600" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.totalDrafted}</div>
           </CardContent>
         </Card>
 
@@ -529,8 +565,8 @@ export default function AdminAnalyticsDashboard() {
               <span className="text-xs sm:text-sm text-gray-500">
                 {language === 'th' ? 'ชั่วโมงยอดนิยม' : 'Peak Hour'}
               </span>
-              <div className="h-8 w-8 rounded-xl bg-amber-100 flex items-center justify-center">
-                <Clock className="h-4 w-4 text-amber-600" />
+              <div className="h-8 w-8 rounded-xl bg-orange-100 flex items-center justify-center">
+                <Clock className="h-4 w-4 text-orange-600" />
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.peakHour?.hour || '-'}</div>
