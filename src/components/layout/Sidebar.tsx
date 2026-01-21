@@ -74,6 +74,12 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       icon: Gauge,
       roles: ['admin', 'executive'],
     },
+    {
+      label: language === 'th' ? 'สิ่งแวดล้อม' : 'Environmental',
+      href: '/reports/environmental',
+      icon: Leaf,
+      roles: ['admin', 'executive'],
+    },
   ];
 
   const masterDataItems = [
