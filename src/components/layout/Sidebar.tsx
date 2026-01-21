@@ -123,18 +123,18 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-sidebar-border bg-sidebar">
+    <aside className="flex h-full w-64 flex-col bg-white/80 backdrop-blur-xl border-r border-gray-200/50">
       {/* Brand */}
-      <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-5">
+      <div className="flex h-16 items-center justify-between border-b border-gray-200/50 px-5">
         <Link to="/dashboard" className="flex items-center gap-3 group" onClick={onNavigate}>
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm transition-transform group-hover:scale-105">
-            <Leaf className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25 transition-transform group-hover:scale-105">
+            <Leaf className="h-5 w-5 text-white" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground tracking-tight">
+            <span className="text-sm font-semibold text-gray-900 tracking-tight">
               {language === 'th' ? 'ESG Performance' : 'ESG Performance'}
             </span>
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+            <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">
               {language === 'th' ? 'ระบบจัดการความยั่งยืน' : 'Sustainability Platform'}
             </span>
           </div>
@@ -145,7 +145,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 text-gray-400 hover:text-gray-700"
             onClick={onNavigate}
           >
             <X className="h-5 w-5" />
@@ -155,8 +155,8 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        <div className="mb-2 px-3">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="mb-3 px-3">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
             {language === 'th' ? 'เมนูหลัก' : 'Main Menu'}
           </span>
         </div>
@@ -172,13 +172,13 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                     to={item.href}
                     onClick={onNavigate}
                     className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200',
                       isActive(item.href)
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                        ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-200/50 text-emerald-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100/80 border border-transparent'
                     )}
                   >
-                    <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-primary")} />
+                    <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-emerald-600")} />
                     {item.label}
                   </Link>
                   
@@ -188,8 +188,8 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                       <CollapsibleTrigger asChild>
                         <button
                           className={cn(
-                            'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 ml-4 mt-1 text-sm transition-all duration-200',
-                            'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                            'flex w-full items-center justify-between gap-3 rounded-xl px-4 py-2.5 ml-4 mt-1 text-sm transition-all duration-200',
+                            'text-gray-400 hover:bg-gray-100/80 hover:text-gray-600'
                           )}
                         >
                           <div className="flex items-center gap-3">
@@ -198,7 +198,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                           </div>
                           <ChevronDown
                             className={cn(
-                              'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200',
+                              'h-3.5 w-3.5 text-gray-400 transition-transform duration-200',
                               reportSettingsOpen && 'rotate-180'
                             )}
                           />
@@ -209,7 +209,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                           <button
                             key={section.id}
                             onClick={() => toggleSection(section.id)}
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-all hover:bg-sidebar-accent/50"
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-xs transition-all hover:bg-gray-100/80"
                           >
                             <Checkbox 
                               checked={section.visible} 
@@ -217,8 +217,8 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                               onCheckedChange={() => toggleSection(section.id)}
                             />
                             <span className={cn(
-                              "text-muted-foreground",
-                              section.visible && "text-sidebar-foreground"
+                              "text-gray-400",
+                              section.visible && "text-gray-700"
                             )}>
                               {language === 'th' ? section.labelTh : section.labelEn}
                             </span>
@@ -235,7 +235,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
             return isGuest ? (
               <div
                 key={item.href}
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground cursor-not-allowed opacity-50"
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-400 cursor-not-allowed opacity-50"
               >
                 <item.icon className="h-4 w-4" />
                 {item.label}
@@ -246,13 +246,13 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                 to={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                  'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border',
                   isActive(item.href)
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                    ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-200/50 text-emerald-700 shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100/80 border-transparent'
                 )}
               >
-                <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-primary")} />
+                <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-emerald-600")} />
                 {item.label}
               </Link>
             );
@@ -261,8 +261,8 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
         {/* Master Data Section */}
         {(role === 'admin' || role === 'supervisor' || role === 'guest') && (
           <>
-            <div className="mb-2 mt-6 px-3">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="mb-3 mt-6 px-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
                 {language === 'th' ? 'ข้อมูลหลัก' : 'Master Data'}
               </span>
             </div>
@@ -271,23 +271,23 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
               <CollapsibleTrigger asChild>
                 <button
                   className={cn(
-                    'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                    'flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border',
                     isGuest 
-                      ? 'text-muted-foreground cursor-not-allowed opacity-50'
+                      ? 'text-gray-400 cursor-not-allowed opacity-50 border-transparent'
                       : pathname.startsWith('/master')
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                        ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-200/50 text-emerald-700'
+                        : 'text-gray-600 hover:bg-gray-100/80 border-transparent'
                   )}
                   disabled={isGuest}
                 >
                   <div className="flex items-center gap-3">
-                    <Database className={cn("h-4 w-4", pathname.startsWith('/master') && "text-primary")} />
+                    <Database className={cn("h-4 w-4", pathname.startsWith('/master') && "text-emerald-600")} />
                     {t('masterData')}
                   </div>
                   {!isGuest && (
                     <ChevronDown
                       className={cn(
-                        'h-4 w-4 text-muted-foreground transition-transform duration-200',
+                        'h-4 w-4 text-gray-400 transition-transform duration-200',
                         masterDataOpen && 'rotate-180'
                       )}
                     />
@@ -302,10 +302,10 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                       to={item.href}
                       onClick={onNavigate}
                       className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200',
+                        'flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition-all duration-200',
                         isActive(item.href)
-                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                          : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                          ? 'bg-emerald-50/80 text-emerald-700'
+                          : 'text-gray-500 hover:bg-gray-100/80 hover:text-gray-700'
                       )}
                     >
                       <item.icon className="h-3.5 w-3.5" />
@@ -321,8 +321,8 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
         {/* Admin Section */}
         {adminItems.filter((item) => item.roles.includes(role || '')).length > 0 && (
           <>
-            <div className="mb-2 mt-6 px-3">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="mb-3 mt-6 px-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
                 {language === 'th' ? 'การจัดการระบบ' : 'Administration'}
               </span>
             </div>
@@ -333,7 +333,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                 isGuest ? (
                   <div
                     key={item.href}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground cursor-not-allowed opacity-50"
+                    className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-400 cursor-not-allowed opacity-50"
                   >
                     <item.icon className="h-4 w-4" />
                     {item.label}
@@ -344,13 +344,13 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                     to={item.href}
                     onClick={onNavigate}
                     className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border',
                       isActive(item.href)
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                        ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-200/50 text-emerald-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100/80 border-transparent'
                     )}
                   >
-                    <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-primary")} />
+                    <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-emerald-600")} />
                     {item.label}
                   </Link>
                 )
@@ -360,10 +360,10 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       </nav>
 
       {/* Logout */}
-      <div className="border-t border-sidebar-border p-3">
+      <div className="border-t border-gray-200/50 p-3">
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          className="w-full justify-start gap-3 text-gray-500 hover:text-red-600 hover:bg-red-50/80 transition-colors rounded-xl"
           onClick={signOut}
         >
           <LogOut className="h-4 w-4" />
