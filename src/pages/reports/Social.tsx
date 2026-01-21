@@ -10,9 +10,9 @@ import {
   Users,
   Heart,
   GraduationCap,
-  UserCheck,
   ShieldCheck,
   Smile,
+  BarChart3,
 } from "lucide-react";
 import {
   XAxis,
@@ -62,8 +62,20 @@ interface MetricValue {
   status: string;
 }
 
+// Empty State Component
+const EmptyState = ({ message }: { message: string }) => (
+  <div className="flex flex-col items-center justify-center h-[280px] text-muted-foreground">
+    <BarChart3 className="h-12 w-12 mb-2 opacity-50" />
+    <p>{message}</p>
+  </div>
+);
+
 // Sparkline component for KPI cards
 const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
+  if (data.length === 0) {
+    return <div className="h-8 w-20 flex items-center justify-center text-xs text-muted-foreground">-</div>;
+  }
+  
   const sparkData = data.map((value, index) => ({ value, index }));
   
   return (
@@ -95,11 +107,11 @@ const SocialKPICard = ({
   color,
 }: {
   title: string;
-  value: string | number;
+  value: string | number | null;
   unit: string;
   icon: React.ElementType;
-  trend?: "up" | "down" | "neutral";
-  trendValue?: string;
+  trend?: "up" | "down" | "neutral" | null;
+  trendValue?: string | null;
   sparklineData: number[];
   color: string;
 }) => {
@@ -117,8 +129,10 @@ const SocialKPICard = ({
               <p className="text-xs text-muted-foreground">{title}</p>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-xl sm:text-2xl font-bold">{value}</span>
-              <span className="text-xs text-muted-foreground">{unit}</span>
+              <span className="text-xl sm:text-2xl font-bold">
+                {value !== null ? value : "-"}
+              </span>
+              {value !== null && <span className="text-xs text-muted-foreground">{unit}</span>}
             </div>
             {trend && trendValue && (
               <div
@@ -132,6 +146,11 @@ const SocialKPICard = ({
                   <TrendingDown className="h-3 w-3" />
                 ) : null}
                 <span>{trendValue} YoY</span>
+              </div>
+            )}
+            {!trend && !trendValue && value !== null && (
+              <div className="text-xs mt-1 text-muted-foreground">
+                -
               </div>
             )}
           </div>
@@ -217,82 +236,70 @@ export default function Social() {
     return true;
   });
 
-  // Generate mock social data
-  const totalValue = filteredValues.reduce((sum, v) => sum + v.value, 0);
-  const avgValue = filteredValues.length > 0 ? totalValue / filteredValues.length : 0;
+  const hasData = filteredValues.length > 0;
 
-  // Gender Diversity (Pie Chart)
-  const genderData = [
-    { name: language === "th" ? "ชาย" : "Male", value: 58, color: "hsl(199 89% 48%)" },
-    { name: language === "th" ? "หญิง" : "Female", value: 40, color: "hsl(330 81% 60%)" },
-    { name: language === "th" ? "อื่นๆ" : "Other", value: 2, color: "hsl(45 93% 47%)" },
-  ];
+  // Gender Diversity (empty - no real data)
+  const genderData: { name: string; value: number; color: string }[] = [];
 
-  // Age Distribution (Bar Chart)
-  const ageData = [
-    { name: "<25", value: 15, color: "hsl(142 71% 45%)" },
-    { name: "25-34", value: 35, color: "hsl(199 89% 48%)" },
-    { name: "35-44", value: 28, color: "hsl(262 83% 58%)" },
-    { name: "45-54", value: 15, color: "hsl(45 93% 47%)" },
-    { name: "55+", value: 7, color: "hsl(330 81% 60%)" },
-  ];
+  // Age Distribution (empty - no real data)
+  const ageData: { name: string; value: number; color: string }[] = [];
 
-  // Training Hours Trend (Area Chart)
+  // Training Hours Trend (from real data if metric exists)
   const trainingTrendData = periods
     .filter((p) => p.year === selectedYear)
     .sort((a, b) => a.month - b.month)
     .map((period) => {
-      const baseValue = 20 + Math.random() * 10;
+      const periodValues = filteredValues.filter((v) => v.period_id === period.period_id);
+      
+      if (periodValues.length === 0) {
+        return {
+          name: period.month_name.slice(0, 3),
+          hours: null as number | null,
+          target: null as number | null,
+        };
+      }
+      
       return {
         name: period.month_name.slice(0, 3),
-        hours: Math.round(baseValue),
-        target: 24,
+        hours: null as number | null, // Would need specific training hours metric
+        target: null as number | null,
       };
     });
 
-  // Health & Safety Incidents (Line Chart)
+  const hasTrainingData = trainingTrendData.some(d => d.hours !== null);
+
+  // Health & Safety Incidents (empty - would need specific metrics)
   const safetyData = periods
     .filter((p) => p.year === selectedYear)
     .sort((a, b) => a.month - b.month)
     .map((period) => ({
       name: period.month_name.slice(0, 3),
-      incidents: Math.round(Math.random() * 3),
-      nearMiss: Math.round(Math.random() * 5),
+      incidents: null as number | null,
+      nearMiss: null as number | null,
     }));
 
-  // Employee Satisfaction by Category (Horizontal Bar)
-  const satisfactionData = [
-    { name: language === "th" ? "สภาพแวดล้อมการทำงาน" : "Work Environment", value: 85, color: "hsl(142 71% 45%)" },
-    { name: language === "th" ? "สวัสดิการ" : "Benefits", value: 78, color: "hsl(199 89% 48%)" },
-    { name: language === "th" ? "การพัฒนาอาชีพ" : "Career Development", value: 72, color: "hsl(262 83% 58%)" },
-    { name: language === "th" ? "ความสมดุลชีวิต" : "Work-Life Balance", value: 80, color: "hsl(45 93% 47%)" },
-    { name: language === "th" ? "ผู้นำ" : "Leadership", value: 82, color: "hsl(330 81% 60%)" },
-  ];
+  const hasSafetyData = safetyData.some(d => d.incidents !== null);
 
-  // Turnover Rate Trend (Line Chart)
+  // Employee Satisfaction by Category (empty - no real data)
+  const satisfactionData: { name: string; value: number; color: string }[] = [];
+
+  // Turnover Rate Trend (empty - would need specific metrics)
   const turnoverData = periods
     .filter((p) => p.year === selectedYear)
     .sort((a, b) => a.month - b.month)
     .map((period) => ({
       name: period.month_name.slice(0, 3),
-      voluntary: Math.round(1 + Math.random() * 2),
-      involuntary: Math.round(Math.random() * 1),
+      voluntary: null as number | null,
+      involuntary: null as number | null,
     }));
 
-  // Calculate KPI values
-  const totalEmployees = 2340 + Math.round(avgValue * 0.1);
-  const trainingHours = 24;
-  const employeeSatisfaction = 82;
-  const safetyRate = 98.5;
+  const hasTurnoverData = turnoverData.some(d => d.voluntary !== null);
 
-  // Generate sparkline data
-  const generateSparkline = (base: number) =>
-    Array.from({ length: 12 }, () => Math.round(base * (0.9 + Math.random() * 0.2)));
-
-  const employeeSparkline = generateSparkline(totalEmployees);
-  const trainingSparkline = generateSparkline(trainingHours);
-  const satisfactionSparkline = generateSparkline(employeeSatisfaction);
-  const safetySparkline = generateSparkline(safetyRate);
+  // Calculate KPI values (null if no real data)
+  const totalEmployees = null;
+  const trainingHours = null;
+  const employeeSatisfaction = null;
+  const safetyRate = null;
 
   if (loading) {
     return <ReportsLoadingSkeleton />;
@@ -379,12 +386,12 @@ export default function Social() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <SocialKPICard
           title={language === "th" ? "จำนวนพนักงาน" : "Total Employees"}
-          value={totalEmployees.toLocaleString()}
+          value={totalEmployees}
           unit={language === "th" ? "คน" : "people"}
           icon={Users}
-          trend="up"
-          trendValue="+3.2%"
-          sparklineData={employeeSparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={[]}
           color="hsl(199 89% 48%)"
         />
         <SocialKPICard
@@ -392,9 +399,9 @@ export default function Social() {
           value={trainingHours}
           unit={language === "th" ? "ชม./คน" : "hrs/person"}
           icon={GraduationCap}
-          trend="up"
-          trendValue="+8.5%"
-          sparklineData={trainingSparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={[]}
           color="hsl(262 83% 58%)"
         />
         <SocialKPICard
@@ -402,9 +409,9 @@ export default function Social() {
           value={employeeSatisfaction}
           unit="%"
           icon={Smile}
-          trend="up"
-          trendValue="+2.1%"
-          sparklineData={satisfactionSparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={[]}
           color="hsl(142 71% 45%)"
         />
         <SocialKPICard
@@ -412,9 +419,9 @@ export default function Social() {
           value={safetyRate}
           unit="%"
           icon={ShieldCheck}
-          trend="up"
-          trendValue="+0.5%"
-          sparklineData={safetySparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={[]}
           color="hsl(45 93% 47%)"
         />
       </div>
@@ -429,32 +436,7 @@ export default function Social() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={genderData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  labelLine={{ stroke: "hsl(var(--muted-foreground))", strokeWidth: 1 }}
-                >
-                  {genderData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -466,25 +448,7 @@ export default function Social() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={ageData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                />
-                <Bar dataKey="value" name={language === "th" ? "เปอร์เซ็นต์" : "Percentage"} radius={[4, 4, 0, 0]}>
-                  {ageData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -496,44 +460,7 @@ export default function Social() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {trainingTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={trainingTrendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="hours"
-                    name={language === "th" ? "ชั่วโมงอบรม" : "Training Hours"}
-                    stroke="hsl(262 83% 58%)"
-                    fill="hsl(262 83% 58%)"
-                    fillOpacity={0.3}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="target"
-                    name={language === "th" ? "เป้าหมาย" : "Target"}
-                    stroke="hsl(var(--destructive))"
-                    strokeDasharray="5 5"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[280px] text-muted-foreground">
-                {language === "th" ? "ไม่มีข้อมูล" : "No data available"}
-              </div>
-            )}
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -545,30 +472,7 @@ export default function Social() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={satisfactionData} layout="vertical" margin={{ top: 10, right: 30, left: 100, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                  width={100}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                />
-                <Bar dataKey="value" name={language === "th" ? "คะแนน" : "Score"} radius={[0, 4, 4, 0]}>
-                  {satisfactionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -580,43 +484,7 @@ export default function Social() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {safetyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={safetyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="incidents"
-                    name={language === "th" ? "เหตุการณ์" : "Incidents"}
-                    stroke="hsl(var(--destructive))"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(var(--destructive))", strokeWidth: 2 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="nearMiss"
-                    name={language === "th" ? "เกือบเกิดเหตุ" : "Near Miss"}
-                    stroke="hsl(45 93% 47%)"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(45 93% 47%)", strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[280px] text-muted-foreground">
-                {language === "th" ? "ไม่มีข้อมูล" : "No data available"}
-              </div>
-            )}
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -628,41 +496,7 @@ export default function Social() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {turnoverData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={turnoverData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="voluntary"
-                    name={language === "th" ? "สมัครใจ" : "Voluntary"}
-                    stackId="a"
-                    fill="hsl(199 89% 48%)"
-                    radius={[0, 0, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="involuntary"
-                    name={language === "th" ? "ไม่สมัครใจ" : "Involuntary"}
-                    stackId="a"
-                    fill="hsl(var(--destructive))"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[280px] text-muted-foreground">
-                {language === "th" ? "ไม่มีข้อมูล" : "No data available"}
-              </div>
-            )}
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
       </div>

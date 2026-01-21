@@ -8,11 +8,11 @@ import {
   TrendingUp,
   TrendingDown,
   Shield,
-  Scale,
   FileCheck,
   Users,
   AlertTriangle,
   CheckCircle,
+  BarChart3,
 } from "lucide-react";
 import {
   XAxis,
@@ -78,8 +78,20 @@ interface MetricValue {
   status: string;
 }
 
+// Empty State Component
+const EmptyState = ({ message }: { message: string }) => (
+  <div className="flex flex-col items-center justify-center h-[280px] text-muted-foreground">
+    <BarChart3 className="h-12 w-12 mb-2 opacity-50" />
+    <p>{message}</p>
+  </div>
+);
+
 // Sparkline component for KPI cards
 const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
+  if (data.length === 0) {
+    return <div className="h-8 w-20 flex items-center justify-center text-xs text-muted-foreground">-</div>;
+  }
+  
   const sparkData = data.map((value, index) => ({ value, index }));
   
   return (
@@ -111,11 +123,11 @@ const GovKPICard = ({
   color,
 }: {
   title: string;
-  value: string | number;
+  value: string | number | null;
   unit: string;
   icon: React.ElementType;
-  trend?: "up" | "down" | "neutral";
-  trendValue?: string;
+  trend?: "up" | "down" | "neutral" | null;
+  trendValue?: string | null;
   sparklineData: number[];
   color: string;
 }) => {
@@ -133,8 +145,10 @@ const GovKPICard = ({
               <p className="text-xs text-muted-foreground">{title}</p>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-xl sm:text-2xl font-bold">{value}</span>
-              <span className="text-xs text-muted-foreground">{unit}</span>
+              <span className="text-xl sm:text-2xl font-bold">
+                {value !== null ? value : "-"}
+              </span>
+              {value !== null && <span className="text-xs text-muted-foreground">{unit}</span>}
             </div>
             {trend && trendValue && (
               <div
@@ -148,6 +162,11 @@ const GovKPICard = ({
                   <TrendingDown className="h-3 w-3" />
                 ) : null}
                 <span>{trendValue} YoY</span>
+              </div>
+            )}
+            {!trend && !trendValue && value !== null && (
+              <div className="text-xs mt-1 text-muted-foreground">
+                -
               </div>
             )}
           </div>
@@ -241,74 +260,47 @@ export default function Governance() {
     return true;
   });
 
-  // Generate mock governance data based on actual metric values
-  const totalValue = filteredValues.reduce((sum, v) => sum + v.value, 0);
-  const avgValue = filteredValues.length > 0 ? totalValue / filteredValues.length : 0;
+  const hasData = filteredValues.length > 0;
 
-  // Board Composition Data (Pie Chart)
-  const boardCompositionData = [
-    { name: language === "th" ? "กรรมการอิสระ" : "Independent", value: 45, color: "hsl(262 83% 58%)" },
-    { name: language === "th" ? "กรรมการบริหาร" : "Executive", value: 30, color: "hsl(199 89% 48%)" },
-    { name: language === "th" ? "กรรมการไม่บริหาร" : "Non-Executive", value: 25, color: "hsl(45 93% 47%)" },
-  ];
+  // Board Composition Data (empty - no real data)
+  const boardCompositionData: { name: string; value: number; color: string }[] = [];
 
-  // Compliance Score by Category (Radar Chart)
-  const complianceRadarData = [
-    { subject: language === "th" ? "จริยธรรม" : "Ethics", score: 92, fullMark: 100 },
-    { subject: language === "th" ? "ความโปร่งใส" : "Transparency", score: 88, fullMark: 100 },
-    { subject: language === "th" ? "การควบคุมภายใน" : "Internal Control", score: 85, fullMark: 100 },
-    { subject: language === "th" ? "การบริหารความเสี่ยง" : "Risk Mgmt", score: 90, fullMark: 100 },
-    { subject: language === "th" ? "การปฏิบัติตามกฎหมาย" : "Regulatory", score: 95, fullMark: 100 },
-    { subject: language === "th" ? "การตรวจสอบ" : "Audit", score: 87, fullMark: 100 },
-  ];
+  // Compliance Score by Category (empty - would need specific metrics)
+  const complianceRadarData: { subject: string; score: number; fullMark: number }[] = [];
 
-  // Policy Compliance Trend (Monthly Line Chart)
+  // Policy Compliance Trend (empty - would need specific metrics)
   const complianceTrendData = periods
     .filter((p) => p.year === selectedYear)
     .sort((a, b) => a.month - b.month)
-    .map((period) => {
-      const baseValue = 85 + Math.random() * 10;
-      return {
-        name: period.month_name.slice(0, 3),
-        compliance: Math.round(baseValue),
-        target: 95,
-      };
-    });
+    .map((period) => ({
+      name: period.month_name.slice(0, 3),
+      compliance: null as number | null,
+      target: null as number | null,
+    }));
 
-  // Risk Assessment by Category (Horizontal Bar Chart)
-  const riskData = [
-    { name: language === "th" ? "ความเสี่ยงด้านการเงิน" : "Financial Risk", value: 25, color: "hsl(142 71% 45%)" },
-    { name: language === "th" ? "ความเสี่ยงด้านปฏิบัติการ" : "Operational Risk", value: 40, color: "hsl(45 93% 47%)" },
-    { name: language === "th" ? "ความเสี่ยงด้านกลยุทธ์" : "Strategic Risk", value: 35, color: "hsl(199 89% 48%)" },
-    { name: language === "th" ? "ความเสี่ยงด้านชื่อเสียง" : "Reputational Risk", value: 20, color: "hsl(262 83% 58%)" },
-    { name: language === "th" ? "ความเสี่ยงด้านกฎหมาย" : "Legal Risk", value: 15, color: "hsl(var(--destructive))" },
-  ];
+  const hasComplianceTrendData = complianceTrendData.some(d => d.compliance !== null);
 
-  // Audit Findings Over Time (Bar Chart)
+  // Risk Assessment by Category (empty - no real data)
+  const riskData: { name: string; value: number; color: string }[] = [];
+
+  // Audit Findings Over Time (empty - would need specific metrics)
   const auditData = periods
     .filter((p) => p.year === selectedYear)
     .sort((a, b) => a.month - b.month)
     .map((period) => ({
       name: period.month_name.slice(0, 3),
-      critical: Math.round(Math.random() * 2),
-      major: Math.round(Math.random() * 5),
-      minor: Math.round(Math.random() * 10),
+      critical: null as number | null,
+      major: null as number | null,
+      minor: null as number | null,
     }));
 
-  // Calculate KPI values
-  const complianceRate = 95;
-  const boardIndependence = 45;
-  const riskScore = Math.round(avgValue * 0.5 + 60);
-  const auditCompletion = 92;
+  const hasAuditData = auditData.some(d => d.critical !== null);
 
-  // Generate sparkline data (12 months trend)
-  const generateSparkline = (base: number) =>
-    Array.from({ length: 12 }, () => Math.round(base * (0.9 + Math.random() * 0.2)));
-
-  const complianceSparkline = generateSparkline(complianceRate);
-  const boardSparkline = generateSparkline(boardIndependence);
-  const riskSparkline = generateSparkline(riskScore);
-  const auditSparkline = generateSparkline(auditCompletion);
+  // Calculate KPI values (null if no real data)
+  const complianceRate = null;
+  const boardIndependence = null;
+  const riskScore = null;
+  const auditCompletion = null;
 
   if (loading) {
     return <ReportsLoadingSkeleton />;
@@ -398,9 +390,9 @@ export default function Governance() {
           value={complianceRate}
           unit="%"
           icon={FileCheck}
-          trend="up"
-          trendValue="+2.5%"
-          sparklineData={complianceSparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={[]}
           color="hsl(142 71% 45%)"
         />
         <GovKPICard
@@ -408,9 +400,9 @@ export default function Governance() {
           value={boardIndependence}
           unit="%"
           icon={Users}
-          trend="up"
-          trendValue="+5.0%"
-          sparklineData={boardSparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={[]}
           color="hsl(262 83% 58%)"
         />
         <GovKPICard
@@ -418,9 +410,9 @@ export default function Governance() {
           value={riskScore}
           unit="/100"
           icon={AlertTriangle}
-          trend="down"
-          trendValue="-3.2%"
-          sparklineData={riskSparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={[]}
           color="hsl(45 93% 47%)"
         />
         <GovKPICard
@@ -428,9 +420,9 @@ export default function Governance() {
           value={auditCompletion}
           unit="%"
           icon={CheckCircle}
-          trend="up"
-          trendValue="+4.0%"
-          sparklineData={auditSparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={[]}
           color="hsl(199 89% 48%)"
         />
       </div>
@@ -445,32 +437,7 @@ export default function Governance() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={boardCompositionData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  labelLine={{ stroke: "hsl(var(--muted-foreground))", strokeWidth: 1 }}
-                >
-                  {boardCompositionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -482,34 +449,7 @@ export default function Governance() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <RadarChart data={complianceRadarData}>
-                <PolarGrid stroke="hsl(var(--border))" />
-                <PolarAngleAxis 
-                  dataKey="subject" 
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                />
-                <PolarRadiusAxis 
-                  angle={30} 
-                  domain={[0, 100]} 
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-                />
-                <Radar
-                  name={language === "th" ? "คะแนน" : "Score"}
-                  dataKey="score"
-                  stroke="hsl(262 83% 58%)"
-                  fill="hsl(262 83% 58%)"
-                  fillOpacity={0.3}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -521,47 +461,7 @@ export default function Governance() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {complianceTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={complianceTrendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis 
-                    domain={[70, 100]} 
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} 
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="compliance"
-                    name={language === "th" ? "อัตราการปฏิบัติตาม" : "Compliance Rate"}
-                    stroke="hsl(142 71% 45%)"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(142 71% 45%)", strokeWidth: 2 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="target"
-                    name={language === "th" ? "เป้าหมาย" : "Target"}
-                    stroke="hsl(var(--destructive))"
-                    strokeDasharray="5 5"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[280px] text-muted-foreground">
-                {language === "th" ? "ไม่มีข้อมูล" : "No data available"}
-              </div>
-            )}
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -573,30 +473,7 @@ export default function Governance() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={riskData} layout="vertical" margin={{ top: 10, right: 30, left: 100, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" domain={[0, 50]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                <YAxis 
-                  type="category" 
-                  dataKey="name" 
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} 
-                  width={100}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                />
-                <Bar dataKey="value" name={language === "th" ? "ระดับความเสี่ยง" : "Risk Level"}>
-                  {riskData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -608,45 +485,7 @@ export default function Governance() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {auditData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={auditData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="critical"
-                    name={language === "th" ? "วิกฤต" : "Critical"}
-                    stackId="a"
-                    fill="hsl(var(--destructive))"
-                  />
-                  <Bar
-                    dataKey="major"
-                    name={language === "th" ? "สำคัญ" : "Major"}
-                    stackId="a"
-                    fill="hsl(45 93% 47%)"
-                  />
-                  <Bar
-                    dataKey="minor"
-                    name={language === "th" ? "เล็กน้อย" : "Minor"}
-                    stackId="a"
-                    fill="hsl(199 89% 48%)"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[280px] text-muted-foreground">
-                {language === "th" ? "ไม่มีข้อมูล" : "No data available"}
-              </div>
-            )}
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
       </div>
