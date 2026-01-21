@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3, CheckSquare, Square, X } from "lucide-react";
+import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3, CheckSquare, Square, X, Leaf, TrendingUp, Clock, Filter } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
@@ -511,113 +511,431 @@ export default function DataEntry() {
   }
 
   return (
-    <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-              <FileText className="h-8 w-8 text-primary" />
-              {language === 'th' ? 'บันทึกข้อมูล ESG' : 'ESG Data Entry'}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {language === 'th' ? 'บันทึกและจัดการข้อมูลตัวชี้วัด ESG' : 'Record and manage ESG metric values'}
-            </p>
+    <div className="space-y-6 bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 min-h-screen -m-6 p-6">
+      {/* Header with Gradient Accent */}
+      <div className="relative">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 rounded-full" />
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl shadow-lg shadow-emerald-500/25">
+              <FileText className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800">
+                {language === 'th' ? 'บันทึกข้อมูล ESG' : 'ESG Data Entry'}
+              </h1>
+              <p className="text-gray-500 mt-0.5">
+                {language === 'th' ? 'บันทึกและจัดการข้อมูลตัวชี้วัด ESG' : 'Record and manage ESG metric values'}
+              </p>
+            </div>
           </div>
-          <Button onClick={handleCreate} className="gap-2">
+          <Button 
+            onClick={handleCreate} 
+            className="gap-2 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl px-6 py-2.5 border-0"
+          >
             <Plus className="h-4 w-4" />
             {language === 'th' ? 'เพิ่มข้อมูล' : 'Add Data'}
           </Button>
         </div>
+      </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-l-4 border-l-primary">
-            <CardHeader className="pb-2">
-              <CardDescription className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                {language === 'th' ? 'ข้อมูลทั้งหมด' : 'Total Records'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{metricValues.length}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-muted-foreground">
-            <CardHeader className="pb-2">
-              <CardDescription>{language === 'th' ? 'ร่าง' : 'Draft'}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{metricValues.filter(v => v.status === 'draft').length}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-secondary">
-            <CardHeader className="pb-2">
-              <CardDescription>{language === 'th' ? 'ส่งแล้ว' : 'Submitted'}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{metricValues.filter(v => v.status === 'submitted').length}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">
-              {language === 'th' ? 'ตัวกรอง' : 'Filters'}
-            </CardTitle>
+      {/* Summary Cards - Glass Style */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2 text-gray-600">
+              <div className="p-1.5 bg-emerald-100 rounded-lg group-hover:bg-emerald-200 transition-colors">
+                <BarChart3 className="h-4 w-4 text-emerald-600" />
+              </div>
+              {language === 'th' ? 'ข้อมูลทั้งหมด' : 'Total Records'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  {language === 'th' ? 'บริษัท' : 'Company'}
-                </Label>
-                <Select value={filterCompany || "__all__"} onValueChange={(v) => { setFilterCompany(v === "__all__" ? "" : v); setFilterSite(''); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
-                    {companies.map((company) => (
-                      <SelectItem key={company.company_id} value={company.company_id}>
-                        {company.company_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <p className="text-3xl font-bold text-gray-800">{metricValues.length}</p>
+            <p className="text-xs text-gray-500 mt-1">{language === 'th' ? 'รายการ' : 'entries'}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2 text-gray-600">
+              <div className="p-1.5 bg-amber-100 rounded-lg group-hover:bg-amber-200 transition-colors">
+                <Clock className="h-4 w-4 text-amber-600" />
               </div>
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  {language === 'th' ? 'สถานที่' : 'Site'}
-                </Label>
-                <Select value={filterSite || "__all__"} onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
-                    {filteredSites.map((site) => (
-                      <SelectItem key={site.site_id} value={site.site_id}>
-                        {site.site_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {language === 'th' ? 'ร่าง' : 'Draft'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-gray-800">{metricValues.filter(v => v.status === 'draft').length}</p>
+            <p className="text-xs text-amber-600 mt-1">{language === 'th' ? 'รอดำเนินการ' : 'pending'}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-500" />
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2 text-gray-600">
+              <div className="p-1.5 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                <TrendingUp className="h-4 w-4 text-blue-600" />
               </div>
+              {language === 'th' ? 'ส่งแล้ว' : 'Submitted'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-gray-800">{metricValues.filter(v => v.status === 'submitted').length}</p>
+            <p className="text-xs text-blue-600 mt-1">{language === 'th' ? 'เสร็จสิ้น' : 'completed'}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters Card - Glass Style */}
+      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-2xl overflow-hidden">
+        <CardHeader className="border-b border-gray-100">
+          <CardTitle className="text-lg flex items-center gap-2 text-gray-800">
+            <div className="p-1.5 bg-gray-100 rounded-lg">
+              <Filter className="h-4 w-4 text-gray-600" />
+            </div>
+            {language === 'th' ? 'ตัวกรอง' : 'Filters'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <Building2 className="h-3.5 w-3.5 text-gray-500" />
+                {language === 'th' ? 'บริษัท' : 'Company'}
+              </Label>
+              <Select value={filterCompany || "__all__"} onValueChange={(v) => { setFilterCompany(v === "__all__" ? "" : v); setFilterSite(''); }}>
+                <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                  <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                  <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.company_id} value={company.company_id}>
+                      {company.company_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <MapPin className="h-3.5 w-3.5 text-gray-500" />
+                {language === 'th' ? 'สถานที่' : 'Site'}
+              </Label>
+              <Select value={filterSite || "__all__"} onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                  <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                  <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                  {filteredSites.map((site) => (
+                    <SelectItem key={site.site_id} value={site.site_id}>
+                      {site.site_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <Calendar className="h-3.5 w-3.5 text-gray-500" />
+                {language === 'th' ? 'รอบระยะเวลา' : 'Period'}
+              </Label>
+              <Select value={filterPeriod || "__all__"} onValueChange={(v) => setFilterPeriod(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                  <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                  <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                  {periods.map((period) => (
+                    <SelectItem key={period.period_id} value={period.period_id}>
+                      {period.month_name} {period.year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'มิติ ESG' : 'Dimension'}</Label>
+              <Select value={filterDimension || "__all__"} onValueChange={(v) => { setFilterDimension(v === "__all__" ? "" : v); setFilterTheme(''); }}>
+                <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                  <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                  <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                  {dimensions.map((dim) => (
+                    <SelectItem key={dim.dimension_id} value={dim.dimension_id}>
+                      {dim.dimension_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'หัวข้อ ESG' : 'Theme'}</Label>
+              <Select value={filterTheme || "__all__"} onValueChange={(v) => setFilterTheme(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                  <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                  <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                  {filteredThemes.map((theme) => (
+                    <SelectItem key={theme.theme_id} value={theme.theme_id}>
+                      {theme.theme_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'สถานะ' : 'Status'}</Label>
+              <Select value={filterStatus || "__all__"} onValueChange={(v) => setFilterStatus(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                  <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                  <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                  <SelectItem value="draft">{language === 'th' ? 'ร่าง' : 'Draft'}</SelectItem>
+                  <SelectItem value="submitted">{language === 'th' ? 'ส่งแล้ว' : 'Submitted'}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Table Card - Glass Style */}
+      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-2xl overflow-hidden">
+        <CardHeader className="border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <CardTitle className="flex items-center gap-3 text-gray-800">
+              {language === 'th' ? 'รายการข้อมูล' : 'Data Records'}
+              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 rounded-full px-3">
+                {filteredValues.length} {language === 'th' ? 'รายการ' : 'records'}
+              </Badge>
+              {selectedIds.size > 0 && (
+                <Badge className="bg-blue-100 text-blue-700 border-blue-200 rounded-full px-3">
+                  {language === 'th' ? `เลือก ${selectedIds.size} รายการ` : `${selectedIds.size} selected`}
+                </Badge>
+              )}
+            </CardTitle>
+            {selectedIds.size > 0 && (
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="gap-2 rounded-xl shadow-lg"
+              >
+                <Trash2 className="h-4 w-4" />
+                {language === 'th' ? `ลบที่เลือก (${selectedIds.size})` : `Delete Selected (${selectedIds.size})`}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="text-center py-12 text-gray-500">
+              {language === 'th' ? 'กำลังโหลด...' : 'Loading...'}
+            </div>
+          ) : filteredValues.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="p-4 bg-gray-100 rounded-2xl inline-block mb-4">
+                <FileText className="h-8 w-8 text-gray-400" />
+              </div>
+              <p className="text-gray-500">{language === 'th' ? 'ไม่พบข้อมูล' : 'No data found'}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={handleSelectAll}
+                        aria-label={language === 'th' ? 'เลือกทั้งหมด' : 'Select all'}
+                        className={isPartialSelected ? 'data-[state=checked]:bg-emerald-500/50' : ''}
+                      />
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700">{language === 'th' ? 'สถานที่' : 'Site'}</TableHead>
+                    <TableHead className="font-semibold text-gray-700">{language === 'th' ? 'รอบระยะเวลา' : 'Period'}</TableHead>
+                    <TableHead className="font-semibold text-gray-700">{language === 'th' ? 'ตัวชี้วัด' : 'Metric'}</TableHead>
+                    <TableHead className="text-right font-semibold text-gray-700">{language === 'th' ? 'ค่า' : 'Value'}</TableHead>
+                    <TableHead className="font-semibold text-gray-700">{language === 'th' ? 'สถานะ' : 'Status'}</TableHead>
+                    <TableHead className="text-right font-semibold text-gray-700">{language === 'th' ? 'จัดการ' : 'Actions'}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredValues.map((value) => (
+                    <TableRow 
+                      key={value.value_id} 
+                      data-state={selectedIds.has(value.value_id) ? 'selected' : undefined}
+                      className="hover:bg-emerald-50/50 transition-colors"
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(value.value_id)}
+                          onCheckedChange={() => handleSelectOne(value.value_id)}
+                          aria-label={language === 'th' ? 'เลือกรายการ' : 'Select row'}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium text-gray-900">
+                        {getDisplayName(value.site_id, 'site')}
+                      </TableCell>
+                      <TableCell className="text-gray-600">{getDisplayName(value.period_id, 'period')}</TableCell>
+                      <TableCell className="text-gray-600">{getDisplayName(value.metric_id, 'metric')}</TableCell>
+                      <TableCell className="text-right font-mono font-semibold text-gray-900">
+                        {value.value.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          className={`rounded-full px-3 ${
+                            value.status === 'submitted' 
+                              ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
+                              : 'bg-amber-100 text-amber-700 border-amber-200'
+                          }`}
+                        >
+                          {getStatusLabel(value.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(value)}
+                            className="h-8 w-8 rounded-lg hover:bg-emerald-100 hover:text-emerald-700"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(value.value_id)}
+                            className="h-8 w-8 rounded-lg hover:bg-red-100 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Dialog - Glass Style */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto [&>button]:hidden bg-white/95 backdrop-blur-2xl border-gray-200/50 shadow-2xl rounded-3xl">
+          <DialogHeader className="relative border-b border-gray-100 pb-4">
+            {/* Mobile close button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-0 h-8 w-8 sm:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+              onClick={() => setIsDialogOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-3 pr-8 sm:pr-0">
+              <div className="p-2.5 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl shadow-lg">
+                {editingValue ? <Edit className="h-5 w-5 text-white" /> : <Plus className="h-5 w-5 text-white" />}
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-gray-800">
+                  {editingValue
+                    ? (language === 'th' ? 'แก้ไขข้อมูล' : 'Edit Data')
+                    : (language === 'th' ? 'เพิ่มข้อมูลใหม่' : 'Add New Data')}
+                </DialogTitle>
+                <DialogDescription className="text-gray-500 mt-0.5">
+                  {language === 'th'
+                    ? 'กรอกข้อมูลตัวชี้วัด ESG ให้ครบถ้วน'
+                    : 'Fill in the ESG metric data completely'}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="grid gap-5 py-6">
+            {/* Staff: Show fixed company + site info (read-only) */}
+            {role === 'staff' && profile?.site_id ? (
               <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  {language === 'th' ? 'รอบระยะเวลา' : 'Period'}
-                </Label>
-                <Select value={filterPeriod || "__all__"} onValueChange={(v) => setFilterPeriod(v === "__all__" ? "" : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
+                <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'บริษัท / สถานที่' : 'Company / Site'}</Label>
+                <div className="flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3 text-sm items-center">
+                  <span className="text-gray-800">
+                    {profile.company_name && (
+                      <span className="font-medium">{profile.company_name} • </span>
+                    )}
+                    {profile.site_name || getDisplayName(profile.site_id, 'site')}
+                    {profile.site_location && (
+                      <span className="text-gray-500 ml-1">({profile.site_location})</span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              /* Supervisor/Admin: Select company first, then filter sites */
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'บริษัท' : 'Company'} *</Label>
+                  <Select
+                    value={formCompany}
+                    onValueChange={(v) => {
+                      setFormCompany(v);
+                      setFormData({ ...formData, site_id: '' });
+                    }}
+                  >
+                    <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                      <SelectValue placeholder={language === 'th' ? 'เลือกบริษัท' : 'Select company'} />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                      {companies.map((company) => (
+                        <SelectItem key={company.company_id} value={company.company_id}>
+                          {company.company_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'สถานที่' : 'Site'} *</Label>
+                  <Select
+                    value={formData.site_id}
+                    onValueChange={(v) => setFormData({ ...formData, site_id: v })}
+                    disabled={!formCompany}
+                  >
+                    <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-50">
+                      <SelectValue placeholder={language === 'th' ? 'เลือกสถานที่' : 'Select site'} />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                      {formFilteredSites.map((site) => (
+                        <SelectItem key={site.site_id} value={site.site_id}>
+                          {site.site_name} {site.location && `(${site.location})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'รอบระยะเวลา' : 'Period'} *</Label>
+                <Select
+                  value={formData.period_id}
+                  onValueChange={(v) => setFormData({ ...formData, period_id: v })}
+                >
+                  <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                    <SelectValue placeholder={language === 'th' ? 'เลือกรอบระยะเวลา' : 'Select period'} />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                  <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
                     {periods.map((period) => (
                       <SelectItem key={period.period_id} value={period.period_id}>
                         {period.month_name} {period.year}
@@ -627,13 +945,15 @@ export default function DataEntry() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>{language === 'th' ? 'มิติ ESG' : 'Dimension'}</Label>
-                <Select value={filterDimension || "__all__"} onValueChange={(v) => { setFilterDimension(v === "__all__" ? "" : v); setFilterTheme(''); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
+                <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'มิติ ESG' : 'Dimension'}</Label>
+                <Select
+                  value={formDimension}
+                  onValueChange={(v) => { setFormDimension(v); setFormTheme(''); setFormData({ ...formData, metric_id: '' }); }}
+                >
+                  <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                    <SelectValue placeholder={language === 'th' ? 'เลือกมิติ' : 'Select dimension'} />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                  <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
                     {dimensions.map((dim) => (
                       <SelectItem key={dim.dimension_id} value={dim.dimension_id}>
                         {dim.dimension_name}
@@ -642,392 +962,141 @@ export default function DataEntry() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>{language === 'th' ? 'หัวข้อ ESG' : 'Theme'}</Label>
-                <Select value={filterTheme || "__all__"} onValueChange={(v) => setFilterTheme(v === "__all__" ? "" : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
-                    {filteredThemes.map((theme) => (
-                      <SelectItem key={theme.theme_id} value={theme.theme_id}>
-                        {theme.theme_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>{language === 'th' ? 'สถานะ' : 'Status'}</Label>
-                <Select value={filterStatus || "__all__"} onValueChange={(v) => setFilterStatus(v === "__all__" ? "" : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
-                    <SelectItem value="draft">{language === 'th' ? 'ร่าง' : 'Draft'}</SelectItem>
-                    <SelectItem value="submitted">{language === 'th' ? 'ส่งแล้ว' : 'Submitted'}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Data Table */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <CardTitle className="flex items-center gap-2">
-                {language === 'th' ? 'รายการข้อมูล' : 'Data Records'}
-                <Badge variant="secondary">
-                  {filteredValues.length} {language === 'th' ? 'รายการ' : 'records'}
-                </Badge>
-                {selectedIds.size > 0 && (
-                  <Badge variant="outline">
-                    {language === 'th' ? `เลือก ${selectedIds.size} รายการ` : `${selectedIds.size} selected`}
-                  </Badge>
-                )}
-              </CardTitle>
-              {selectedIds.size > 0 && (
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                  className="gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {language === 'th' ? `ลบที่เลือก (${selectedIds.size})` : `Delete Selected (${selectedIds.size})`}
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {language === 'th' ? 'กำลังโหลด...' : 'Loading...'}
-              </div>
-            ) : filteredValues.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {language === 'th' ? 'ไม่พบข้อมูล' : 'No data found'}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={isAllSelected}
-                          onCheckedChange={handleSelectAll}
-                          aria-label={language === 'th' ? 'เลือกทั้งหมด' : 'Select all'}
-                          className={isPartialSelected ? 'data-[state=checked]:bg-primary/50' : ''}
-                        />
-                      </TableHead>
-                      <TableHead>{language === 'th' ? 'สถานที่' : 'Site'}</TableHead>
-                      <TableHead>{language === 'th' ? 'รอบระยะเวลา' : 'Period'}</TableHead>
-                      <TableHead>{language === 'th' ? 'ตัวชี้วัด' : 'Metric'}</TableHead>
-                      <TableHead className="text-right">{language === 'th' ? 'ค่า' : 'Value'}</TableHead>
-                      <TableHead>{language === 'th' ? 'สถานะ' : 'Status'}</TableHead>
-                      <TableHead className="text-right">{language === 'th' ? 'จัดการ' : 'Actions'}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredValues.map((value) => (
-                      <TableRow key={value.value_id} data-state={selectedIds.has(value.value_id) ? 'selected' : undefined}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedIds.has(value.value_id)}
-                            onCheckedChange={() => handleSelectOne(value.value_id)}
-                            aria-label={language === 'th' ? 'เลือกรายการ' : 'Select row'}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {getDisplayName(value.site_id, 'site')}
-                        </TableCell>
-                        <TableCell>{getDisplayName(value.period_id, 'period')}</TableCell>
-                        <TableCell>{getDisplayName(value.metric_id, 'metric')}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {value.value.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusVariant(value.status)}>
-                            {getStatusLabel(value.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(value)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(value.value_id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Add/Edit Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
-            <DialogHeader className="relative">
-              {/* Mobile close button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-0 h-8 w-8 sm:hidden text-muted-foreground hover:text-foreground"
-                onClick={() => setIsDialogOpen(false)}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'หัวข้อ ESG' : 'Theme'}</Label>
+              <Select
+                value={formTheme}
+                onValueChange={(v) => { setFormTheme(v); setFormData({ ...formData, metric_id: '' }); }}
+                disabled={!formDimension}
               >
-                <X className="h-5 w-5" />
-              </Button>
-              <DialogTitle className="pr-8 sm:pr-0">
-                {editingValue
-                  ? (language === 'th' ? 'แก้ไขข้อมูล' : 'Edit Data')
-                  : (language === 'th' ? 'เพิ่มข้อมูลใหม่' : 'Add New Data')}
-              </DialogTitle>
-              <DialogDescription>
-                {language === 'th'
-                  ? 'กรอกข้อมูลตัวชี้วัด ESG ให้ครบถ้วน'
-                  : 'Fill in the ESG metric data completely'}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              {/* Staff: Show fixed company + site info (read-only) */}
-              {role === 'staff' && profile?.site_id ? (
-                <div className="space-y-2">
-                  <Label>{language === 'th' ? 'บริษัท / สถานที่' : 'Company / Site'}</Label>
-                  <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm">
-                    <span className="text-foreground">
-                      {profile.company_name && (
-                        <span className="font-medium">{profile.company_name} • </span>
-                      )}
-                      {profile.site_name || getDisplayName(profile.site_id, 'site')}
-                      {profile.site_location && (
-                        <span className="text-muted-foreground ml-1">({profile.site_location})</span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                /* Supervisor/Admin: Select company first, then filter sites */
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>{language === 'th' ? 'บริษัท' : 'Company'} *</Label>
-                    <Select
-                      value={formCompany}
-                      onValueChange={(v) => {
-                        setFormCompany(v);
-                        setFormData({ ...formData, site_id: '' });
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={language === 'th' ? 'เลือกบริษัท' : 'Select company'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {companies.map((company) => (
-                          <SelectItem key={company.company_id} value={company.company_id}>
-                            {company.company_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>{language === 'th' ? 'สถานที่' : 'Site'} *</Label>
-                    <Select
-                      value={formData.site_id}
-                      onValueChange={(v) => setFormData({ ...formData, site_id: v })}
-                      disabled={!formCompany}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={language === 'th' ? 'เลือกสถานที่' : 'Select site'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {formFilteredSites.map((site) => (
-                          <SelectItem key={site.site_id} value={site.site_id}>
-                            {site.site_name} {site.location && `(${site.location})`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
+                <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-50">
+                  <SelectValue placeholder={language === 'th' ? 'เลือกหัวข้อ' : 'Select theme'} />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                  {formFilteredThemes.map((theme) => (
+                    <SelectItem key={theme.theme_id} value={theme.theme_id}>
+                      {theme.theme_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>{language === 'th' ? 'รอบระยะเวลา' : 'Period'} *</Label>
-                  <Select
-                    value={formData.period_id}
-                    onValueChange={(v) => setFormData({ ...formData, period_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={language === 'th' ? 'เลือกรอบระยะเวลา' : 'Select period'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {periods.map((period) => (
-                        <SelectItem key={period.period_id} value={period.period_id}>
-                          {period.month_name} {period.year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>{language === 'th' ? 'มิติ ESG' : 'Dimension'}</Label>
-                  <Select
-                    value={formDimension}
-                    onValueChange={(v) => { setFormDimension(v); setFormTheme(''); setFormData({ ...formData, metric_id: '' }); }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={language === 'th' ? 'เลือกมิติ' : 'Select dimension'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {dimensions.map((dim) => (
-                        <SelectItem key={dim.dimension_id} value={dim.dimension_id}>
-                          {dim.dimension_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>{language === 'th' ? 'หัวข้อ ESG' : 'Theme'}</Label>
-                  <Select
-                    value={formTheme}
-                    onValueChange={(v) => { setFormTheme(v); setFormData({ ...formData, metric_id: '' }); }}
-                    disabled={!formDimension}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={language === 'th' ? 'เลือกหัวข้อ' : 'Select theme'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formFilteredThemes.map((theme) => (
-                        <SelectItem key={theme.theme_id} value={theme.theme_id}>
-                          {theme.theme_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'ตัวชี้วัด' : 'Metric'} *</Label>
+              <Select
+                value={formData.metric_id}
+                onValueChange={(v) => setFormData({ ...formData, metric_id: v })}
+                disabled={!formTheme}
+              >
+                <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-50">
+                  <SelectValue placeholder={language === 'th' ? 'เลือกตัวชี้วัด' : 'Select metric'} />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                  {formFilteredMetrics.map((metric) => (
+                    <SelectItem key={metric.metric_id} value={metric.metric_id}>
+                      {metric.metric_name} {metric.unit ? `(${metric.unit})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{language === 'th' ? 'ตัวชี้วัด' : 'Metric'} *</Label>
+                <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'ค่า' : 'Value'} *</Label>
+                <Input
+                  type="number"
+                  value={formData.value}
+                  onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
+                  className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'สถานะ' : 'Status'}</Label>
                 <Select
-                  value={formData.metric_id}
-                  onValueChange={(v) => setFormData({ ...formData, metric_id: v })}
-                  disabled={!formTheme}
+                  value={formData.status}
+                  onValueChange={(v) => setFormData({ ...formData, status: v })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder={language === 'th' ? 'เลือกตัวชี้วัด' : 'Select metric'} />
+                  <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                    <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    {formFilteredMetrics.map((metric) => (
-                      <SelectItem key={metric.metric_id} value={metric.metric_id}>
-                        {metric.metric_name} {metric.unit ? `(${metric.unit})` : ''}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                    <SelectItem value="draft">{language === 'th' ? 'ร่าง' : 'Draft'}</SelectItem>
+                    <SelectItem value="submitted">{language === 'th' ? 'ส่ง' : 'Submit'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>{language === 'th' ? 'ค่า' : 'Value'} *</Label>
-                  <Input
-                    type="number"
-                    value={formData.value}
-                    onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>{language === 'th' ? 'สถานะ' : 'Status'}</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(v) => setFormData({ ...formData, status: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="draft">{language === 'th' ? 'ร่าง' : 'Draft'}</SelectItem>
-                      <SelectItem value="submitted">{language === 'th' ? 'ส่ง' : 'Submit'}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>{language === 'th' ? 'แหล่งข้อมูล' : 'Data Source'}</Label>
-                <Input
-                  value={formData.data_source}
-                  onChange={(e) => setFormData({ ...formData, data_source: e.target.value })}
-                  placeholder={language === 'th' ? 'ระบุแหล่งที่มาของข้อมูล' : 'Specify data source'}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{language === 'th' ? 'หมายเหตุ' : 'Remark'}</Label>
-                <Textarea
-                  value={formData.remark}
-                  onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
-                  placeholder={language === 'th' ? 'หมายเหตุเพิ่มเติม' : 'Additional notes'}
-                  rows={3}
-                />
-              </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                {language === 'th' ? 'ยกเลิก' : 'Cancel'}
-              </Button>
-              <Button onClick={handleSubmit} className="gap-2">
-                <Save className="h-4 w-4" />
-                {language === 'th' ? 'บันทึก' : 'Save'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
-        {/* Bulk Delete Confirmation Dialog */}
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {language === 'th' ? 'ยืนยันการลบข้อมูล' : 'Confirm Deletion'}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {language === 'th' 
-                  ? `คุณต้องการลบข้อมูลที่เลือก ${selectedIds.size} รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้`
-                  : `Are you sure you want to delete ${selectedIds.size} selected records? This action cannot be undone.`}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>
-                {language === 'th' ? 'ยกเลิก' : 'Cancel'}
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                {language === 'th' ? 'ลบ' : 'Delete'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'แหล่งข้อมูล' : 'Data Source'}</Label>
+              <Input
+                value={formData.data_source}
+                onChange={(e) => setFormData({ ...formData, data_source: e.target.value })}
+                placeholder={language === 'th' ? 'ระบุแหล่งที่มาของข้อมูล' : 'Specify data source'}
+                className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all placeholder:text-gray-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'หมายเหตุ' : 'Remark'}</Label>
+              <Textarea
+                value={formData.remark}
+                onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
+                placeholder={language === 'th' ? 'หมายเหตุเพิ่มเติม' : 'Additional notes'}
+                rows={3}
+                className="bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all placeholder:text-gray-400 resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter className="border-t border-gray-100 pt-4 gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDialogOpen(false)}
+              className="rounded-xl border-gray-200 hover:bg-gray-100"
+            >
+              {language === 'th' ? 'ยกเลิก' : 'Cancel'}
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              className="gap-2 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 rounded-xl border-0"
+            >
+              <Save className="h-4 w-4" />
+              {language === 'th' ? 'บันทึก' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="bg-white/95 backdrop-blur-2xl border-gray-200/50 shadow-2xl rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-gray-800">
+              {language === 'th' ? 'ยืนยันการลบข้อมูล' : 'Confirm Deletion'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-500">
+              {language === 'th' 
+                ? `คุณต้องการลบข้อมูลที่เลือก ${selectedIds.size} รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้`
+                : `Are you sure you want to delete ${selectedIds.size} selected records? This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl border-gray-200 hover:bg-gray-100">
+              {language === 'th' ? 'ยกเลิก' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleBulkDelete} 
+              className="bg-red-500 text-white hover:bg-red-600 rounded-xl shadow-lg"
+            >
+              {language === 'th' ? 'ลบ' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
