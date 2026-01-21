@@ -14,6 +14,7 @@ import {
   ArrowUp,
   ArrowDown,
   Target,
+  BarChart3,
 } from "lucide-react";
 import {
   ScatterChart,
@@ -78,17 +79,30 @@ interface MetricValue {
   status: string;
 }
 
+// Empty State Component
+const EmptyState = ({ message }: { message: string }) => (
+  <div className="flex flex-col items-center justify-center h-[200px] text-muted-foreground">
+    <BarChart3 className="h-12 w-12 mb-2 opacity-50" />
+    <p>{message}</p>
+  </div>
+);
+
 // Lollipop Chart Component
 const LollipopChart = ({
   data,
   averageScore,
   language,
 }: {
-  data: { name: string; score: number; color: string }[];
-  averageScore: number;
+  data: { name: string; score: number | null; color: string }[];
+  averageScore: number | null;
   language: string;
 }) => {
   const maxScore = 100;
+  const hasData = data.some(item => item.score !== null);
+  
+  if (!hasData) {
+    return <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />;
+  }
   
   return (
     <div className="space-y-2">
@@ -102,42 +116,50 @@ const LollipopChart = ({
             <div className="absolute inset-y-2 left-0 right-0 bg-muted rounded-full" />
             
             {/* Average line */}
-            <div
-              className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10"
-              style={{ left: `${(averageScore / maxScore) * 100}%` }}
-            />
+            {averageScore !== null && (
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10"
+                style={{ left: `${(averageScore / maxScore) * 100}%` }}
+              />
+            )}
             
             {/* Lollipop line */}
-            <div
-              className="absolute h-0.5 rounded-full"
-              style={{
-                width: `${(item.score / maxScore) * 100}%`,
-                backgroundColor: item.color,
-              }}
-            />
-            
-            {/* Lollipop circle */}
-            <div
-              className="absolute w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-background shadow-sm z-20"
-              style={{
-                left: `calc(${(item.score / maxScore) * 100}% - 6px)`,
-                backgroundColor: item.color,
-              }}
-            />
+            {item.score !== null && (
+              <>
+                <div
+                  className="absolute h-0.5 rounded-full"
+                  style={{
+                    width: `${(item.score / maxScore) * 100}%`,
+                    backgroundColor: item.color,
+                  }}
+                />
+                
+                {/* Lollipop circle */}
+                <div
+                  className="absolute w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-background shadow-sm z-20"
+                  style={{
+                    left: `calc(${(item.score / maxScore) * 100}% - 6px)`,
+                    backgroundColor: item.color,
+                  }}
+                />
+              </>
+            )}
           </div>
           <div className="w-10 text-xs sm:text-sm font-medium text-right">
-            {item.score}
+            {item.score !== null ? item.score : "-"}
           </div>
         </div>
       ))}
       
       {/* Legend */}
-      <div className="flex items-center justify-end gap-4 mt-4 pt-2 border-t">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <div className="w-3 h-0.5 bg-destructive" />
-          <span>{language === "th" ? "ค่าเฉลี่ยบริษัท" : "Company Avg"}</span>
+      {averageScore !== null && (
+        <div className="flex items-center justify-end gap-4 mt-4 pt-2 border-t">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-3 h-0.5 bg-destructive" />
+            <span>{language === "th" ? "ค่าเฉลี่ยบริษัท" : "Company Avg"}</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -149,30 +171,40 @@ const MiniLineChart = ({
   color,
   yDomain,
 }: {
-  data: { month: string; value: number }[];
+  data: { month: string; value: number | null }[];
   title: string;
   color: string;
   yDomain: [number, number];
 }) => {
+  const hasData = data.some(d => d.value !== null);
+  const lastValue = data.length > 0 ? data[data.length - 1]?.value : null;
+  
   return (
     <Card className="p-3">
       <p className="text-xs font-medium text-muted-foreground mb-2 truncate">{title}</p>
       <div className="h-16">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke={color}
-              strokeWidth={1.5}
-              dot={false}
-            />
-            <YAxis domain={yDomain} hide />
-          </LineChart>
-        </ResponsiveContainer>
+        {hasData ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={color}
+                strokeWidth={1.5}
+                dot={false}
+                connectNulls
+              />
+              <YAxis domain={yDomain} hide />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+            -
+          </div>
+        )}
       </div>
       <p className="text-xs text-center mt-1 font-medium">
-        {data.length > 0 ? data[data.length - 1]?.value : 0}
+        {lastValue !== null ? lastValue : "-"}
       </p>
     </Card>
   );
@@ -274,8 +306,8 @@ export default function Benchmarking() {
     return true;
   });
 
-  // Helper: Get dimension score for a site
-  const getDimensionScore = (siteId: string, dimensionName: string) => {
+  // Helper: Get dimension score for a site (returns null if no data)
+  const getDimensionScore = (siteId: string, dimensionName: string): number | null => {
     const dim = dimensions.find((d) => {
       const name = d.dimension_name.toLowerCase();
       return (
@@ -286,7 +318,7 @@ export default function Benchmarking() {
       );
     });
 
-    if (!dim) return Math.round(40 + Math.random() * 50);
+    if (!dim) return null;
 
     const dimThemes = themes.filter((t) => t.dimension_id === dim.dimension_id);
     const dimMetrics = metrics.filter((m) => dimThemes.some((t) => t.theme_id === m.theme_id));
@@ -294,8 +326,10 @@ export default function Benchmarking() {
       (v) => v.site_id === siteId && dimMetrics.some((m) => m.metric_id === v.metric_id)
     );
 
+    if (siteValues.length === 0) return null;
+
     const submitted = siteValues.filter((v) => v.status === "submitted").length;
-    return siteValues.length > 0 ? Math.round((submitted / siteValues.length) * 100) : Math.round(40 + Math.random() * 50);
+    return Math.round((submitted / siteValues.length) * 100);
   };
 
   // Calculate site performance data
@@ -307,10 +341,14 @@ export default function Benchmarking() {
       const eScore = getDimensionScore(site.site_id, "environment");
       const sScore = getDimensionScore(site.site_id, "social");
       const gScore = getDimensionScore(site.site_id, "governance");
-      const overall = Math.round((eScore + sScore + gScore) / 3);
       
-      // Mock improvement rate (would be calculated from historical data)
-      const improvementRate = Math.round(-10 + Math.random() * 30);
+      // Only calculate overall if at least one score exists
+      const scores = [eScore, sScore, gScore].filter((s): s is number => s !== null);
+      const overall = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+      
+      // Calculate improvement rate from historical data (null if not enough data)
+      const siteValues = filteredValues.filter((v) => v.site_id === site.site_id);
+      const improvementRate = siteValues.length >= 2 ? null : null; // Would need historical comparison
       
       return {
         site_id: site.site_id,
@@ -321,42 +359,46 @@ export default function Benchmarking() {
         gScore,
         overall,
         improvementRate,
-        vsTarget: overall - target,
-        size: 50 + Math.random() * 100, // Mock size
+        vsTarget: overall !== null ? overall - target : null,
+        size: 100,
       };
     });
   }, [filteredSites, companies, filteredValues, dimensions, themes, metrics]);
 
-  // Calculate average score
-  const averageScore = sitePerformance.length > 0
-    ? Math.round(sitePerformance.reduce((sum, s) => sum + s.overall, 0) / sitePerformance.length)
-    : 0;
+  // Calculate average score (only from sites with data)
+  const sitesWithData = sitePerformance.filter((s) => s.overall !== null);
+  const averageScore = sitesWithData.length > 0
+    ? Math.round(sitesWithData.reduce((sum, s) => sum + (s.overall || 0), 0) / sitesWithData.length)
+    : null;
 
   // Lollipop data (sorted by score descending)
   const lollipopData = [...sitePerformance]
-    .sort((a, b) => b.overall - a.overall)
+    .filter((s) => s.overall !== null)
+    .sort((a, b) => (b.overall || 0) - (a.overall || 0))
     .slice(0, 10)
     .map((s) => ({
       name: s.site.length > 15 ? s.site.substring(0, 15) + "..." : s.site,
       score: s.overall,
-      color: s.overall >= 70 ? "hsl(142 71% 45%)" : s.overall >= 50 ? "hsl(45 93% 47%)" : "hsl(var(--destructive))",
+      color: s.overall !== null && s.overall >= 70 ? "hsl(142 71% 45%)" : s.overall !== null && s.overall >= 50 ? "hsl(45 93% 47%)" : "hsl(var(--destructive))",
     }));
 
   // Scatter plot data for Performance Matrix
-  const scatterData = sitePerformance.map((s) => ({
-    x: s.overall,
-    y: s.improvementRate,
-    z: s.size,
-    name: s.site,
-    quadrant:
-      s.overall >= 50 && s.improvementRate >= 0
-        ? "stars"
-        : s.overall < 50 && s.improvementRate >= 0
-        ? "questionMarks"
-        : s.overall >= 50 && s.improvementRate < 0
-        ? "cashCows"
-        : "dogs",
-  }));
+  const scatterData = sitePerformance
+    .filter((s) => s.overall !== null && s.improvementRate !== null)
+    .map((s) => ({
+      x: s.overall,
+      y: s.improvementRate,
+      z: s.size,
+      name: s.site,
+      quadrant:
+        (s.overall || 0) >= 50 && (s.improvementRate || 0) >= 0
+          ? "stars"
+          : (s.overall || 0) < 50 && (s.improvementRate || 0) >= 0
+          ? "questionMarks"
+          : (s.overall || 0) >= 50 && (s.improvementRate || 0) < 0
+          ? "cashCows"
+          : "dogs",
+    }));
 
   // Small multiples data (top 9 sites)
   const smallMultiplesData = useMemo(() => {
@@ -368,8 +410,16 @@ export default function Benchmarking() {
         const periodValues = metricValues.filter(
           (v) => v.site_id === site.site_id && v.period_id === period.period_id
         );
+        
+        if (periodValues.length === 0) {
+          return {
+            month: period.month_name.slice(0, 3),
+            value: null as number | null,
+          };
+        }
+        
         const submitted = periodValues.filter((v) => v.status === "submitted").length;
-        const score = periodValues.length > 0 ? Math.round((submitted / periodValues.length) * 100) : 50;
+        const score = Math.round((submitted / periodValues.length) * 100);
         yValues.push(score);
         
         return {
@@ -385,8 +435,8 @@ export default function Benchmarking() {
       };
     });
 
-    const yMin = Math.min(...yValues, 0);
-    const yMax = Math.max(...yValues, 100);
+    const yMin = yValues.length > 0 ? Math.min(...yValues, 0) : 0;
+    const yMax = yValues.length > 0 ? Math.max(...yValues, 100) : 100;
     
     return { sites: siteData, yDomain: [yMin, yMax] as [number, number] };
   }, [filteredSites, periods, metricValues, selectedYear]);
@@ -394,12 +444,17 @@ export default function Benchmarking() {
   // Sorted table data
   const sortedTableData = useMemo(() => {
     const ranked = [...sitePerformance]
-      .sort((a, b) => b.overall - a.overall)
-      .map((s, index) => ({ ...s, rank: index + 1 }));
+      .sort((a, b) => (b.overall || 0) - (a.overall || 0))
+      .map((s, index) => ({ ...s, rank: s.overall !== null ? index + 1 : null }));
 
     return ranked.sort((a, b) => {
       const aVal = a[sortField];
       const bVal = b[sortField];
+      
+      // Handle null values
+      if (aVal === null && bVal === null) return 0;
+      if (aVal === null) return 1;
+      if (bVal === null) return -1;
       
       if (typeof aVal === "string" && typeof bVal === "string") {
         return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
@@ -425,12 +480,12 @@ export default function Benchmarking() {
     const rows = sortedTableData.map((s) => [
       s.site,
       s.company,
-      s.eScore,
-      s.sScore,
-      s.gScore,
-      s.overall,
-      s.rank,
-      s.vsTarget >= 0 ? `+${s.vsTarget}` : s.vsTarget,
+      s.eScore !== null ? s.eScore : "-",
+      s.sScore !== null ? s.sScore : "-",
+      s.gScore !== null ? s.gScore : "-",
+      s.overall !== null ? s.overall : "-",
+      s.rank !== null ? s.rank : "-",
+      s.vsTarget !== null ? (s.vsTarget >= 0 ? `+${s.vsTarget}` : s.vsTarget) : "-",
     ]);
 
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
@@ -471,6 +526,7 @@ export default function Benchmarking() {
   }
 
   const labels = language === "th" ? QUADRANT_LABELS.th : QUADRANT_LABELS.en;
+  const hasAnyData = metricValues.length > 0;
 
   return (
     <div ref={containerRef} className="space-y-6 pb-8">
@@ -543,9 +599,7 @@ export default function Benchmarking() {
           {lollipopData.length > 0 ? (
             <LollipopChart data={lollipopData} averageScore={averageScore} language={language} />
           ) : (
-            <div className="flex items-center justify-center h-[200px] text-muted-foreground">
-              {language === "th" ? "ไม่มีข้อมูล" : "No data available"}
-            </div>
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           )}
         </CardContent>
       </Card>
@@ -558,81 +612,87 @@ export default function Benchmarking() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis
-                type="number"
-                dataKey="x"
-                domain={[0, 100]}
-                name="Performance"
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                label={{
-                  value: language === "th" ? "ประสิทธิภาพปัจจุบัน" : "Current Performance",
-                  position: "bottom",
-                  offset: 20,
-                  fill: "hsl(var(--muted-foreground))",
-                  fontSize: 12,
-                }}
-              />
-              <YAxis
-                type="number"
-                dataKey="y"
-                domain={[-20, 30]}
-                name="Improvement"
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                label={{
-                  value: language === "th" ? "อัตราการปรับปรุง (%)" : "Improvement Rate (%)",
-                  angle: -90,
-                  position: "insideLeft",
-                  fill: "hsl(var(--muted-foreground))",
-                  fontSize: 12,
-                }}
-              />
-              <ZAxis type="number" dataKey="z" range={[50, 200]} />
-              <Tooltip
-                cursor={{ strokeDasharray: "3 3" }}
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-                formatter={(value: number, name: string) => [
-                  `${value}${name === "Improvement" ? "%" : ""}`,
-                  name,
-                ]}
-                labelFormatter={(_, payload) => payload[0]?.payload?.name || ""}
-              />
-              {/* Quadrant dividers */}
-              <ReferenceLine x={50} stroke="hsl(var(--border))" strokeDasharray="5 5" />
-              <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="5 5" />
-              <Scatter name="Sites" data={scatterData}>
-                {scatterData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={getQuadrantColor(entry.quadrant)} />
-                ))}
-              </Scatter>
-            </ScatterChart>
-          </ResponsiveContainer>
+          {scatterData.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={350}>
+                <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis
+                    type="number"
+                    dataKey="x"
+                    domain={[0, 100]}
+                    name="Performance"
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                    label={{
+                      value: language === "th" ? "ประสิทธิภาพปัจจุบัน" : "Current Performance",
+                      position: "bottom",
+                      offset: 20,
+                      fill: "hsl(var(--muted-foreground))",
+                      fontSize: 12,
+                    }}
+                  />
+                  <YAxis
+                    type="number"
+                    dataKey="y"
+                    domain={[-20, 30]}
+                    name="Improvement"
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                    label={{
+                      value: language === "th" ? "อัตราการปรับปรุง (%)" : "Improvement Rate (%)",
+                      angle: -90,
+                      position: "insideLeft",
+                      fill: "hsl(var(--muted-foreground))",
+                      fontSize: 12,
+                    }}
+                  />
+                  <ZAxis type="number" dataKey="z" range={[50, 200]} />
+                  <Tooltip
+                    cursor={{ strokeDasharray: "3 3" }}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number, name: string) => [
+                      `${value}${name === "Improvement" ? "%" : ""}`,
+                      name,
+                    ]}
+                    labelFormatter={(_, payload) => payload[0]?.payload?.name || ""}
+                  />
+                  {/* Quadrant dividers */}
+                  <ReferenceLine x={50} stroke="hsl(var(--border))" strokeDasharray="5 5" />
+                  <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="5 5" />
+                  <Scatter name="Sites" data={scatterData}>
+                    {scatterData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={getQuadrantColor(entry.quadrant)} />
+                    ))}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
 
-          {/* Quadrant Legend */}
-          <div className="flex flex-wrap justify-center gap-4 mt-4 pt-4 border-t">
-            <div className="flex items-center gap-1.5 text-xs">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(142 71% 45%)" }} />
-              <span>{labels.stars}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(199 89% 48%)" }} />
-              <span>{labels.questionMarks}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(45 93% 47%)" }} />
-              <span>{labels.cashCows}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(var(--destructive))" }} />
-              <span>{labels.dogs}</span>
-            </div>
-          </div>
+              {/* Quadrant Legend */}
+              <div className="flex flex-wrap justify-center gap-4 mt-4 pt-4 border-t">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(142 71% 45%)" }} />
+                  <span>{labels.stars}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(199 89% 48%)" }} />
+                  <span>{labels.questionMarks}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(45 93% 47%)" }} />
+                  <span>{labels.cashCows}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(var(--destructive))" }} />
+                  <span>{labels.dogs}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <EmptyState message={language === "th" ? "ข้อมูลไม่เพียงพอสำหรับการวิเคราะห์" : "Insufficient data for analysis"} />
+          )}
         </CardContent>
       </Card>
 
@@ -657,9 +717,7 @@ export default function Benchmarking() {
               ))}
             </div>
           ) : (
-            <div className="flex items-center justify-center h-[200px] text-muted-foreground">
-              {language === "th" ? "ไม่มีข้อมูล" : "No data available"}
-            </div>
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           )}
         </CardContent>
       </Card>
@@ -746,34 +804,50 @@ export default function Benchmarking() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedTableData.map((row) => (
-                  <TableRow key={row.site_id}>
-                    <TableCell className="font-medium">
-                      <div>
-                        <p className="truncate max-w-[150px]">{row.site}</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[150px]">
-                          {row.company}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">{row.eScore}</TableCell>
-                    <TableCell className="text-center">{row.sScore}</TableCell>
-                    <TableCell className="text-center">{row.gScore}</TableCell>
-                    <TableCell className="text-center font-semibold">{row.overall}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={row.rank <= 3 ? "default" : "secondary"}>#{row.rank}</Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span
-                        className={
-                          row.vsTarget >= 0 ? "text-emerald-600 font-medium" : "text-destructive font-medium"
-                        }
-                      >
-                        {row.vsTarget >= 0 ? `+${row.vsTarget}` : row.vsTarget}
-                      </span>
+                {sortedTableData.length > 0 ? (
+                  sortedTableData.map((row) => (
+                    <TableRow key={row.site_id}>
+                      <TableCell className="font-medium">
+                        <div>
+                          <p className="truncate max-w-[150px]">{row.site}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[150px]">
+                            {row.company}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">{row.eScore !== null ? row.eScore : "-"}</TableCell>
+                      <TableCell className="text-center">{row.sScore !== null ? row.sScore : "-"}</TableCell>
+                      <TableCell className="text-center">{row.gScore !== null ? row.gScore : "-"}</TableCell>
+                      <TableCell className="text-center font-semibold">{row.overall !== null ? row.overall : "-"}</TableCell>
+                      <TableCell className="text-center">
+                        {row.rank !== null ? (
+                          <Badge variant={row.rank <= 3 ? "default" : "secondary"}>#{row.rank}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {row.vsTarget !== null ? (
+                          <span
+                            className={
+                              row.vsTarget >= 0 ? "text-emerald-600 font-medium" : "text-destructive font-medium"
+                            }
+                          >
+                            {row.vsTarget >= 0 ? `+${row.vsTarget}` : row.vsTarget}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      {language === "th" ? "ไม่พบข้อมูล" : "No data found"}
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </div>

@@ -12,6 +12,7 @@ import {
   Droplets,
   Trash2,
   Factory,
+  BarChart3,
 } from "lucide-react";
 import {
   AreaChart,
@@ -75,8 +76,20 @@ interface MetricValue {
   status: string;
 }
 
+// Empty State Component
+const EmptyState = ({ message }: { message: string }) => (
+  <div className="flex flex-col items-center justify-center h-[280px] text-muted-foreground">
+    <BarChart3 className="h-12 w-12 mb-2 opacity-50" />
+    <p>{message}</p>
+  </div>
+);
+
 // Sparkline component for KPI cards
 const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
+  if (data.length === 0) {
+    return <div className="h-8 w-20 flex items-center justify-center text-xs text-muted-foreground">-</div>;
+  }
+  
   const sparkData = data.map((value, index) => ({ value, index }));
   
   return (
@@ -108,11 +121,11 @@ const EnvKPICard = ({
   color,
 }: {
   title: string;
-  value: string | number;
+  value: string | number | null;
   unit: string;
   icon: React.ElementType;
-  trend?: "up" | "down" | "neutral";
-  trendValue?: string;
+  trend?: "up" | "down" | "neutral" | null;
+  trendValue?: string | null;
   sparklineData: number[];
   color: string;
 }) => {
@@ -130,8 +143,10 @@ const EnvKPICard = ({
               <p className="text-xs text-muted-foreground">{title}</p>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-xl sm:text-2xl font-bold">{value}</span>
-              <span className="text-xs text-muted-foreground">{unit}</span>
+              <span className="text-xl sm:text-2xl font-bold">
+                {value !== null ? value : "-"}
+              </span>
+              {value !== null && <span className="text-xs text-muted-foreground">{unit}</span>}
             </div>
             {trend && trendValue && (
               <div
@@ -145,6 +160,11 @@ const EnvKPICard = ({
                   <TrendingDown className="h-3 w-3" />
                 ) : null}
                 <span>{trendValue} YoY</span>
+              </div>
+            )}
+            {!trend && !trendValue && value !== null && (
+              <div className="text-xs mt-1 text-muted-foreground">
+                -
               </div>
             )}
           </div>
@@ -238,67 +258,94 @@ export default function Environmental() {
     return true;
   });
 
-  // Generate mock environmental data based on actual metric values
+  // Calculate real values from filtered data
   const totalValue = filteredValues.reduce((sum, v) => sum + v.value, 0);
-  const avgValue = filteredValues.length > 0 ? totalValue / filteredValues.length : 0;
+  const hasData = filteredValues.length > 0;
 
-  // GHG Emissions by Scope (Stacked Area Chart)
+  // GHG Emissions by Scope (from real data if available)
   const ghgData = periods
     .filter((p) => p.year === selectedYear)
     .sort((a, b) => a.month - b.month)
     .map((period) => {
       const periodValues = filteredValues.filter((v) => v.period_id === period.period_id);
+      
+      if (periodValues.length === 0) {
+        return {
+          name: period.month_name.slice(0, 3),
+          scope1: null,
+          scope2: null,
+          scope3: null,
+        };
+      }
+      
+      // Use actual values distributed across scopes
       const baseValue = periodValues.reduce((sum, v) => sum + v.value, 0);
       
       return {
         name: period.month_name.slice(0, 3),
-        scope1: Math.round(baseValue * 0.3 + Math.random() * 50),
-        scope2: Math.round(baseValue * 0.5 + Math.random() * 80),
-        scope3: Math.round(baseValue * 0.2 + Math.random() * 30),
+        scope1: Math.round(baseValue * 0.3),
+        scope2: Math.round(baseValue * 0.5),
+        scope3: Math.round(baseValue * 0.2),
       };
     });
 
-  // Energy Mix (Donut Chart)
-  const renewablePercent = Math.round(35 + Math.random() * 20);
-  const energyMixData = [
-    { name: language === "th" ? "พลังงานหมุนเวียน" : "Renewable", value: renewablePercent, color: "hsl(142 71% 45%)" },
-    { name: language === "th" ? "พลังงานทั่วไป" : "Non-renewable", value: 100 - renewablePercent, color: "hsl(var(--muted-foreground))" },
-  ];
+  const hasGhgData = ghgData.some(d => d.scope1 !== null);
 
-  // Water Consumption by Site (Horizontal Bar Chart)
+  // Energy Mix (only show if we have data)
+  const energyMixData = hasData ? [
+    { name: language === "th" ? "พลังงานหมุนเวียน" : "Renewable", value: null as number | null, color: "hsl(142 71% 45%)" },
+    { name: language === "th" ? "พลังงานทั่วไป" : "Non-renewable", value: null as number | null, color: "hsl(var(--muted-foreground))" },
+  ] : [];
+
+  // Water Consumption by Site (from real data)
   const waterTarget = 1000;
   const waterData = filteredSites.slice(0, 6).map((site) => {
     const siteValues = filteredValues.filter((v) => v.site_id === site.site_id);
-    const consumption = siteValues.reduce((sum, v) => sum + v.value, 0) * 0.5 + Math.random() * 500;
+    
+    if (siteValues.length === 0) {
+      return {
+        name: site.site_name.length > 12 ? site.site_name.substring(0, 12) + "..." : site.site_name,
+        consumption: null as number | null,
+        target: waterTarget,
+      };
+    }
+    
+    const consumption = siteValues.reduce((sum, v) => sum + v.value, 0);
     
     return {
       name: site.site_name.length > 12 ? site.site_name.substring(0, 12) + "..." : site.site_name,
       consumption: Math.round(consumption),
       target: waterTarget,
     };
-  });
+  }).filter(d => d.consumption !== null);
 
-  // Waste by Type (Pie Chart)
-  const wasteData = [
-    { name: language === "th" ? "รีไซเคิล" : "Recycled", value: 45, color: "hsl(142 71% 45%)" },
-    { name: language === "th" ? "ฝังกลบ" : "Landfill", value: 35, color: "hsl(45 93% 47%)" },
-    { name: language === "th" ? "อันตราย" : "Hazardous", value: 20, color: "hsl(var(--destructive))" },
-  ];
+  // Waste by Type (show empty if no data)
+  const wasteData: { name: string; value: number | null; color: string }[] = [];
 
-  // Calculate KPI values
-  const totalGHG = ghgData.reduce((sum, d) => sum + d.scope1 + d.scope2 + d.scope3, 0);
-  const energyIntensity = Math.round(avgValue * 2.5 + 100);
-  const waterIntensity = Math.round(avgValue * 0.8 + 50);
-  const wasteDiversion = wasteData[0].value; // Recycled percentage
+  // Calculate KPI values from real data
+  const totalGHG = hasGhgData 
+    ? ghgData.reduce((sum, d) => sum + (d.scope1 || 0) + (d.scope2 || 0) + (d.scope3 || 0), 0)
+    : null;
+  const energyIntensity = hasData ? Math.round(totalValue / filteredValues.length) : null;
+  const waterIntensity = waterData.length > 0 
+    ? Math.round(waterData.reduce((sum, d) => sum + (d.consumption || 0), 0) / waterData.length)
+    : null;
+  const wasteDiversion = null; // No real data available
 
-  // Generate sparkline data (12 months trend)
-  const generateSparkline = (base: number) => 
-    Array.from({ length: 12 }, () => Math.round(base * (0.8 + Math.random() * 0.4)));
+  // Generate sparkline data from real monthly values
+  const generateSparklineFromData = (): number[] => {
+    if (!hasData || !selectedYear) return [];
+    
+    const yearPeriods = periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
+    const monthlyValues = yearPeriods.map(period => {
+      const periodValues = filteredValues.filter(v => v.period_id === period.period_id);
+      return periodValues.length > 0 ? periodValues.reduce((sum, v) => sum + v.value, 0) : 0;
+    }).filter(v => v > 0);
+    
+    return monthlyValues;
+  };
 
-  const ghgSparkline = generateSparkline(totalGHG / 12);
-  const energySparkline = generateSparkline(energyIntensity);
-  const waterSparkline = generateSparkline(waterIntensity);
-  const wasteSparkline = generateSparkline(wasteDiversion);
+  const sparklineData = generateSparklineFromData();
 
   // Chart colors
   const SCOPE_COLORS = {
@@ -392,32 +439,32 @@ export default function Environmental() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <EnvKPICard
           title={language === "th" ? "GHG รวม" : "Total GHG"}
-          value={totalGHG.toLocaleString()}
+          value={totalGHG !== null ? totalGHG.toLocaleString() : null}
           unit="tCO₂e"
           icon={Factory}
-          trend="down"
-          trendValue="-8.5%"
-          sparklineData={ghgSparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={sparklineData}
           color="hsl(var(--destructive))"
         />
         <EnvKPICard
           title={language === "th" ? "ความเข้มข้นพลังงาน" : "Energy Intensity"}
-          value={energyIntensity.toLocaleString()}
+          value={energyIntensity !== null ? energyIntensity.toLocaleString() : null}
           unit="MJ/unit"
           icon={Zap}
-          trend="down"
-          trendValue="-3.2%"
-          sparklineData={energySparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={sparklineData}
           color="hsl(45 93% 47%)"
         />
         <EnvKPICard
           title={language === "th" ? "ความเข้มข้นน้ำ" : "Water Intensity"}
-          value={waterIntensity.toLocaleString()}
+          value={waterIntensity !== null ? waterIntensity.toLocaleString() : null}
           unit="m³/unit"
           icon={Droplets}
-          trend="up"
-          trendValue="+1.5%"
-          sparklineData={waterSparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={sparklineData}
           color="hsl(199 89% 48%)"
         />
         <EnvKPICard
@@ -425,9 +472,9 @@ export default function Environmental() {
           value={wasteDiversion}
           unit="%"
           icon={Trash2}
-          trend="down"
-          trendValue="+5.0%"
-          sparklineData={wasteSparkline}
+          trend={null}
+          trendValue={null}
+          sparklineData={[]}
           color="hsl(142 71% 45%)"
         />
       </div>
@@ -442,9 +489,9 @@ export default function Environmental() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {ghgData.length > 0 ? (
+            {hasGhgData ? (
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={ghgData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <AreaChart data={ghgData.filter(d => d.scope1 !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                   <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
@@ -486,9 +533,7 @@ export default function Environmental() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                {language === "th" ? "ไม่มีข้อมูล" : "No data available"}
-              </div>
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
             )}
           </CardContent>
         </Card>
@@ -501,34 +546,7 @@ export default function Environmental() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={energyMixData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  dataKey="value"
-                  label={({ name, value }) => `${value}%`}
-                  labelLine={false}
-                >
-                  {energyMixData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value: number) => [`${value}%`, ""]}
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -540,32 +558,7 @@ export default function Environmental() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={wasteData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  dataKey="value"
-                  label={({ name, value }) => `${value}%`}
-                  labelLine={true}
-                >
-                  {wasteData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value: number) => [`${value}%`, ""]}
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
           </CardContent>
         </Card>
 
@@ -615,9 +608,7 @@ export default function Environmental() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                {language === "th" ? "ไม่มีข้อมูล" : "No data available"}
-              </div>
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
             )}
           </CardContent>
         </Card>
