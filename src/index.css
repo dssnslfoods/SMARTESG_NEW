@@ -318,4 +318,14 @@
       background-position: -200% 0;
     }
   }
+
+  /* Liquid Glass Floating Animation */
+  @keyframes float-slow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+  }
+
+  .animate-float-slow {
+    animation: float-slow 8s ease-in-out infinite;
+  }
 }
