@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import UserManagement from "./pages/UserManagement";
 import AuditLog from "./pages/AuditLog";
 import Reports from "./pages/Reports";
+import Scorecard from "./pages/reports/Scorecard";
 import CompanyManagement from "./pages/master/CompanyManagement";
 import SiteManagement from "./pages/master/SiteManagement";
 import PeriodManagement from "./pages/master/PeriodManagement";
@@ -114,6 +115,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "executive"]}>
                     <Reports />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reports/scorecard"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
+                    <Scorecard />
                   </ProtectedRoute>
                 }
               />

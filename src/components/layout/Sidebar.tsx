@@ -15,6 +15,7 @@ import {
   Calendar,
   Layers,
   Tag,
+  Gauge,
   Activity,
   Leaf,
   X,
@@ -65,6 +66,12 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       label: t('reports'),
       href: '/reports',
       icon: BarChart3,
+      roles: ['admin', 'executive'],
+    },
+    {
+      label: language === 'th' ? 'Scorecard' : 'Scorecard',
+      href: '/reports/scorecard',
+      icon: Gauge,
       roles: ['admin', 'executive'],
     },
   ];
