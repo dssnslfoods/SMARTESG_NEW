@@ -85,15 +85,19 @@ export default {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out'
   		},
-  		boxShadow: {
-  			'2xs': 'var(--shadow-2xs)',
-  			xs: 'var(--shadow-xs)',
-  			sm: 'var(--shadow-sm)',
-  			md: 'var(--shadow-md)',
-  			lg: 'var(--shadow-lg)',
-  			xl: 'var(--shadow-xl)',
-  			'2xl': 'var(--shadow-2xl)'
-  		},
+		boxShadow: {
+			'2xs': 'var(--shadow-2xs)',
+			xs: 'var(--shadow-xs)',
+			sm: 'var(--shadow-sm)',
+			md: 'var(--shadow-md)',
+			lg: 'var(--shadow-lg)',
+			xl: 'var(--shadow-xl)',
+			'2xl': 'var(--shadow-2xl)',
+			'glass': '0 8px 32px rgba(0, 0, 0, 0.08)',
+			'glass-lg': '0 20px 50px rgba(0, 0, 0, 0.12)',
+			'glass-emerald': '0 10px 40px rgba(16, 185, 129, 0.2)',
+			'glass-emerald-lg': '0 15px 50px rgba(16, 185, 129, 0.35)',
+		},
   		fontFamily: {
   			sans: [
   				'Work Sans',
