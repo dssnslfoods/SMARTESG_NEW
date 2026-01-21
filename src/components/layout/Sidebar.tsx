@@ -23,6 +23,7 @@ import {
   ChevronDown,
   GitCompare,
   FileText,
+  Scale,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -92,6 +93,12 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       label: language === 'th' ? 'สรุปผู้บริหาร' : 'Infographic',
       href: '/reports/infographic',
       icon: FileText,
+      roles: ['admin', 'executive'],
+    },
+    {
+      label: language === 'th' ? 'ธรรมาภิบาล' : 'Governance',
+      href: '/reports/governance',
+      icon: Scale,
       roles: ['admin', 'executive'],
     },
   ];
