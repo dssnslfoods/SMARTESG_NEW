@@ -391,7 +391,6 @@ export default function Dashboard() {
     ],
     supervisor: [
       { label: t('dataEntry'), href: '/data-entry', icon: FileInput },
-      { label: t('reports'), href: '/reports', icon: BarChart3 },
     ],
     staff: [
       { label: t('dataEntry'), href: '/data-entry', icon: FileInput },
