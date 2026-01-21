@@ -22,6 +22,7 @@ import {
   Settings,
   ChevronDown,
   GitCompare,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -85,6 +86,12 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       label: language === 'th' ? 'เปรียบเทียบ' : 'Benchmarking',
       href: '/reports/benchmarking',
       icon: GitCompare,
+      roles: ['admin', 'executive'],
+    },
+    {
+      label: language === 'th' ? 'สรุปผู้บริหาร' : 'Infographic',
+      href: '/reports/infographic',
+      icon: FileText,
       roles: ['admin', 'executive'],
     },
   ];
