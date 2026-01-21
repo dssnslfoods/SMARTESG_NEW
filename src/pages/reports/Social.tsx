@@ -95,7 +95,7 @@ const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
   );
 };
 
-// Social KPI Card Component
+// Social KPI Card Component with Glass Design
 const SocialKPICard = ({
   title,
   value,
@@ -118,12 +118,12 @@ const SocialKPICard = ({
   const isPositiveTrend = trend === "up";
 
   return (
-    <Card className="flex-1 min-w-[220px]">
+    <Card className="flex-1 min-w-[220px] bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded-lg" style={{ backgroundColor: `${color}20` }}>
+              <div className="p-2 rounded-xl bg-blue-100" style={{ backgroundColor: `${color}20` }}>
                 <Icon className="h-4 w-4" style={{ color }} />
               </div>
               <p className="text-xs text-muted-foreground">{title}</p>
@@ -306,14 +306,19 @@ export default function Social() {
   }
 
   return (
-    <div ref={containerRef} className="space-y-6 pb-8">
+    <div ref={containerRef} className="space-y-6 pb-8 bg-gradient-to-br from-gray-50 via-white to-blue-50/30 min-h-screen -m-6 p-6">
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+
+      {/* Gradient Accent Line */}
+      <div className="h-1 w-full bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-500 rounded-full" />
 
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-            <Heart className="h-5 w-5 sm:h-6 sm:w-6 text-rose-500" />
+            <div className="p-2 bg-rose-100 rounded-xl">
+              <Heart className="h-5 w-5 sm:h-6 sm:w-6 text-rose-500" />
+            </div>
             {language === "th" ? "Social Dashboard" : "Social Dashboard"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -324,17 +329,17 @@ export default function Social() {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
+      {/* Filters - Glass Card */}
+      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-2xl">
         <CardContent className="p-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "บริษัท" : "Company"}</Label>
               <Select value={filterCompany} onValueChange={setFilterCompany}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-blue-500/30">
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
                   {companies.map((c) => (
                     <SelectItem key={c.company_id} value={c.company_id}>
@@ -348,10 +353,10 @@ export default function Social() {
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "สถานที่" : "Site"}</Label>
               <Select value={filterSite} onValueChange={setFilterSite}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-blue-500/30">
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
                   {filteredSites.map((s) => (
                     <SelectItem key={s.site_id} value={s.site_id}>
@@ -365,10 +370,10 @@ export default function Social() {
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "ปี" : "Year"}</Label>
               <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-blue-500/30">
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
                   {uniqueYears.map((year) => (
                     <SelectItem key={year} value={year.toString()}>
@@ -429,8 +434,11 @@ export default function Social() {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gender Diversity (Pie Chart) */}
-        <Card>
-          <CardHeader>
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-xl">
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
             <CardTitle className="text-base font-medium">
               {language === "th" ? "ความหลากหลายทางเพศ" : "Gender Diversity"}
             </CardTitle>
@@ -441,8 +449,11 @@ export default function Social() {
         </Card>
 
         {/* Age Distribution (Bar Chart) */}
-        <Card>
-          <CardHeader>
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-xl">
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
             <CardTitle className="text-base font-medium">
               {language === "th" ? "การกระจายตามอายุ" : "Age Distribution"}
             </CardTitle>
@@ -453,8 +464,11 @@ export default function Social() {
         </Card>
 
         {/* Training Hours Trend (Area Chart) */}
-        <Card>
-          <CardHeader>
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-xl">
+              <GraduationCap className="h-4 w-4 text-blue-600" />
+            </div>
             <CardTitle className="text-base font-medium">
               {language === "th" ? "ชั่วโมงอบรมรายเดือน" : "Training Hours (Monthly)"}
             </CardTitle>
@@ -465,8 +479,11 @@ export default function Social() {
         </Card>
 
         {/* Employee Satisfaction by Category (Horizontal Bar) */}
-        <Card>
-          <CardHeader>
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-xl">
+              <Smile className="h-4 w-4 text-blue-600" />
+            </div>
             <CardTitle className="text-base font-medium">
               {language === "th" ? "ความพึงพอใจตามหมวดหมู่" : "Satisfaction by Category"}
             </CardTitle>
@@ -477,8 +494,11 @@ export default function Social() {
         </Card>
 
         {/* Health & Safety Incidents (Line Chart) - Full Width */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
+        <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-xl">
+              <ShieldCheck className="h-4 w-4 text-blue-600" />
+            </div>
             <CardTitle className="text-base font-medium">
               {language === "th" ? "เหตุการณ์ด้านความปลอดภัย (รายเดือน)" : "Safety Incidents (Monthly)"}
             </CardTitle>
@@ -489,8 +509,11 @@ export default function Social() {
         </Card>
 
         {/* Turnover Rate (Stacked Bar Chart) - Full Width */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
+        <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-xl">
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
             <CardTitle className="text-base font-medium">
               {language === "th" ? "อัตราการลาออก (รายเดือน)" : "Turnover Rate (Monthly)"}
             </CardTitle>

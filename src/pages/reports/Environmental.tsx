@@ -109,7 +109,7 @@ const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
   );
 };
 
-// Environmental KPI Card Component
+// Environmental KPI Card Component with Glass Design
 const EnvKPICard = ({
   title,
   value,
@@ -132,12 +132,12 @@ const EnvKPICard = ({
   const isPositiveTrend = trend === "down"; // For environmental metrics, down is usually good
 
   return (
-    <Card className="flex-1 min-w-[220px]">
+    <Card className="flex-1 min-w-[220px] bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded-lg" style={{ backgroundColor: `${color}20` }}>
+              <div className="p-2 rounded-xl bg-emerald-100" style={{ backgroundColor: `${color}20` }}>
                 <Icon className="h-4 w-4" style={{ color }} />
               </div>
               <p className="text-xs text-muted-foreground">{title}</p>
@@ -359,14 +359,19 @@ export default function Environmental() {
   }
 
   return (
-    <div ref={containerRef} className="space-y-6 pb-8">
+    <div ref={containerRef} className="space-y-6 pb-8 bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 min-h-screen -m-6 p-6">
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+
+      {/* Gradient Accent Line */}
+      <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 rounded-full" />
 
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-            <Leaf className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+            <div className="p-2 bg-emerald-100 rounded-xl">
+              <Leaf className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+            </div>
             {language === "th" ? "Environmental Dashboard" : "Environmental Dashboard"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -377,17 +382,17 @@ export default function Environmental() {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
+      {/* Filters - Glass Card */}
+      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-2xl">
         <CardContent className="p-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "บริษัท" : "Company"}</Label>
               <Select value={filterCompany} onValueChange={setFilterCompany}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
                   {companies.map((c) => (
                     <SelectItem key={c.company_id} value={c.company_id}>
@@ -401,10 +406,10 @@ export default function Environmental() {
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "สถานที่" : "Site"}</Label>
               <Select value={filterSite} onValueChange={setFilterSite}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
                   {filteredSites.map((s) => (
                     <SelectItem key={s.site_id} value={s.site_id}>
@@ -418,10 +423,10 @@ export default function Environmental() {
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "ปี" : "Year"}</Label>
               <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
                   {uniqueYears.map((year) => (
                     <SelectItem key={year} value={year.toString()}>
@@ -482,8 +487,11 @@ export default function Environmental() {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* GHG Emissions Stacked Area Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
+        <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl">
+              <Factory className="h-4 w-4 text-emerald-600" />
+            </div>
             <CardTitle className="text-base font-medium">
               {language === "th" ? "การปล่อย GHG ตาม Scope (รายเดือน)" : "GHG Emissions by Scope (Monthly)"}
             </CardTitle>
@@ -497,9 +505,11 @@ export default function Environmental() {
                   <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
+                      backgroundColor: "rgba(255, 255, 255, 0.95)",
+                      backdropFilter: "blur(20px)",
+                      border: "1px solid rgba(229, 231, 235, 0.5)",
+                      borderRadius: "12px",
+                      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
                     }}
                   />
                   <Legend />
@@ -539,8 +549,11 @@ export default function Environmental() {
         </Card>
 
         {/* Energy Mix Donut Chart */}
-        <Card>
-          <CardHeader>
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl">
+              <Zap className="h-4 w-4 text-emerald-600" />
+            </div>
             <CardTitle className="text-base font-medium">
               {language === "th" ? "สัดส่วนพลังงาน" : "Energy Mix"}
             </CardTitle>
@@ -551,8 +564,11 @@ export default function Environmental() {
         </Card>
 
         {/* Waste by Type Pie Chart */}
-        <Card>
-          <CardHeader>
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl">
+              <Trash2 className="h-4 w-4 text-emerald-600" />
+            </div>
             <CardTitle className="text-base font-medium">
               {language === "th" ? "ประเภทของเสีย" : "Waste by Type"}
             </CardTitle>
@@ -563,8 +579,11 @@ export default function Environmental() {
         </Card>
 
         {/* Water Consumption Horizontal Bar Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
+        <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl">
+              <Droplets className="h-4 w-4 text-emerald-600" />
+            </div>
             <CardTitle className="text-base font-medium">
               {language === "th" ? "การใช้น้ำแต่ละสถานที่" : "Water Consumption by Site"}
             </CardTitle>
@@ -587,9 +606,11 @@ export default function Environmental() {
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
+                      backgroundColor: "rgba(255, 255, 255, 0.95)",
+                      backdropFilter: "blur(20px)",
+                      border: "1px solid rgba(229, 231, 235, 0.5)",
+                      borderRadius: "12px",
+                      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
                     }}
                     formatter={(value: number) => [`${value.toLocaleString()} m³`, ""]}
                   />
