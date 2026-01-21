@@ -43,6 +43,7 @@ import {
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '@/components/ui/pull-to-refresh';
 import { DashboardLoadingSkeleton } from '@/components/ui/loading-skeleton';
+import AdminAnalyticsDashboard from '@/components/dashboard/AdminAnalyticsDashboard';
 
 interface DetailData {
   type: 'companies' | 'sites' | 'metrics' | 'pending' | 'drafts' | 'submitted';
@@ -493,6 +494,9 @@ export default function Dashboard() {
           </Card>
         </div>
       )}
+
+      {/* Admin Analytics Dashboard */}
+      {role === 'admin' && <AdminAnalyticsDashboard />}
 
       {/* User Roles Table (Admin only) - Glass Card */}
       {role === 'admin' && (
