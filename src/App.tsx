@@ -13,10 +13,8 @@ import Dashboard from "./pages/Dashboard";
 import UserManagement from "./pages/UserManagement";
 import AuditLog from "./pages/AuditLog";
 import Reports from "./pages/Reports";
-import Scorecard from "./pages/reports/Scorecard";
 import Environmental from "./pages/reports/Environmental";
 import Benchmarking from "./pages/reports/Benchmarking";
-import Infographic from "./pages/reports/Infographic";
 import Governance from "./pages/reports/Governance";
 import Social from "./pages/reports/Social";
 import CompanyManagement from "./pages/master/CompanyManagement";
@@ -124,14 +122,6 @@ const App = () => (
                 }
               />
               <Route
-                path="/reports/scorecard"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
-                    <Scorecard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/reports/environmental"
                 element={
                   <ProtectedRoute allowedRoles={["admin", "executive"]}>
@@ -140,18 +130,10 @@ const App = () => (
                 }
               />
               <Route
-                path="/reports/benchmarking"
+                path="/reports/social"
                 element={
                   <ProtectedRoute allowedRoles={["admin", "executive"]}>
-                    <Benchmarking />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/reports/infographic"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
-                    <Infographic />
+                    <Social />
                   </ProtectedRoute>
                 }
               />
@@ -164,10 +146,10 @@ const App = () => (
                 }
               />
               <Route
-                path="/reports/social"
+                path="/reports/benchmarking"
                 element={
                   <ProtectedRoute allowedRoles={["admin", "executive"]}>
-                    <Social />
+                    <Benchmarking />
                   </ProtectedRoute>
                 }
               />

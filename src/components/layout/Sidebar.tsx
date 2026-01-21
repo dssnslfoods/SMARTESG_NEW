@@ -15,14 +15,12 @@ import {
   Calendar,
   Layers,
   Tag,
-  Gauge,
   Activity,
   Leaf,
   X,
   Settings,
   ChevronDown,
   GitCompare,
-  FileText,
   Scale,
   Heart,
 } from 'lucide-react';
@@ -73,12 +71,6 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       roles: ['admin', 'executive'],
     },
     {
-      label: language === 'th' ? 'Scorecard' : 'Scorecard',
-      href: '/reports/scorecard',
-      icon: Gauge,
-      roles: ['admin', 'executive'],
-    },
-    {
       label: language === 'th' ? 'สิ่งแวดล้อม' : 'Environmental',
       href: '/reports/environmental',
       icon: Leaf,
@@ -91,21 +83,15 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       roles: ['admin', 'executive'],
     },
     {
-      label: language === 'th' ? 'เปรียบเทียบ' : 'Benchmarking',
-      href: '/reports/benchmarking',
-      icon: GitCompare,
-      roles: ['admin', 'executive'],
-    },
-    {
-      label: language === 'th' ? 'สรุปผู้บริหาร' : 'Infographic',
-      href: '/reports/infographic',
-      icon: FileText,
-      roles: ['admin', 'executive'],
-    },
-    {
       label: language === 'th' ? 'ธรรมาภิบาล' : 'Governance',
       href: '/reports/governance',
       icon: Scale,
+      roles: ['admin', 'executive'],
+    },
+    {
+      label: language === 'th' ? 'เปรียบเทียบ' : 'Benchmarking',
+      href: '/reports/benchmarking',
+      icon: GitCompare,
       roles: ['admin', 'executive'],
     },
   ];
