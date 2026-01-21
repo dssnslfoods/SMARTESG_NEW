@@ -15,6 +15,7 @@ import AuditLog from "./pages/AuditLog";
 import Reports from "./pages/Reports";
 import Scorecard from "./pages/reports/Scorecard";
 import Environmental from "./pages/reports/Environmental";
+import Benchmarking from "./pages/reports/Benchmarking";
 import CompanyManagement from "./pages/master/CompanyManagement";
 import SiteManagement from "./pages/master/SiteManagement";
 import PeriodManagement from "./pages/master/PeriodManagement";
@@ -132,6 +133,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "executive"]}>
                     <Environmental />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reports/benchmarking"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
+                    <Benchmarking />
                   </ProtectedRoute>
                 }
               />
