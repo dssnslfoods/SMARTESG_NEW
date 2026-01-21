@@ -611,11 +611,6 @@ export default function Environmental() {
                     x={waterTarget}
                     stroke="hsl(var(--destructive))"
                     strokeDasharray="5 5"
-                    label={{
-                      value: language === "th" ? "เป้าหมาย" : "Target",
-                      fill: "hsl(var(--destructive))",
-                      fontSize: 11,
-                    }}
                   />
                 </BarChart>
               </ResponsiveContainer>
