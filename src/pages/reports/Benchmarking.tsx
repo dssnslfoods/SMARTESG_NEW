@@ -164,7 +164,7 @@ const LollipopChart = ({
   );
 };
 
-// Mini Line Chart for Small Multiples
+// Mini Line Chart for Small Multiples with Glass Design
 const MiniLineChart = ({
   data,
   title,
@@ -180,7 +180,7 @@ const MiniLineChart = ({
   const lastValue = data.length > 0 ? data[data.length - 1]?.value : null;
   
   return (
-    <Card className="p-3">
+    <Card className="p-3 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl">
       <p className="text-xs font-medium text-muted-foreground mb-2 truncate">{title}</p>
       <div className="h-16">
         {hasData ? (
@@ -529,14 +529,19 @@ export default function Benchmarking() {
   const hasAnyData = metricValues.length > 0;
 
   return (
-    <div ref={containerRef} className="space-y-6 pb-8">
+    <div ref={containerRef} className="space-y-6 pb-8 bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 min-h-screen -m-6 p-6">
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+
+      {/* Gradient Accent Line */}
+      <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-full" />
 
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-            <GitCompare className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            <div className="p-2 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-xl">
+              <GitCompare className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+            </div>
             {language === "th" ? "Site Benchmarking" : "Site Benchmarking"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -547,17 +552,17 @@ export default function Benchmarking() {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
+      {/* Filters - Glass Card */}
+      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-2xl">
         <CardContent className="p-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "บริษัท" : "Company"}</Label>
               <Select value={filterCompany} onValueChange={setFilterCompany}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
                   {companies.map((c) => (
                     <SelectItem key={c.company_id} value={c.company_id}>
@@ -571,10 +576,10 @@ export default function Benchmarking() {
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "ปี" : "Year"}</Label>
               <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
                   {uniqueYears.map((year) => (
                     <SelectItem key={year} value={year.toString()}>
@@ -589,8 +594,11 @@ export default function Benchmarking() {
       </Card>
 
       {/* Lollipop Chart */}
-      <Card>
-        <CardHeader>
+      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="p-2 bg-emerald-100 rounded-xl">
+            <Target className="h-4 w-4 text-emerald-600" />
+          </div>
           <CardTitle className="text-base font-medium">
             {language === "th" ? "อันดับ ESG Score ตามสถานที่" : "ESG Score Ranking by Site"}
           </CardTitle>
@@ -605,8 +613,11 @@ export default function Benchmarking() {
       </Card>
 
       {/* Performance Matrix */}
-      <Card>
-        <CardHeader>
+      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="p-2 bg-emerald-100 rounded-xl">
+            <GitCompare className="h-4 w-4 text-emerald-600" />
+          </div>
           <CardTitle className="text-base font-medium">
             {language === "th" ? "Performance Matrix" : "Performance Matrix"}
           </CardTitle>
@@ -649,9 +660,11 @@ export default function Benchmarking() {
                   <Tooltip
                     cursor={{ strokeDasharray: "3 3" }}
                     contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
+                      backgroundColor: "rgba(255, 255, 255, 0.95)",
+                      backdropFilter: "blur(20px)",
+                      border: "1px solid rgba(229, 231, 235, 0.5)",
+                      borderRadius: "12px",
+                      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
                     }}
                     formatter={(value: number, name: string) => [
                       `${value}${name === "Improvement" ? "%" : ""}`,
@@ -697,8 +710,11 @@ export default function Benchmarking() {
       </Card>
 
       {/* Small Multiples Grid */}
-      <Card>
-        <CardHeader>
+      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="p-2 bg-emerald-100 rounded-xl">
+            <BarChart3 className="h-4 w-4 text-emerald-600" />
+          </div>
           <CardTitle className="text-base font-medium">
             {language === "th" ? "แนวโน้ม 12 เดือน ตามสถานที่" : "12-Month Trends by Site"}
           </CardTitle>
@@ -723,21 +739,31 @@ export default function Benchmarking() {
       </Card>
 
       {/* Data Table */}
-      <Card>
+      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-medium">
-            {language === "th" ? "ตารางเปรียบเทียบ" : "Comparison Table"}
-          </CardTitle>
-          <Button variant="outline" size="sm" onClick={exportToCSV} className="gap-1.5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl">
+              <BarChart3 className="h-4 w-4 text-emerald-600" />
+            </div>
+            <CardTitle className="text-base font-medium">
+              {language === "th" ? "ตารางเปรียบเทียบ" : "Comparison Table"}
+            </CardTitle>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={exportToCSV} 
+            className="gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] rounded-xl"
+          >
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">CSV</span>
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-2xl border border-gray-200/50">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="bg-gray-50/80">
                   <TableHead
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort("site")}
@@ -805,8 +831,11 @@ export default function Benchmarking() {
               </TableHeader>
               <TableBody>
                 {sortedTableData.length > 0 ? (
-                  sortedTableData.map((row) => (
-                    <TableRow key={row.site_id}>
+                  sortedTableData.map((row, index) => (
+                    <TableRow 
+                      key={row.site_id}
+                      className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-emerald-50/50 transition-colors`}
+                    >
                       <TableCell className="font-medium">
                         <div>
                           <p className="truncate max-w-[150px]">{row.site}</p>
@@ -821,7 +850,7 @@ export default function Benchmarking() {
                       <TableCell className="text-center font-semibold">{row.overall !== null ? row.overall : "-"}</TableCell>
                       <TableCell className="text-center">
                         {row.rank !== null ? (
-                          <Badge variant={row.rank <= 3 ? "default" : "secondary"}>#{row.rank}</Badge>
+                          <Badge variant={row.rank <= 3 ? "default" : "secondary"} className={row.rank <= 3 ? "bg-gradient-to-r from-emerald-500 to-teal-500" : ""}>#{row.rank}</Badge>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
