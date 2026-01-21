@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,20 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   BarChart,
   Bar,
   XAxis,
@@ -20,18 +34,33 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
-  Legend,
 } from 'recharts';
 import {
   Users,
   TrendingUp,
   Clock,
-  Calendar,
+  Calendar as CalendarIcon,
   Activity,
   BarChart3,
+  Filter,
+  X,
+  CalendarDays,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO, differenceInDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+interface MetricValueRecord {
+  value_id: string;
+  submitted_by: string | null;
+  created_at: string | null;
+  status: string;
+}
+
+interface UserProfile {
+  user_id: string;
+  full_name: string | null;
+}
 
 interface UserSubmissionStats {
   userId: string;
@@ -56,21 +85,24 @@ interface DailyData {
 
 export default function AdminAnalyticsDashboard() {
   const { language } = useLanguage();
-  const [userStats, setUserStats] = useState<UserSubmissionStats[]>([]);
-  const [hourlyData, setHourlyData] = useState<HourlyData[]>([]);
-  const [dailyData, setDailyData] = useState<DailyData[]>([]);
-  const [peakHour, setPeakHour] = useState<{ hour: string; count: number } | null>(null);
-  const [peakDay, setPeakDay] = useState<{ date: string; count: number } | null>(null);
-  const [totalEntries, setTotalEntries] = useState(0);
+  
+  // Raw data
+  const [allMetricValues, setAllMetricValues] = useState<MetricValueRecord[]>([]);
+  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Filters
+  const [selectedUser, setSelectedUser] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [selectedHourRange, setSelectedHourRange] = useState<string>('all');
+
   useEffect(() => {
-    fetchAnalyticsData();
+    fetchRawData();
   }, []);
 
-  const fetchAnalyticsData = async () => {
+  const fetchRawData = async () => {
     try {
-      // Fetch all metric_value entries with created_at timestamp
       const { data: metricValues, error } = await supabase
         .from('metric_value')
         .select('value_id, submitted_by, created_at, status')
@@ -78,135 +110,198 @@ export default function AdminAnalyticsDashboard() {
 
       if (error) throw error;
 
-      if (!metricValues || metricValues.length === 0) {
-        setLoading(false);
-        return;
+      if (metricValues && metricValues.length > 0) {
+        setAllMetricValues(metricValues);
+
+        const uniqueUserIds = [...new Set(metricValues.filter(m => m.submitted_by).map(m => m.submitted_by))] as string[];
+        const { data: profiles } = await supabase
+          .from('app_user_profile')
+          .select('user_id, full_name')
+          .in('user_id', uniqueUserIds);
+
+        setUserProfiles(profiles || []);
       }
-
-      setTotalEntries(metricValues.length);
-
-      // Fetch user profiles for names
-      const uniqueUserIds = [...new Set(metricValues.filter(m => m.submitted_by).map(m => m.submitted_by))] as string[];
-      const { data: profiles } = await supabase
-        .from('app_user_profile')
-        .select('user_id, full_name')
-        .in('user_id', uniqueUserIds);
-
-      // Calculate user submission stats
-      const userSubmissionMap = new Map<string, { count: number; dates: Date[] }>();
-      
-      metricValues.forEach(mv => {
-        if (mv.submitted_by) {
-          const existing = userSubmissionMap.get(mv.submitted_by) || { count: 0, dates: [] };
-          existing.count++;
-          if (mv.created_at) {
-            existing.dates.push(new Date(mv.created_at));
-          }
-          userSubmissionMap.set(mv.submitted_by, existing);
-        }
-      });
-
-      const userStatsArray: UserSubmissionStats[] = [];
-      userSubmissionMap.forEach((value, key) => {
-        const profile = profiles?.find(p => p.user_id === key);
-        const sortedDates = value.dates.sort((a, b) => a.getTime() - b.getTime());
-        const firstDate = sortedDates[0];
-        const lastDate = sortedDates[sortedDates.length - 1];
-        
-        // Calculate days between first and last submission (minimum 1 day)
-        const daySpan = firstDate && lastDate 
-          ? Math.max(1, differenceInDays(lastDate, firstDate) + 1)
-          : 1;
-        
-        userStatsArray.push({
-          userId: key,
-          userName: profile?.full_name || 'Unknown User',
-          totalSubmissions: value.count,
-          avgPerDay: Math.round((value.count / daySpan) * 100) / 100,
-          firstSubmission: firstDate ? firstDate.toISOString() : null,
-          lastSubmission: lastDate ? lastDate.toISOString() : null,
-        });
-      });
-
-      // Sort by total submissions descending
-      userStatsArray.sort((a, b) => b.totalSubmissions - a.totalSubmissions);
-      setUserStats(userStatsArray);
-
-      // Calculate hourly distribution
-      const hourlyMap = new Map<number, number>();
-      for (let i = 0; i < 24; i++) {
-        hourlyMap.set(i, 0);
-      }
-
-      metricValues.forEach(mv => {
-        if (mv.created_at) {
-          const hour = new Date(mv.created_at).getHours();
-          hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + 1);
-        }
-      });
-
-      const hourlyDataArray: HourlyData[] = [];
-      let maxHour = { hour: 0, count: 0 };
-      
-      hourlyMap.forEach((count, hour) => {
-        const label = `${hour.toString().padStart(2, '0')}:00`;
-        hourlyDataArray.push({
-          hour: hour.toString(),
-          count,
-          label,
-        });
-        if (count > maxHour.count) {
-          maxHour = { hour, count };
-        }
-      });
-
-      setHourlyData(hourlyDataArray);
-      setPeakHour({ hour: `${maxHour.hour.toString().padStart(2, '0')}:00`, count: maxHour.count });
-
-      // Calculate daily distribution (last 30 days)
-      const dailyMap = new Map<string, number>();
-      
-      metricValues.forEach(mv => {
-        if (mv.created_at) {
-          const dateStr = format(parseISO(mv.created_at), 'yyyy-MM-dd');
-          dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + 1);
-        }
-      });
-
-      const dailyDataArray: DailyData[] = [];
-      let maxDay = { date: '', count: 0 };
-
-      dailyMap.forEach((count, date) => {
-        dailyDataArray.push({
-          date,
-          count,
-          label: format(parseISO(date), 'MMM dd'),
-        });
-        if (count > maxDay.count) {
-          maxDay = { date, count };
-        }
-      });
-
-      // Sort by date
-      dailyDataArray.sort((a, b) => a.date.localeCompare(b.date));
-      
-      // Take last 30 days
-      const last30Days = dailyDataArray.slice(-30);
-      setDailyData(last30Days);
-      
-      if (maxDay.date) {
-        setPeakDay({ 
-          date: format(parseISO(maxDay.date), 'MMM dd, yyyy'), 
-          count: maxDay.count 
-        });
-      }
-
     } catch (error) {
       console.error('Error fetching analytics data:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Filter data based on selections
+  const filteredData = useMemo(() => {
+    let filtered = [...allMetricValues];
+
+    // Filter by user
+    if (selectedUser !== 'all') {
+      filtered = filtered.filter(mv => mv.submitted_by === selectedUser);
+    }
+
+    // Filter by date range
+    if (dateFrom || dateTo) {
+      filtered = filtered.filter(mv => {
+        if (!mv.created_at) return false;
+        const entryDate = new Date(mv.created_at);
+        
+        if (dateFrom && dateTo) {
+          return isWithinInterval(entryDate, { 
+            start: startOfDay(dateFrom), 
+            end: endOfDay(dateTo) 
+          });
+        } else if (dateFrom) {
+          return entryDate >= startOfDay(dateFrom);
+        } else if (dateTo) {
+          return entryDate <= endOfDay(dateTo);
+        }
+        return true;
+      });
+    }
+
+    // Filter by hour range
+    if (selectedHourRange !== 'all') {
+      const [startHour, endHour] = selectedHourRange.split('-').map(Number);
+      filtered = filtered.filter(mv => {
+        if (!mv.created_at) return false;
+        const hour = new Date(mv.created_at).getHours();
+        return hour >= startHour && hour <= endHour;
+      });
+    }
+
+    return filtered;
+  }, [allMetricValues, selectedUser, dateFrom, dateTo, selectedHourRange]);
+
+  // Calculate analytics from filtered data
+  const analytics = useMemo(() => {
+    const totalEntries = filteredData.length;
+
+    // User stats
+    const userSubmissionMap = new Map<string, { count: number; dates: Date[] }>();
+    
+    filteredData.forEach(mv => {
+      if (mv.submitted_by) {
+        const existing = userSubmissionMap.get(mv.submitted_by) || { count: 0, dates: [] };
+        existing.count++;
+        if (mv.created_at) {
+          existing.dates.push(new Date(mv.created_at));
+        }
+        userSubmissionMap.set(mv.submitted_by, existing);
+      }
+    });
+
+    const userStatsArray: UserSubmissionStats[] = [];
+    userSubmissionMap.forEach((value, key) => {
+      const profile = userProfiles.find(p => p.user_id === key);
+      const sortedDates = value.dates.sort((a, b) => a.getTime() - b.getTime());
+      const firstDate = sortedDates[0];
+      const lastDate = sortedDates[sortedDates.length - 1];
+      
+      const daySpan = firstDate && lastDate 
+        ? Math.max(1, differenceInDays(lastDate, firstDate) + 1)
+        : 1;
+      
+      userStatsArray.push({
+        userId: key,
+        userName: profile?.full_name || 'Unknown User',
+        totalSubmissions: value.count,
+        avgPerDay: Math.round((value.count / daySpan) * 100) / 100,
+        firstSubmission: firstDate ? firstDate.toISOString() : null,
+        lastSubmission: lastDate ? lastDate.toISOString() : null,
+      });
+    });
+    userStatsArray.sort((a, b) => b.totalSubmissions - a.totalSubmissions);
+
+    // Hourly distribution
+    const hourlyMap = new Map<number, number>();
+    for (let i = 0; i < 24; i++) {
+      hourlyMap.set(i, 0);
+    }
+
+    filteredData.forEach(mv => {
+      if (mv.created_at) {
+        const hour = new Date(mv.created_at).getHours();
+        hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + 1);
+      }
+    });
+
+    const hourlyDataArray: HourlyData[] = [];
+    let maxHour = { hour: 0, count: 0 };
+    
+    hourlyMap.forEach((count, hour) => {
+      const label = `${hour.toString().padStart(2, '0')}:00`;
+      hourlyDataArray.push({ hour: hour.toString(), count, label });
+      if (count > maxHour.count) {
+        maxHour = { hour, count };
+      }
+    });
+
+    // Daily distribution
+    const dailyMap = new Map<string, number>();
+    
+    filteredData.forEach(mv => {
+      if (mv.created_at) {
+        const dateStr = format(parseISO(mv.created_at), 'yyyy-MM-dd');
+        dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + 1);
+      }
+    });
+
+    const dailyDataArray: DailyData[] = [];
+    let maxDay = { date: '', count: 0 };
+
+    dailyMap.forEach((count, date) => {
+      dailyDataArray.push({
+        date,
+        count,
+        label: format(parseISO(date), 'MMM dd'),
+      });
+      if (count > maxDay.count) {
+        maxDay = { date, count };
+      }
+    });
+
+    dailyDataArray.sort((a, b) => a.date.localeCompare(b.date));
+    const last30Days = dailyDataArray.slice(-30);
+
+    // Calculate overall average
+    const overallAvg = totalEntries > 0 && last30Days.length > 0
+      ? Math.round((totalEntries / Math.max(1, last30Days.length)) * 100) / 100
+      : 0;
+
+    return {
+      totalEntries,
+      userStats: userStatsArray,
+      hourlyData: hourlyDataArray,
+      dailyData: last30Days,
+      peakHour: maxHour.count > 0 ? { hour: `${maxHour.hour.toString().padStart(2, '0')}:00`, count: maxHour.count } : null,
+      peakDay: maxDay.date ? { date: format(parseISO(maxDay.date), 'MMM dd, yyyy'), count: maxDay.count } : null,
+      overallAvg,
+    };
+  }, [filteredData, userProfiles]);
+
+  // Available users for filter
+  const availableUsers = useMemo(() => {
+    const uniqueUserIds = [...new Set(allMetricValues.filter(m => m.submitted_by).map(m => m.submitted_by))] as string[];
+    return uniqueUserIds.map(userId => {
+      const profile = userProfiles.find(p => p.user_id === userId);
+      return { userId, userName: profile?.full_name || 'Unknown User' };
+    }).sort((a, b) => a.userName.localeCompare(b.userName));
+  }, [allMetricValues, userProfiles]);
+
+  const hourRanges = [
+    { value: 'all', label: language === 'th' ? 'ทุกช่วงเวลา' : 'All Hours' },
+    { value: '0-5', label: language === 'th' ? '00:00-05:59 (กลางคืน)' : '00:00-05:59 (Night)' },
+    { value: '6-11', label: language === 'th' ? '06:00-11:59 (เช้า)' : '06:00-11:59 (Morning)' },
+    { value: '12-17', label: language === 'th' ? '12:00-17:59 (บ่าย)' : '12:00-17:59 (Afternoon)' },
+    { value: '18-23', label: language === 'th' ? '18:00-23:59 (เย็น)' : '18:00-23:59 (Evening)' },
+  ];
+
+  const clearFilters = () => {
+    setSelectedUser('all');
+    setDateFrom(undefined);
+    setDateTo(undefined);
+    setSelectedHourRange('all');
+  };
+
+  const hasActiveFilters = selectedUser !== 'all' || dateFrom || dateTo || selectedHourRange !== 'all';
 
   if (loading) {
     return (
@@ -220,7 +315,7 @@ export default function AdminAnalyticsDashboard() {
     );
   }
 
-  if (totalEntries === 0) {
+  if (allMetricValues.length === 0) {
     return (
       <Card className="bg-white/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-xl shadow-gray-900/5">
         <CardHeader className="p-4 sm:p-6">
@@ -255,8 +350,133 @@ export default function AdminAnalyticsDashboard() {
         </div>
       </div>
 
+      {/* Filters Card */}
+      <Card className="bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-200/50 shadow-xl shadow-gray-900/5">
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="flex items-center justify-between text-sm text-gray-700">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-violet-600" />
+              {language === 'th' ? 'ตัวกรอง' : 'Filters'}
+            </div>
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="h-7 text-xs text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-3 w-3 mr-1" />
+                {language === 'th' ? 'ล้างตัวกรอง' : 'Clear'}
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-2">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            {/* User Filter */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-600">
+                {language === 'th' ? 'ผู้ใช้' : 'User'}
+              </label>
+              <Select value={selectedUser} onValueChange={setSelectedUser}>
+                <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-500/30">
+                  <SelectValue placeholder={language === 'th' ? 'เลือกผู้ใช้' : 'Select user'} />
+                </SelectTrigger>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
+                  <SelectItem value="all">{language === 'th' ? 'ทุกคน' : 'All Users'}</SelectItem>
+                  {availableUsers.map(user => (
+                    <SelectItem key={user.userId} value={user.userId}>
+                      {user.userName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date From */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-600">
+                {language === 'th' ? 'ตั้งแต่วันที่' : 'From Date'}
+              </label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal bg-white/80 backdrop-blur border-gray-200 rounded-xl",
+                      !dateFrom && "text-gray-400"
+                    )}
+                  >
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {dateFrom ? format(dateFrom, "PPP") : (language === 'th' ? 'เลือกวันที่' : 'Pick a date')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFrom}
+                    onSelect={setDateFrom}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Date To */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-600">
+                {language === 'th' ? 'ถึงวันที่' : 'To Date'}
+              </label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal bg-white/80 backdrop-blur border-gray-200 rounded-xl",
+                      !dateTo && "text-gray-400"
+                    )}
+                  >
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {dateTo ? format(dateTo, "PPP") : (language === 'th' ? 'เลือกวันที่' : 'Pick a date')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateTo}
+                    onSelect={setDateTo}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Hour Range Filter */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-600">
+                {language === 'th' ? 'ช่วงเวลา' : 'Time Range'}
+              </label>
+              <Select value={selectedHourRange} onValueChange={setSelectedHourRange}>
+                <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-500/30">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
+                  {hourRanges.map(range => (
+                    <SelectItem key={range.value} value={range.value}>
+                      {range.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Peak Stats Cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5">
         {/* Total Entries */}
         <Card className="bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300">
           <CardContent className="p-4">
@@ -268,7 +488,7 @@ export default function AdminAnalyticsDashboard() {
                 <Activity className="h-4 w-4 text-blue-600" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{totalEntries}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.totalEntries}</div>
           </CardContent>
         </Card>
 
@@ -277,13 +497,28 @@ export default function AdminAnalyticsDashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs sm:text-sm text-gray-500">
-                {language === 'th' ? 'ผู้ใช้ที่ลงข้อมูล' : 'Active Users'}
+                {language === 'th' ? 'ผู้ใช้' : 'Users'}
               </span>
               <div className="h-8 w-8 rounded-xl bg-emerald-100 flex items-center justify-center">
                 <Users className="h-4 w-4 text-emerald-600" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{userStats.length}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.userStats.length}</div>
+          </CardContent>
+        </Card>
+
+        {/* Average per Day */}
+        <Card className="bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs sm:text-sm text-gray-500">
+                {language === 'th' ? 'เฉลี่ย/วัน' : 'Avg/Day'}
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-indigo-100 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4 text-indigo-600" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.overallAvg}</div>
           </CardContent>
         </Card>
 
@@ -298,9 +533,9 @@ export default function AdminAnalyticsDashboard() {
                 <Clock className="h-4 w-4 text-amber-600" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{peakHour?.hour || '-'}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.peakHour?.hour || '-'}</div>
             <div className="text-xs text-gray-400 mt-1">
-              {peakHour ? `${peakHour.count} ${language === 'th' ? 'รายการ' : 'entries'}` : ''}
+              {analytics.peakHour ? `${analytics.peakHour.count} ${language === 'th' ? 'รายการ' : 'entries'}` : ''}
             </div>
           </CardContent>
         </Card>
@@ -313,12 +548,12 @@ export default function AdminAnalyticsDashboard() {
                 {language === 'th' ? 'วันยอดนิยม' : 'Peak Day'}
               </span>
               <div className="h-8 w-8 rounded-xl bg-purple-100 flex items-center justify-center">
-                <Calendar className="h-4 w-4 text-purple-600" />
+                <CalendarIcon className="h-4 w-4 text-purple-600" />
               </div>
             </div>
-            <div className="text-lg sm:text-xl font-bold text-gray-900 truncate">{peakDay?.date || '-'}</div>
+            <div className="text-lg sm:text-xl font-bold text-gray-900 truncate">{analytics.peakDay?.date || '-'}</div>
             <div className="text-xs text-gray-400 mt-1">
-              {peakDay ? `${peakDay.count} ${language === 'th' ? 'รายการ' : 'entries'}` : ''}
+              {analytics.peakDay ? `${analytics.peakDay.count} ${language === 'th' ? 'รายการ' : 'entries'}` : ''}
             </div>
           </CardContent>
         </Card>
@@ -342,7 +577,7 @@ export default function AdminAnalyticsDashboard() {
           <CardContent className="p-4 sm:p-6 pt-0">
             <div className="h-64 sm:h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={hourlyData}>
+                <BarChart data={analytics.hourlyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis 
                     dataKey="label" 
@@ -362,11 +597,11 @@ export default function AdminAnalyticsDashboard() {
                   />
                   <Bar 
                     dataKey="count" 
-                    fill="url(#barGradient)" 
+                    fill="url(#barGradientAnalytics)" 
                     radius={[4, 4, 0, 0]}
                   />
                   <defs>
-                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="barGradientAnalytics" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#f59e0b" />
                       <stop offset="100%" stopColor="#d97706" />
                     </linearGradient>
@@ -387,13 +622,13 @@ export default function AdminAnalyticsDashboard() {
               {language === 'th' ? 'แนวโน้มรายวัน' : 'Daily Trend'}
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm text-gray-500">
-              {language === 'th' ? 'จำนวนรายการใน 30 วันล่าสุด' : 'Entries over the last 30 days'}
+              {language === 'th' ? 'จำนวนรายการตามช่วงเวลาที่เลือก' : 'Entries based on selected filters'}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
             <div className="h-64 sm:h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dailyData}>
+                <LineChart data={analytics.dailyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis 
                     dataKey="label" 
@@ -440,64 +675,70 @@ export default function AdminAnalyticsDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 pt-0">
-          <div className="overflow-x-auto -mx-4 sm:mx-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-gray-200/50">
-                  <TableHead className="text-xs sm:text-sm text-gray-600">
-                    {language === 'th' ? 'ผู้ใช้' : 'User'}
-                  </TableHead>
-                  <TableHead className="text-xs sm:text-sm text-gray-600 text-right">
-                    {language === 'th' ? 'จำนวนรายการ' : 'Total Entries'}
-                  </TableHead>
-                  <TableHead className="text-xs sm:text-sm text-gray-600 text-right hidden sm:table-cell">
-                    {language === 'th' ? 'เฉลี่ย/วัน' : 'Avg/Day'}
-                  </TableHead>
-                  <TableHead className="text-xs sm:text-sm text-gray-600 hidden md:table-cell">
-                    {language === 'th' ? 'ลงข้อมูลล่าสุด' : 'Last Entry'}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {userStats.map((stat, index) => (
-                  <TableRow key={stat.userId} className="border-gray-200/50 hover:bg-emerald-50/50 transition-colors">
-                    <TableCell className="font-medium text-xs sm:text-sm py-3 text-gray-900">
-                      <div className="flex items-center gap-2">
-                        {index < 3 && (
-                          <Badge 
-                            className={`text-xs rounded-full ${
-                              index === 0 
-                                ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white border-0' 
-                                : index === 1 
-                                  ? 'bg-gradient-to-r from-gray-300 to-gray-400 text-white border-0'
-                                  : 'bg-gradient-to-r from-amber-600 to-orange-700 text-white border-0'
-                            }`}
-                          >
-                            #{index + 1}
-                          </Badge>
-                        )}
-                        {stat.userName}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge className="bg-emerald-100 text-emerald-700 border-0 font-semibold">
-                        {stat.totalSubmissions}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-gray-600 text-sm hidden sm:table-cell">
-                      {stat.avgPerDay}
-                    </TableCell>
-                    <TableCell className="text-gray-500 text-xs hidden md:table-cell">
-                      {stat.lastSubmission 
-                        ? format(parseISO(stat.lastSubmission), 'MMM dd, yyyy HH:mm')
-                        : '-'
-                      }
-                    </TableCell>
+          {analytics.userStats.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              {language === 'th' ? 'ไม่พบข้อมูลตามเงื่อนไขที่เลือก' : 'No data matching selected filters'}
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-gray-200/50">
+                    <TableHead className="text-xs sm:text-sm text-gray-600">
+                      {language === 'th' ? 'ผู้ใช้' : 'User'}
+                    </TableHead>
+                    <TableHead className="text-xs sm:text-sm text-gray-600 text-right">
+                      {language === 'th' ? 'จำนวนรายการ' : 'Total Entries'}
+                    </TableHead>
+                    <TableHead className="text-xs sm:text-sm text-gray-600 text-right hidden sm:table-cell">
+                      {language === 'th' ? 'เฉลี่ย/วัน' : 'Avg/Day'}
+                    </TableHead>
+                    <TableHead className="text-xs sm:text-sm text-gray-600 hidden md:table-cell">
+                      {language === 'th' ? 'ลงข้อมูลล่าสุด' : 'Last Entry'}
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {analytics.userStats.map((stat, index) => (
+                    <TableRow key={stat.userId} className="border-gray-200/50 hover:bg-emerald-50/50 transition-colors">
+                      <TableCell className="font-medium text-xs sm:text-sm py-3 text-gray-900">
+                        <div className="flex items-center gap-2">
+                          {index < 3 && (
+                            <Badge 
+                              className={`text-xs rounded-full ${
+                                index === 0 
+                                  ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white border-0' 
+                                  : index === 1 
+                                    ? 'bg-gradient-to-r from-gray-300 to-gray-400 text-white border-0'
+                                    : 'bg-gradient-to-r from-amber-600 to-orange-700 text-white border-0'
+                              }`}
+                            >
+                              #{index + 1}
+                            </Badge>
+                          )}
+                          {stat.userName}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge className="bg-emerald-100 text-emerald-700 border-0 font-semibold">
+                          {stat.totalSubmissions}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-gray-600 text-sm hidden sm:table-cell">
+                        {stat.avgPerDay}
+                      </TableCell>
+                      <TableCell className="text-gray-500 text-xs hidden md:table-cell">
+                        {stat.lastSubmission 
+                          ? format(parseISO(stat.lastSubmission), 'MMM dd, yyyy HH:mm')
+                          : '-'
+                        }
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
