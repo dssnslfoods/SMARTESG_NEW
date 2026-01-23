@@ -297,24 +297,51 @@ export default function Benchmarking() {
     }
   };
 
-  // Get unique years
+  // Get unique years that have data
   const uniqueYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
-  const selectedYear = filterYear ? parseInt(filterYear) : uniqueYears[0];
+  
+  // Find years that actually have metric values
+  const yearsWithData = uniqueYears.filter(year => {
+    const yearPeriods = periods.filter(p => p.year === year);
+    return metricValues.some(v => yearPeriods.some(p => p.period_id === v.period_id));
+  });
+  
+  // Default to most recent year with data, fallback to most recent year
+  const defaultYear = yearsWithData.length > 0 ? yearsWithData[0] : uniqueYears[0];
+  const selectedYear = filterYear ? parseInt(filterYear) : defaultYear;
 
   // Filter sites by company
   const filteredSites = filterCompany ? sites.filter((s) => s.company_id === filterCompany) : sites;
 
-  // Filter values
+  // Filter values - use selectedYear when no explicit filter is set
+  const activeYear = filterYear ? parseInt(filterYear) : defaultYear;
   const filteredValues = metricValues.filter((v) => {
     if (filterCompany) {
       const site = sites.find((s) => s.site_id === v.site_id);
       if (site?.company_id !== filterCompany) return false;
     }
-    if (filterYear) {
+    // Always filter by year (use default year with data if no filter set)
+    if (activeYear) {
       const period = periods.find((p) => p.period_id === v.period_id);
-      if (period?.year !== parseInt(filterYear)) return false;
+      if (period?.year !== activeYear) return false;
     }
     return true;
+  });
+
+  // Debug: Log filtered data for verification
+  console.log("[Benchmarking] Filter state:", {
+    filterCompany,
+    filterYear,
+    activeYear,
+    defaultYear,
+    yearsWithData,
+    totalMetricValues: metricValues.length,
+    filteredValuesCount: filteredValues.length,
+    sampleFilteredValues: filteredValues.slice(0, 3).map(v => ({ 
+      site_id: v.site_id, 
+      period_id: v.period_id, 
+      status: v.status 
+    })),
   });
 
   // Helper: Get dimension score for a site (returns null if no data)
