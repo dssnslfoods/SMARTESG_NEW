@@ -667,6 +667,95 @@ export default function DataEntry() {
     return true;
   });
 
+  const unique = (items: string[]) => Array.from(new Set(items)).filter(Boolean);
+
+  const getFilterDropReason = () => {
+    if (metricValues.length === 0) return null;
+
+    const companyStep = filterCompany
+      ? metricValues.filter(v => {
+          const site = sites.find(s => s.site_id === v.site_id);
+          return site?.company_id === filterCompany;
+        })
+      : metricValues;
+
+    const siteStep = filterSite ? companyStep.filter(v => v.site_id === filterSite) : companyStep;
+    const periodStep = filterPeriod ? siteStep.filter(v => v.period_id === filterPeriod) : siteStep;
+    const statusStep = filterStatus ? periodStep.filter(v => v.status === filterStatus) : periodStep;
+    const themeStep = filterTheme
+      ? statusStep.filter(v => {
+          const metric = metrics.find(m => m.metric_id === v.metric_id);
+          return metric?.theme_id === filterTheme;
+        })
+      : statusStep;
+    const dimensionStep = filterDimension
+      ? themeStep.filter(v => {
+          const metric = metrics.find(m => m.metric_id === v.metric_id);
+          const theme = themes.find(t => t.theme_id === metric?.theme_id);
+          return theme?.dimension_id === filterDimension;
+        })
+      : themeStep;
+
+    // If final result has data, no need to show reason.
+    if (dimensionStep.length > 0) return null;
+
+    // Identify the first filter that drops the dataset to zero.
+    if (filterCompany && companyStep.length === 0) {
+      return {
+        key: 'company' as const,
+        available: unique(metricValues.map(v => sites.find(s => s.site_id === v.site_id)?.company_id || '')).slice(0, 8),
+      };
+    }
+    if (filterSite && siteStep.length === 0) {
+      return {
+        key: 'site' as const,
+        available: unique(companyStep.map(v => v.site_id)).slice(0, 8),
+      };
+    }
+    if (filterPeriod && periodStep.length === 0) {
+      return {
+        key: 'period' as const,
+        available: unique(siteStep.map(v => v.period_id)).slice(0, 8),
+      };
+    }
+    if (filterStatus && statusStep.length === 0) {
+      return {
+        key: 'status' as const,
+        available: unique(periodStep.map(v => v.status)).slice(0, 8),
+      };
+    }
+    if (filterTheme && themeStep.length === 0) {
+      const themeIds = unique(
+        statusStep
+          .map(v => metrics.find(m => m.metric_id === v.metric_id)?.theme_id || '')
+          .filter(Boolean)
+      );
+      return {
+        key: 'theme' as const,
+        available: themeIds.slice(0, 8),
+      };
+    }
+    if (filterDimension && dimensionStep.length === 0) {
+      const dimensionIds = unique(
+        themeStep
+          .map(v => {
+            const metric = metrics.find(m => m.metric_id === v.metric_id);
+            const theme = themes.find(t => t.theme_id === metric?.theme_id);
+            return theme?.dimension_id || '';
+          })
+          .filter(Boolean)
+      );
+      return {
+        key: 'dimension' as const,
+        available: dimensionIds.slice(0, 8),
+      };
+    }
+
+    return null;
+  };
+
+  const filterDropReason = getFilterDropReason();
+
   const isAllSelected = filteredValues.length > 0 && selectedIds.size === filteredValues.length;
   const isPartialSelected = selectedIds.size > 0 && selectedIds.size < filteredValues.length;
 
@@ -906,6 +995,72 @@ export default function DataEntry() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="text-xs text-gray-500">
+              {language === 'th'
+                ? `ทั้งหมด ${metricValues.length} รายการ • หลังกรอง ${filteredValues.length} รายการ`
+                : `Total ${metricValues.length} • After filters ${filteredValues.length}`}
+            </div>
+
+            {filterDropReason && (
+              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                {language === 'th' ? (
+                  <>
+                    ไม่พบข้อมูลหลังกรองที่ <b>{filterDropReason.key}</b> — ค่าที่มีในระบบ (ตัวอย่าง):{' '}
+                    <b>
+                      {filterDropReason.available
+                        .map((id) => {
+                          switch (filterDropReason.key) {
+                            case 'company':
+                              return id ? getDisplayName(id, 'company') : id;
+                            case 'site':
+                              return id ? getDisplayName(id, 'site') : id;
+                            case 'period':
+                              return id ? getDisplayName(id, 'period') : id;
+                            case 'theme':
+                              return id ? getDisplayName(id, 'theme') : id;
+                            case 'dimension':
+                              return id ? getDisplayName(id, 'dimension') : id;
+                            case 'status':
+                              return getStatusLabel(id);
+                            default:
+                              return id;
+                          }
+                        })
+                        .join(', ') || '-'}
+                    </b>
+                  </>
+                ) : (
+                  <>
+                    No records after filtering at <b>{filterDropReason.key}</b>. Available values (sample):{' '}
+                    <b>
+                      {filterDropReason.available
+                        .map((id) => {
+                          switch (filterDropReason.key) {
+                            case 'company':
+                              return id ? getDisplayName(id, 'company') : id;
+                            case 'site':
+                              return id ? getDisplayName(id, 'site') : id;
+                            case 'period':
+                              return id ? getDisplayName(id, 'period') : id;
+                            case 'theme':
+                              return id ? getDisplayName(id, 'theme') : id;
+                            case 'dimension':
+                              return id ? getDisplayName(id, 'dimension') : id;
+                            case 'status':
+                              return getStatusLabel(id);
+                            default:
+                              return id;
+                          }
+                        })
+                        .join(', ') || '-'}
+                    </b>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
