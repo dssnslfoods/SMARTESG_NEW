@@ -579,60 +579,28 @@ export default function DataEntry() {
         });
       }
     } else {
-      const { error: insertError } = await supabase.from('metric_value').insert(dataToSave);
-
-      // If unique constraint triggers anyway (race condition), fallback to update existing
-      if (insertError && (insertError as any)?.message?.toLowerCase?.().includes('duplicate key')) {
-        try {
-          const fallbackExisting = await findExistingOnBackend(formData.site_id, formData.period_id, formData.metric_id);
-          if (fallbackExisting) {
-            const dataToUpdate = {
-              value: formData.value,
-              data_source: formData.data_source || null,
-              remark: formData.remark || null,
-              status: formData.status,
-              submitted_by: user.id,
-            };
-
-            const { error: updateError } = await supabase
-              .from('metric_value')
-              .update(dataToUpdate)
-              .eq('value_id', fallbackExisting.value_id);
-
-            if (!updateError) {
-              await logActivity({
-                action: 'UPDATE',
-                entityType: 'metric_value',
-                entityId: fallbackExisting.value_id,
-                beforeData: fallbackExisting,
-                afterData: { ...fallbackExisting, ...dataToUpdate },
-              });
-              toast({
-                title: language === 'th' ? 'สำเร็จ' : 'Success',
-                description: language === 'th' ? 'อัปเดตข้อมูลสำเร็จ' : 'Data updated successfully',
-              });
-              setIsDialogOpen(false);
-              fetchAllData();
-              return;
-            }
-
-            error = updateError;
-          } else {
-            error = insertError;
-          }
-        } catch {
-          error = insertError;
-        }
-      } else {
-        error = insertError;
-      }
+      // Use upsert to handle duplicate key gracefully at database level
+      // This works even when RLS prevents SELECT of the existing record
+      const { data: upsertedData, error: upsertError } = await supabase
+        .from('metric_value')
+        .upsert(dataToSave, { 
+          onConflict: 'metric_id,site_id,period_id',
+          ignoreDuplicates: false 
+        })
+        .select()
+        .maybeSingle();
       
-      if (!insertError) {
+      error = upsertError;
+      
+      if (!upsertError) {
+        // Determine if this was an insert or update based on whether we had existingMatch
+        const wasUpdate = existingMatch || prefilledFromExisting;
         await logActivity({
-          action: 'CREATE',
+          action: wasUpdate ? 'UPDATE' : 'CREATE',
           entityType: 'metric_value',
-          entityId: formData.value_id,
-          afterData: dataToSave,
+          entityId: upsertedData?.value_id || formData.value_id,
+          beforeData: wasUpdate ? existingMatch : undefined,
+          afterData: upsertedData || dataToSave,
         });
       }
     }
