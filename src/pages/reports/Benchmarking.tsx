@@ -272,6 +272,17 @@ export default function Benchmarking() {
         supabase.from("metric_value").select("*"),
       ]);
 
+      // Debug logging for data verification
+      console.log("[Benchmarking] Data fetched:", {
+        companies: companiesData?.length || 0,
+        sites: sitesData?.length || 0,
+        periods: periodsData?.length || 0,
+        dimensions: dimensionsData?.length || 0,
+        themes: themesData?.length || 0,
+        metrics: metricsData?.length || 0,
+        metricValues: valuesData?.length || 0,
+      });
+
       setCompanies(companiesData || []);
       setSites(sitesData || []);
       setPeriods(periodsData || []);
@@ -307,6 +318,7 @@ export default function Benchmarking() {
   });
 
   // Helper: Get dimension score for a site (returns null if no data)
+  // Score is calculated as percentage of records that are "submitted" or "approved" 
   const getDimensionScore = (siteId: string, dimensionName: string): number | null => {
     const dim = dimensions.find((d) => {
       const name = d.dimension_name.toLowerCase();
@@ -328,8 +340,9 @@ export default function Benchmarking() {
 
     if (siteValues.length === 0) return null;
 
-    const submitted = siteValues.filter((v) => v.status === "submitted").length;
-    return Math.round((submitted / siteValues.length) * 100);
+    // Count both "submitted" and "approved" as completed records
+    const completed = siteValues.filter((v) => v.status === "submitted" || v.status === "approved").length;
+    return Math.round((completed / siteValues.length) * 100);
   };
 
   // Calculate site performance data
@@ -418,8 +431,9 @@ export default function Benchmarking() {
           };
         }
         
-        const submitted = periodValues.filter((v) => v.status === "submitted").length;
-        const score = Math.round((submitted / periodValues.length) * 100);
+        // Count both "submitted" and "approved" as completed records
+        const completed = periodValues.filter((v) => v.status === "submitted" || v.status === "approved").length;
+        const score = Math.round((completed / periodValues.length) * 100);
         yValues.push(score);
         
         return {
