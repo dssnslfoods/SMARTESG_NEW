@@ -14,7 +14,7 @@ import UserManagement from "./pages/UserManagement";
 import AuditLog from "./pages/AuditLog";
 import Reports from "./pages/Reports";
 import Environmental from "./pages/reports/Environmental";
-import Benchmarking from "./pages/reports/Benchmarking";
+
 import Governance from "./pages/reports/Governance";
 import Social from "./pages/reports/Social";
 import CompanyManagement from "./pages/master/CompanyManagement";
@@ -142,14 +142,6 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "executive"]}>
                     <Governance />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/reports/benchmarking"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
-                    <Benchmarking />
                   </ProtectedRoute>
                 }
               />

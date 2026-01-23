@@ -20,7 +20,6 @@ import {
   X,
   Settings,
   ChevronDown,
-  GitCompare,
   Scale,
   Heart,
 } from 'lucide-react';
@@ -86,12 +85,6 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       label: language === 'th' ? 'ธรรมาภิบาล' : 'Governance',
       href: '/reports/governance',
       icon: Scale,
-      roles: ['admin', 'executive'],
-    },
-    {
-      label: language === 'th' ? 'เปรียบเทียบ' : 'Benchmarking',
-      href: '/reports/benchmarking',
-      icon: GitCompare,
       roles: ['admin', 'executive'],
     },
   ];
