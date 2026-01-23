@@ -199,7 +199,10 @@ export default function DataEntry() {
         supabase.from('esg_dimension').select('*').order('dimension_name'),
         supabase.from('esg_theme').select('*').order('theme_name'),
         supabase.from('esg_metric').select('*').order('metric_name'),
-        supabase.from('metric_value').select('*').order('created_at', { ascending: false }),
+        // IMPORTANT: PostgREST has a default max of 1000 rows per request.
+        // Ordering by updated_at ensures recently UPDATED records are included in the latest page,
+        // so users can immediately find updated data via filters.
+        supabase.from('metric_value').select('*').order('updated_at', { ascending: false }),
       ]);
 
       setSites(sitesData || []);
