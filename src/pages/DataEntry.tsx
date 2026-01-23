@@ -364,6 +364,64 @@ export default function DataEntry() {
       return;
     }
 
+    // Check if a record with same metric_id, site_id, period_id already exists
+    const existingRecord = metricValues.find(
+      v => v.metric_id === formData.metric_id && 
+           v.site_id === formData.site_id && 
+           v.period_id === formData.period_id &&
+           (!editingValue || v.value_id !== editingValue.value_id)
+    );
+
+    if (existingRecord && !editingValue) {
+      // Record exists - ask user if they want to update it
+      const confirmUpdate = confirm(
+        language === 'th' 
+          ? 'มีข้อมูลสำหรับ Metric, Site และ Period นี้อยู่แล้ว ต้องการอัปเดตข้อมูลเดิมหรือไม่?' 
+          : 'A record for this Metric, Site, and Period already exists. Do you want to update it?'
+      );
+      
+      if (!confirmUpdate) {
+        return;
+      }
+      
+      // Update existing record
+      const dataToUpdate = {
+        value: formData.value,
+        data_source: formData.data_source || null,
+        remark: formData.remark || null,
+        status: formData.status,
+        submitted_by: user.id,
+      };
+
+      const { error: updateError } = await supabase
+        .from('metric_value')
+        .update(dataToUpdate)
+        .eq('value_id', existingRecord.value_id);
+
+      if (updateError) {
+        toast({
+          title: language === 'th' ? 'เกิดข้อผิดพลาด' : 'Error',
+          description: updateError.message,
+          variant: 'destructive',
+        });
+      } else {
+        await logActivity({
+          action: 'UPDATE',
+          entityType: 'metric_value',
+          entityId: existingRecord.value_id,
+          beforeData: existingRecord,
+          afterData: { ...existingRecord, ...dataToUpdate },
+        });
+        toast({
+          title: language === 'th' ? 'สำเร็จ' : 'Success',
+          description: language === 'th' ? 'อัปเดตข้อมูลสำเร็จ' : 'Data updated successfully',
+        });
+        setIsDialogOpen(false);
+        fetchAllData();
+      }
+      return;
+    }
+
     const dataToSave = {
       value_id: formData.value_id,
       site_id: formData.site_id,
@@ -375,7 +433,6 @@ export default function DataEntry() {
       status: formData.status,
       submitted_by: user.id,
     };
-
 
     let error;
     if (editingValue) {
