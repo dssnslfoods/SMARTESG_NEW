@@ -647,6 +647,11 @@ export default function DataEntry() {
 
   // Filter metric values
   const filteredValues = metricValues.filter(v => {
+    // Filter by company: check if site belongs to the selected company
+    if (filterCompany) {
+      const site = sites.find(s => s.site_id === v.site_id);
+      if (site?.company_id !== filterCompany) return false;
+    }
     if (filterSite && v.site_id !== filterSite) return false;
     if (filterPeriod && v.period_id !== filterPeriod) return false;
     if (filterStatus && v.status !== filterStatus) return false;
