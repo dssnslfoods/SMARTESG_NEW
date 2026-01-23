@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3, CheckSquare, Square, X, Leaf, TrendingUp, Clock, Filter } from "lucide-react";
+import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3, CheckSquare, Square, X, Leaf, TrendingUp, Clock, Filter, AlertTriangle, Database } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
@@ -128,6 +128,7 @@ export default function DataEntry() {
   const [dimensions, setDimensions] = useState<EsgDimension[]>([]);
   const [themes, setThemes] = useState<EsgTheme[]>([]);
   const [metrics, setMetrics] = useState<EsgMetric[]>([]);
+  const [totalDbCount, setTotalDbCount] = useState<number>(0); // Actual count in database
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingValue, setEditingValue] = useState<MetricValue | null>(null);
@@ -184,6 +185,41 @@ export default function DataEntry() {
   const fetchAllData = async () => {
     setLoading(true);
     try {
+      // First, get the actual count from database
+      const { count: dbCount } = await supabase
+        .from('metric_value')
+        .select('*', { count: 'exact', head: true });
+      
+      setTotalDbCount(dbCount || 0);
+
+      // Fetch all metric values using pagination to get ALL records
+      const fetchAllMetricValues = async (): Promise<MetricValue[]> => {
+        const PAGE_SIZE = 1000;
+        let allValues: MetricValue[] = [];
+        let from = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('metric_value')
+            .select('*')
+            .order('updated_at', { ascending: false })
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            allValues = [...allValues, ...data];
+            from += PAGE_SIZE;
+            hasMore = data.length === PAGE_SIZE;
+          } else {
+            hasMore = false;
+          }
+        }
+
+        return allValues;
+      };
+
       const [
         { data: sitesData },
         { data: companiesData },
@@ -191,7 +227,7 @@ export default function DataEntry() {
         { data: dimensionsData },
         { data: themesData },
         { data: metricsData },
-        { data: valuesData },
+        valuesData,
       ] = await Promise.all([
         supabase.from('site').select('*').order('site_name'),
         supabase.from('company').select('*').order('company_name'),
@@ -199,10 +235,7 @@ export default function DataEntry() {
         supabase.from('esg_dimension').select('*').order('dimension_name'),
         supabase.from('esg_theme').select('*').order('theme_name'),
         supabase.from('esg_metric').select('*').order('metric_name'),
-        // IMPORTANT: PostgREST has a default max of 1000 rows per request.
-        // Ordering by updated_at ensures recently UPDATED records are included in the latest page,
-        // so users can immediately find updated data via filters.
-        supabase.from('metric_value').select('*').order('updated_at', { ascending: false }),
+        fetchAllMetricValues(),
       ]);
 
       setSites(sitesData || []);
@@ -211,7 +244,9 @@ export default function DataEntry() {
       setDimensions(dimensionsData || []);
       setThemes(themesData || []);
       setMetrics(metricsData || []);
-      setMetricValues(valuesData || []);
+      setMetricValues(valuesData);
+      
+      console.log(`[DataEntry] Loaded ${valuesData.length} metric values (DB total: ${dbCount})`);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -833,8 +868,40 @@ export default function DataEntry() {
         </div>
       </div>
 
+      {/* Database Sync Status Banner */}
+      {totalDbCount > 0 && metricValues.length !== totalDbCount && (
+        <Card className="bg-amber-50/80 backdrop-blur-xl border-amber-200/50 shadow-lg rounded-2xl overflow-hidden">
+          <CardContent className="py-3">
+            <div className="flex items-center gap-3 text-amber-700">
+              <AlertTriangle className="h-5 w-5" />
+              <span className="text-sm">
+                {language === 'th' 
+                  ? `แสดง ${metricValues.length} จาก ${totalDbCount} รายการ (RLS อาจซ่อนบางรายการ)` 
+                  : `Showing ${metricValues.length} of ${totalDbCount} records (RLS may hide some records)`}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Summary Cards - Glass Style */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-400 to-violet-500" />
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2 text-gray-600">
+              <div className="p-1.5 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                <Database className="h-4 w-4 text-purple-600" />
+              </div>
+              {language === 'th' ? 'ข้อมูลใน Database' : 'Database Records'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-gray-800">{totalDbCount}</p>
+            <p className="text-xs text-purple-600 mt-1">{language === 'th' ? 'รายการทั้งหมด' : 'total entries'}</p>
+          </CardContent>
+        </Card>
+
         <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
           <CardHeader className="pb-2">
@@ -842,7 +909,7 @@ export default function DataEntry() {
               <div className="p-1.5 bg-emerald-100 rounded-lg group-hover:bg-emerald-200 transition-colors">
                 <BarChart3 className="h-4 w-4 text-emerald-600" />
               </div>
-              {language === 'th' ? 'ข้อมูลทั้งหมด' : 'Total Records'}
+              {language === 'th' ? 'ข้อมูลที่เห็น' : 'Visible Records'}
             </CardDescription>
           </CardHeader>
           <CardContent>
