@@ -131,6 +131,8 @@ export default function DataEntry() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingValue, setEditingValue] = useState<MetricValue | null>(null);
+  const [existingMatch, setExistingMatch] = useState<MetricValue | null>(null);
+  const [prefilledFromExisting, setPrefilledFromExisting] = useState(false);
   
   // Selection states
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -205,6 +207,8 @@ export default function DataEntry() {
 
   const handleCreate = () => {
     setEditingValue(null);
+    setExistingMatch(null);
+    setPrefilledFromExisting(false);
     setFormCompany('');
     setFormDimension('');
     setFormTheme('');
@@ -236,6 +240,8 @@ export default function DataEntry() {
     const site = sites.find(s => s.site_id === value.site_id);
     
     setEditingValue(value);
+    setExistingMatch(null);
+    setPrefilledFromExisting(false);
     setFormCompany(site?.company_id || '');
     setFormDimension(theme?.dimension_id || '');
     setFormTheme(metric?.theme_id || '');
@@ -251,6 +257,64 @@ export default function DataEntry() {
     });
     setIsDialogOpen(true);
   };
+
+  // Auto-load existing record into the form when user selects Site + Period + Metric
+  // (so users can "search" by selections and see existing values, and avoid duplicate key errors)
+  useEffect(() => {
+    if (!isDialogOpen) return;
+    if (editingValue) return; // explicit edit mode should not be overwritten
+
+    const { site_id, period_id, metric_id } = formData;
+    if (!site_id || !period_id || !metric_id) {
+      // If previously prefilled and user cleared a selector, reset
+      if (existingMatch) {
+        setExistingMatch(null);
+        setPrefilledFromExisting(false);
+        setFormData(prev => ({
+          ...prev,
+          value_id: generateValueId(),
+          value: 0,
+          data_source: '',
+          remark: '',
+          status: 'draft',
+        }));
+      }
+      return;
+    }
+
+    const match = metricValues.find(
+      v => v.site_id === site_id && v.period_id === period_id && v.metric_id === metric_id
+    );
+
+    if (!match) {
+      if (existingMatch) {
+        setExistingMatch(null);
+        setPrefilledFromExisting(false);
+        setFormData(prev => ({
+          ...prev,
+          value_id: generateValueId(),
+          value: 0,
+          data_source: '',
+          remark: '',
+          status: 'draft',
+        }));
+      }
+      return;
+    }
+
+    if (existingMatch?.value_id === match.value_id) return;
+
+    setExistingMatch(match);
+    setPrefilledFromExisting(true);
+    setFormData(prev => ({
+      ...prev,
+      value_id: match.value_id,
+      value: match.value,
+      data_source: match.data_source || '',
+      remark: match.remark || '',
+      status: match.status,
+    }));
+  }, [isDialogOpen, editingValue, formData.site_id, formData.period_id, formData.metric_id, metricValues, existingMatch]);
 
   const handleDelete = async (valueId: string) => {
     if (!confirm(language === 'th' ? 'ยืนยันการลบข้อมูล?' : 'Confirm delete?')) return;
@@ -373,6 +437,45 @@ export default function DataEntry() {
     );
 
     if (existingRecord && !editingValue) {
+      // If we already auto-loaded that record into the form, update without prompting.
+      if (prefilledFromExisting && existingMatch?.value_id === existingRecord.value_id) {
+        const dataToUpdate = {
+          value: formData.value,
+          data_source: formData.data_source || null,
+          remark: formData.remark || null,
+          status: formData.status,
+          submitted_by: user.id,
+        };
+
+        const { error: updateError } = await supabase
+          .from('metric_value')
+          .update(dataToUpdate)
+          .eq('value_id', existingRecord.value_id);
+
+        if (updateError) {
+          toast({
+            title: language === 'th' ? 'เกิดข้อผิดพลาด' : 'Error',
+            description: updateError.message,
+            variant: 'destructive',
+          });
+        } else {
+          await logActivity({
+            action: 'UPDATE',
+            entityType: 'metric_value',
+            entityId: existingRecord.value_id,
+            beforeData: existingRecord,
+            afterData: { ...existingRecord, ...dataToUpdate },
+          });
+          toast({
+            title: language === 'th' ? 'สำเร็จ' : 'Success',
+            description: language === 'th' ? 'อัปเดตข้อมูลสำเร็จ' : 'Data updated successfully',
+          });
+          setIsDialogOpen(false);
+          fetchAllData();
+        }
+        return;
+      }
+
       // Record exists - ask user if they want to update it
       const confirmUpdate = confirm(
         language === 'th' 
@@ -1060,6 +1163,21 @@ export default function DataEntry() {
                 </SelectContent>
               </Select>
             </div>
+
+            {existingMatch && !editingValue && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 rounded-full">
+                    {language === 'th' ? 'พบข้อมูลเดิม' : 'Existing record found'}
+                  </Badge>
+                  <span className="text-sm text-emerald-800">
+                    {language === 'th'
+                      ? 'ระบบดึงค่าที่บันทึกไว้แล้วมาแสดงในฟอร์ม (กดบันทึกเพื่ออัปเดต)'
+                      : 'Loaded saved values into the form (Save to update).'}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
