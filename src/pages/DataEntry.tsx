@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -133,6 +133,21 @@ export default function DataEntry() {
   const [editingValue, setEditingValue] = useState<MetricValue | null>(null);
   const [existingMatch, setExistingMatch] = useState<MetricValue | null>(null);
   const [prefilledFromExisting, setPrefilledFromExisting] = useState(false);
+  const latestLookupKeyRef = useRef<string | null>(null);
+
+  const findExistingOnBackend = async (siteId: string, periodId: string, metricId: string) => {
+    const { data, error } = await supabase
+      .from('metric_value')
+      .select('*')
+      .eq('site_id', siteId)
+      .eq('period_id', periodId)
+      .eq('metric_id', metricId)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data as MetricValue | null;
+  };
   
   // Selection states
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -282,39 +297,48 @@ export default function DataEntry() {
       return;
     }
 
-    const match = metricValues.find(
-      v => v.site_id === site_id && v.period_id === period_id && v.metric_id === metric_id
-    );
+    const lookupKey = `${site_id}::${period_id}::${metric_id}`;
+    latestLookupKeyRef.current = lookupKey;
 
-    if (!match) {
-      if (existingMatch) {
-        setExistingMatch(null);
-        setPrefilledFromExisting(false);
+    (async () => {
+      try {
+        const match = await findExistingOnBackend(site_id, period_id, metric_id);
+        if (latestLookupKeyRef.current !== lookupKey) return;
+
+        if (!match) {
+          if (existingMatch) {
+            setExistingMatch(null);
+            setPrefilledFromExisting(false);
+            setFormData(prev => ({
+              ...prev,
+              value_id: generateValueId(),
+              value: 0,
+              data_source: '',
+              remark: '',
+              status: 'draft',
+            }));
+          }
+          return;
+        }
+
+        if (existingMatch?.value_id === match.value_id) return;
+
+        setExistingMatch(match);
+        setPrefilledFromExisting(true);
         setFormData(prev => ({
           ...prev,
-          value_id: generateValueId(),
-          value: 0,
-          data_source: '',
-          remark: '',
-          status: 'draft',
+          value_id: match.value_id,
+          value: match.value,
+          data_source: match.data_source || '',
+          remark: match.remark || '',
+          status: match.status,
         }));
+      } catch {
+        // If user doesn't have permission to view an existing record, we can't prefill it.
+        // We'll still handle uniqueness at save time.
       }
-      return;
-    }
-
-    if (existingMatch?.value_id === match.value_id) return;
-
-    setExistingMatch(match);
-    setPrefilledFromExisting(true);
-    setFormData(prev => ({
-      ...prev,
-      value_id: match.value_id,
-      value: match.value,
-      data_source: match.data_source || '',
-      remark: match.remark || '',
-      status: match.status,
-    }));
-  }, [isDialogOpen, editingValue, formData.site_id, formData.period_id, formData.metric_id, metricValues, existingMatch]);
+    })();
+  }, [isDialogOpen, editingValue, formData.site_id, formData.period_id, formData.metric_id, existingMatch]);
 
   const handleDelete = async (valueId: string) => {
     if (!confirm(language === 'th' ? 'ยืนยันการลบข้อมูล?' : 'Confirm delete?')) return;
@@ -428,13 +452,13 @@ export default function DataEntry() {
       return;
     }
 
-    // Check if a record with same metric_id, site_id, period_id already exists
-    const existingRecord = metricValues.find(
-      v => v.metric_id === formData.metric_id && 
-           v.site_id === formData.site_id && 
-           v.period_id === formData.period_id &&
-           (!editingValue || v.value_id !== editingValue.value_id)
-    );
+    // Check from backend to avoid stale state and guarantee uniqueness behavior
+    let existingRecord: MetricValue | null = null;
+    try {
+      existingRecord = await findExistingOnBackend(formData.site_id, formData.period_id, formData.metric_id);
+    } catch {
+      existingRecord = null;
+    }
 
     if (existingRecord && !editingValue) {
       // If we already auto-loaded that record into the form, update without prompting.
@@ -556,7 +580,52 @@ export default function DataEntry() {
       }
     } else {
       const { error: insertError } = await supabase.from('metric_value').insert(dataToSave);
-      error = insertError;
+
+      // If unique constraint triggers anyway (race condition), fallback to update existing
+      if (insertError && (insertError as any)?.message?.toLowerCase?.().includes('duplicate key')) {
+        try {
+          const fallbackExisting = await findExistingOnBackend(formData.site_id, formData.period_id, formData.metric_id);
+          if (fallbackExisting) {
+            const dataToUpdate = {
+              value: formData.value,
+              data_source: formData.data_source || null,
+              remark: formData.remark || null,
+              status: formData.status,
+              submitted_by: user.id,
+            };
+
+            const { error: updateError } = await supabase
+              .from('metric_value')
+              .update(dataToUpdate)
+              .eq('value_id', fallbackExisting.value_id);
+
+            if (!updateError) {
+              await logActivity({
+                action: 'UPDATE',
+                entityType: 'metric_value',
+                entityId: fallbackExisting.value_id,
+                beforeData: fallbackExisting,
+                afterData: { ...fallbackExisting, ...dataToUpdate },
+              });
+              toast({
+                title: language === 'th' ? 'สำเร็จ' : 'Success',
+                description: language === 'th' ? 'อัปเดตข้อมูลสำเร็จ' : 'Data updated successfully',
+              });
+              setIsDialogOpen(false);
+              fetchAllData();
+              return;
+            }
+
+            error = updateError;
+          } else {
+            error = insertError;
+          }
+        } catch {
+          error = insertError;
+        }
+      } else {
+        error = insertError;
+      }
       
       if (!insertError) {
         await logActivity({
