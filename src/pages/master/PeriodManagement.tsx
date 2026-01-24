@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Pencil, Search, Trash2 } from 'lucide-react';
+import { ExportExcelButton } from '@/components/ExportExcelButton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -274,12 +275,28 @@ export default function PeriodManagement() {
               if (!open) resetForm();
             }}
           >
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                {t('add')}
-              </Button>
-            </DialogTrigger>
+            <div className="flex gap-2">
+              <ExportExcelButton
+                data={filteredPeriods as unknown as Record<string, unknown>[]}
+                filenamePrefix="periods_masterdata"
+                sourcePage="Period Management"
+                appliedFilters={{ search: searchTerm || 'None' }}
+                columnOrder={['period_id', 'year', 'month', 'month_name']}
+                columnLabels={{
+                  period_id: language === 'th' ? 'รหัส' : 'Period ID',
+                  year: language === 'th' ? 'ปี' : 'Year',
+                  month: language === 'th' ? 'เดือน' : 'Month',
+                  month_name: language === 'th' ? 'ชื่อเดือน' : 'Month Name',
+                }}
+                sheetName="Periods"
+              />
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  {t('add')}
+                </Button>
+              </DialogTrigger>
+            </div>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>

@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Pencil, Search, Trash2 } from 'lucide-react';
+import { ExportExcelButton } from '@/components/ExportExcelButton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -257,12 +258,27 @@ export default function CompanyManagement() {
               if (!open) resetForm();
             }}
           >
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                {t('add')}
-              </Button>
-            </DialogTrigger>
+            <div className="flex gap-2">
+              <ExportExcelButton
+                data={filteredCompanies as unknown as Record<string, unknown>[]}
+                filenamePrefix="companies_masterdata"
+                sourcePage="Company Management"
+                appliedFilters={{ search: searchTerm || 'None' }}
+                columnOrder={['company_name', 'industry', 'country']}
+                columnLabels={{
+                  company_name: language === 'th' ? 'ชื่อบริษัท' : 'Company Name',
+                  industry: language === 'th' ? 'อุตสาหกรรม' : 'Industry',
+                  country: language === 'th' ? 'ประเทศ' : 'Country',
+                }}
+                sheetName="Companies"
+              />
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  {t('add')}
+                </Button>
+              </DialogTrigger>
+            </div>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>
