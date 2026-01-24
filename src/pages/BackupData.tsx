@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -109,25 +108,23 @@ export default function BackupData() {
   // Additional access control - only admin
   if (role !== 'admin') {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Card className="max-w-md">
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center gap-4">
-                <Shield className="h-12 w-12 text-destructive" />
-                <h2 className="text-xl font-semibold">
-                  {language === 'th' ? 'ไม่มีสิทธิ์เข้าถึง' : 'Access Denied'}
-                </h2>
-                <p className="text-muted-foreground">
-                  {language === 'th' 
-                    ? 'เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถเข้าถึงหน้านี้ได้' 
-                    : 'Only administrators can access this page'}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </MainLayout>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center text-center gap-4">
+              <Shield className="h-12 w-12 text-destructive" />
+              <h2 className="text-xl font-semibold">
+                {language === 'th' ? 'ไม่มีสิทธิ์เข้าถึง' : 'Access Denied'}
+              </h2>
+              <p className="text-muted-foreground">
+                {language === 'th' 
+                  ? 'เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถเข้าถึงหน้านี้ได้' 
+                  : 'Only administrators can access this page'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -479,8 +476,7 @@ export default function BackupData() {
   };
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -726,6 +722,5 @@ export default function BackupData() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
   );
 }
