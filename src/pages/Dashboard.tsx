@@ -55,7 +55,11 @@ interface DashboardStats {
   totalCompanies: number;
   totalSites: number;
   totalMetrics: number;
-  totalSubmitted: number;
+  // KPI counts matching Data Entry page calculation
+  totalDbRecords: number;      // Total metric_value in database (before RLS)
+  visibleRecords: number;      // Records visible after RLS
+  draftCount: number;          // status === 'draft' from visible records
+  submittedCount: number;      // status === 'submitted' from visible records
   myDrafts: number;
   mySubmitted: number;
 }
@@ -75,7 +79,10 @@ export default function Dashboard() {
     totalCompanies: 0,
     totalSites: 0,
     totalMetrics: 0,
-    totalSubmitted: 0,
+    totalDbRecords: 0,
+    visibleRecords: 0,
+    draftCount: 0,
+    submittedCount: 0,
     myDrafts: 0,
     mySubmitted: 0,
   });
@@ -105,29 +112,67 @@ export default function Dashboard() {
 
   const fetchStats = async () => {
     try {
+      // Fetch all metric values using pagination to get ALL visible records (same as Data Entry)
+      const fetchAllMetricValues = async () => {
+        const PAGE_SIZE = 1000;
+        let allValues: { value_id: string; status: string; submitted_by: string | null }[] = [];
+        let from = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('metric_value')
+            .select('value_id, status, submitted_by')
+            .order('created_at', { ascending: false })
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            allValues = [...allValues, ...data];
+            from += PAGE_SIZE;
+            hasMore = data.length === PAGE_SIZE;
+          } else {
+            hasMore = false;
+          }
+        }
+
+        return allValues;
+      };
+
       const [
         { count: companiesCount },
         { count: sitesCount },
         { count: metricsCount },
-        { count: submittedTotalCount },
-        { count: draftsCount },
-        { count: submittedCount },
+        { count: totalDbCount },
+        metricValues,
       ] = await Promise.all([
         supabase.from('company').select('*', { count: 'exact', head: true }),
         supabase.from('site').select('*', { count: 'exact', head: true }),
         supabase.from('esg_metric').select('*', { count: 'exact', head: true }),
-        supabase.from('metric_value').select('*', { count: 'exact', head: true }).eq('status', 'submitted'),
-        supabase.from('metric_value').select('*', { count: 'exact', head: true }).eq('status', 'draft').eq('submitted_by', user?.id || ''),
-        supabase.from('metric_value').select('*', { count: 'exact', head: true }).eq('submitted_by', user?.id || ''),
+        supabase.from('metric_value').select('*', { count: 'exact', head: true }),
+        fetchAllMetricValues(),
       ]);
+
+      // Calculate counts from visible records (same logic as Data Entry)
+      const visibleRecords = metricValues.length;
+      const draftCount = metricValues.filter(v => v.status === 'draft').length;
+      const submittedCount = metricValues.filter(v => v.status === 'submitted').length;
+      
+      // Staff-specific counts (my drafts, my submissions)
+      const myDrafts = metricValues.filter(v => v.status === 'draft' && v.submitted_by === user?.id).length;
+      const mySubmitted = metricValues.filter(v => v.submitted_by === user?.id).length;
 
       setStats({
         totalCompanies: companiesCount || 0,
         totalSites: sitesCount || 0,
         totalMetrics: metricsCount || 0,
-        totalSubmitted: submittedTotalCount || 0,
-        myDrafts: draftsCount || 0,
-        mySubmitted: submittedCount || 0,
+        totalDbRecords: totalDbCount || 0,
+        visibleRecords,
+        draftCount,
+        submittedCount,
+        myDrafts,
+        mySubmitted,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);

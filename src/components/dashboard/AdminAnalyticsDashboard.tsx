@@ -105,12 +105,35 @@ export default function AdminAnalyticsDashboard() {
 
   const fetchRawData = async () => {
     try {
-      const { data: metricValues, error } = await supabase
-        .from('metric_value')
-        .select('value_id, submitted_by, created_at, status')
-        .order('created_at', { ascending: false });
+      // Use pagination to fetch ALL metric values (same as Data Entry page)
+      const fetchAllMetricValues = async () => {
+        const PAGE_SIZE = 1000;
+        let allValues: MetricValueRecord[] = [];
+        let from = 0;
+        let hasMore = true;
 
-      if (error) throw error;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('metric_value')
+            .select('value_id, submitted_by, created_at, status')
+            .order('created_at', { ascending: false })
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            allValues = [...allValues, ...data];
+            from += PAGE_SIZE;
+            hasMore = data.length === PAGE_SIZE;
+          } else {
+            hasMore = false;
+          }
+        }
+
+        return allValues;
+      };
+
+      const metricValues = await fetchAllMetricValues();
 
       if (metricValues && metricValues.length > 0) {
         setAllMetricValues(metricValues);
@@ -172,10 +195,12 @@ export default function AdminAnalyticsDashboard() {
     return filtered;
   }, [allMetricValues, selectedUser, dateFrom, dateTo, selectedHourRange]);
 
-  // Calculate analytics from filtered data
+  // Calculate analytics from filtered data (matches Data Entry page calculation)
   const analytics = useMemo(() => {
     const totalEntries = filteredData.length;
-    const totalSubmitted = filteredData.filter(mv => mv.status === 'submitted' || mv.status === 'approved').length;
+    // Match Data Entry: status === 'submitted' only
+    const totalSubmitted = filteredData.filter(mv => mv.status === 'submitted').length;
+    // Match Data Entry: status === 'draft' only
     const totalDrafted = filteredData.filter(mv => mv.status === 'draft').length;
 
     // User stats
