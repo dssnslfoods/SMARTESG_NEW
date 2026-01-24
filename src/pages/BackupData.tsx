@@ -65,7 +65,7 @@ interface MetricValue {
   remark: string | null;
 }
 
-// Human-readable export row (exactly 10 columns)
+// Human-readable export row (11 columns including status)
 interface HumanReadableRow {
   company: string;
   site: string;
@@ -75,6 +75,7 @@ interface HumanReadableRow {
   metric: string;
   value: number;
   unit: string;
+  status: string;
   data_source: string;
   remark: string;
 }
@@ -103,6 +104,7 @@ export default function BackupData() {
   const [filterDimension, setFilterDimension] = useState<string>('all');
   const [filterTheme, setFilterTheme] = useState<string>('all');
   const [filterMetric, setFilterMetric] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
 
   // Additional access control - only admin
   if (role !== 'admin') {
@@ -255,6 +257,11 @@ export default function BackupData() {
         query = query.eq('period_id', endPeriod);
       }
 
+      // Apply status filter
+      if (filterStatus !== 'all') {
+        query = query.eq('status', filterStatus);
+      }
+
       const { data, error } = await query;
 
       if (error) {
@@ -290,6 +297,9 @@ export default function BackupData() {
       const dimensionName = themeInfo ? dimensionMap.get(themeInfo.dimension_id) : null;
       const companyName = siteInfo ? companyMap.get(siteInfo.company_id) : null;
 
+      // Map status to readable label
+      const statusLabel = row.status === 'draft' ? 'Draft' : row.status === 'submitted' ? 'Submitted' : row.status;
+
       return {
         company: companyName || '',
         site: siteInfo?.name || '',
@@ -299,6 +309,7 @@ export default function BackupData() {
         metric: metricInfo?.name || '',
         value: row.value,
         unit: metricInfo?.unit || '',
+        status: statusLabel,
         data_source: row.data_source || '',
         remark: row.remark || '',
       };
@@ -376,6 +387,12 @@ export default function BackupData() {
         appliedFilters['Metric'] = 'All';
       }
 
+      if (filterStatus !== 'all') {
+        appliedFilters['Status'] = filterStatus === 'draft' ? 'Draft' : filterStatus === 'submitted' ? 'Submitted' : filterStatus;
+      } else {
+        appliedFilters['Status'] = 'All';
+      }
+
       const metadata: ExportMetadata = {
         exported_at: new Date().toISOString(),
         exported_by_id: user?.id || null,
@@ -388,7 +405,7 @@ export default function BackupData() {
 
       const filename = generateExportFilename('backup_kpi');
 
-      // Exactly 10 columns in specified order
+      // 11 columns in specified order (including status)
       const columnOrder = [
         'company',
         'site',
@@ -398,6 +415,7 @@ export default function BackupData() {
         'metric',
         'value',
         'unit',
+        'status',
         'data_source',
         'remark',
       ];
@@ -411,6 +429,7 @@ export default function BackupData() {
         metric: 'Metric',
         value: 'Value',
         unit: 'Unit',
+        status: 'Status',
         data_source: 'Data Source',
         remark: 'Remark',
       };
@@ -573,8 +592,8 @@ export default function BackupData() {
               </div>
             </div>
 
-            {/* Filters - Row 3: Dimension, Theme, Metric */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Filters - Row 3: Dimension, Theme, Metric, Status */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>{language === 'th' ? 'มิติ (Dimension)' : 'Dimension'}</Label>
                 <Select value={filterDimension} onValueChange={handleDimensionChange}>
@@ -631,6 +650,26 @@ export default function BackupData() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label>{language === 'th' ? 'สถานะ' : 'Status'}</Label>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={language === 'th' ? 'เลือกสถานะ' : 'Select status'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      {language === 'th' ? 'ทั้งหมด' : 'All'}
+                    </SelectItem>
+                    <SelectItem value="draft">
+                      {language === 'th' ? 'ฉบับร่าง' : 'Draft'}
+                    </SelectItem>
+                    <SelectItem value="submitted">
+                      {language === 'th' ? 'ส่งแล้ว' : 'Submitted'}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Export Button */}
@@ -668,8 +707,8 @@ export default function BackupData() {
                   </li>
                   <li>
                     {language === 'th'
-                      ? 'ไฟล์ Excel มี 10 คอลัมน์: Company, Site, Period, Dimension, Theme, Metric, Value, Unit, Data Source, Remark'
-                      : 'Excel contains 10 columns: Company, Site, Period, Dimension, Theme, Metric, Value, Unit, Data Source, Remark'}
+                      ? 'ไฟล์ Excel มี 11 คอลัมน์: Company, Site, Period, Dimension, Theme, Metric, Value, Unit, Status, Data Source, Remark'
+                      : 'Excel contains 11 columns: Company, Site, Period, Dimension, Theme, Metric, Value, Unit, Status, Data Source, Remark'}
                   </li>
                   <li>
                     {language === 'th'
