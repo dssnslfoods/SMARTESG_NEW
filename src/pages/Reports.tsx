@@ -135,6 +135,7 @@ export default function Reports() {
   const [metrics, setMetrics] = useState<EsgMetric[]>([]);
   const [metricValues, setMetricValues] = useState<MetricValue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   // Filters
   const [filterCompany, setFilterCompany] = useState<string>("");
@@ -223,6 +224,7 @@ export default function Reports() {
       setThemes(themesData || []);
       setMetrics(metricsData || []);
       setMetricValues(valuesData);
+      setLastRefresh(new Date());
       
       console.log(`[Reports] Loaded ${valuesData.length} metric values`);
     } catch (error) {
@@ -520,8 +522,23 @@ export default function Reports() {
             {language === "th" 
               ? "ภาพรวมประสิทธิภาพความยั่งยืนขององค์กร" 
               : "Enterprise Sustainability Performance Overview"}
-        </p>
+          </p>
         </div>
+        
+        {/* Last Refresh Indicator */}
+        {lastRefresh && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border/50">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">
+              {language === "th" ? "อัปเดตล่าสุด: " : "Last updated: "}
+              {lastRefresh.toLocaleTimeString(language === "th" ? "th-TH" : "en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
