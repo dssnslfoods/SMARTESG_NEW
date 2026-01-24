@@ -13,8 +13,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Loader2, Database, Shield, Calendar } from 'lucide-react';
+import { Download, Loader2, Database, Shield, Calendar, Upload } from 'lucide-react';
 import { exportToExcel, generateExportFilename, ExportMetadata, AdditionalSheet } from '@/lib/excelExport';
+import { ImportExcelDialog } from '@/components/import/ImportExcelDialog';
 
 // Lookup types for human-readable mapping
 interface Company {
@@ -104,7 +105,7 @@ export default function BackupData() {
   const [filterTheme, setFilterTheme] = useState<string>('all');
   const [filterMetric, setFilterMetric] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   // Additional access control - only admin
   if (role !== 'admin') {
     return (
@@ -550,6 +551,16 @@ export default function BackupData() {
     setFilterMetric('all');
   };
 
+  // Lookup data for import dialog
+  const lookupData = {
+    companies,
+    sites,
+    periods,
+    dimensions,
+    themes,
+    metrics,
+  };
+
   return (
     <div className="space-y-6">
         {/* Header */}
@@ -561,10 +572,19 @@ export default function BackupData() {
             </h1>
             <p className="text-muted-foreground">
               {language === 'th'
-                ? 'ส่งออกข้อมูล KPI ทั้งหมดเป็นไฟล์ Excel แบบอ่านได้ง่าย (Human-Readable)'
-                : 'Export all KPI data to human-readable Excel file'}
+                ? 'ส่งออกและนำเข้าข้อมูล KPI เป็นไฟล์ Excel'
+                : 'Export and Import KPI data as Excel file'}
             </p>
           </div>
+          <Button 
+            variant="outline" 
+            className="gap-2"
+            onClick={() => setImportDialogOpen(true)}
+            disabled={loading}
+          >
+            <Upload className="h-4 w-4" />
+            {language === 'th' ? 'Import Excel' : 'Import Excel'}
+          </Button>
         </div>
 
         {/* Transaction Export Card */}
@@ -801,6 +821,14 @@ export default function BackupData() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Import Dialog */}
+        <ImportExcelDialog
+          open={importDialogOpen}
+          onOpenChange={setImportDialogOpen}
+          lookupData={lookupData}
+          onImportComplete={fetchLookupData}
+        />
       </div>
   );
 }
