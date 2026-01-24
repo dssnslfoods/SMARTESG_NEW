@@ -170,6 +170,34 @@ export default function Reports() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // Fetch all metric values using pagination to get ALL records (same as DataEntry)
+      const fetchAllMetricValues = async (): Promise<MetricValue[]> => {
+        const PAGE_SIZE = 1000;
+        let allValues: MetricValue[] = [];
+        let from = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('metric_value')
+            .select('*')
+            .order('updated_at', { ascending: false })
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            allValues = [...allValues, ...data];
+            from += PAGE_SIZE;
+            hasMore = data.length === PAGE_SIZE;
+          } else {
+            hasMore = false;
+          }
+        }
+
+        return allValues;
+      };
+
       const [
         { data: companiesData },
         { data: sitesData },
@@ -177,7 +205,7 @@ export default function Reports() {
         { data: dimensionsData },
         { data: themesData },
         { data: metricsData },
-        { data: valuesData },
+        valuesData,
       ] = await Promise.all([
         supabase.from("company").select("*").order("company_name"),
         supabase.from("site").select("*").order("site_name"),
@@ -185,7 +213,7 @@ export default function Reports() {
         supabase.from("esg_dimension").select("*").order("dimension_name"),
         supabase.from("esg_theme").select("*").order("theme_name"),
         supabase.from("esg_metric").select("*").order("metric_name"),
-        supabase.from("metric_value").select("*"),
+        fetchAllMetricValues(),
       ]);
 
       setCompanies(companiesData || []);
@@ -194,7 +222,9 @@ export default function Reports() {
       setDimensions(dimensionsData || []);
       setThemes(themesData || []);
       setMetrics(metricsData || []);
-      setMetricValues(valuesData || []);
+      setMetricValues(valuesData);
+      
+      console.log(`[Reports] Loaded ${valuesData.length} metric values`);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
