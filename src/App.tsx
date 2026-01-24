@@ -24,6 +24,7 @@ import DimensionManagement from "./pages/master/DimensionManagement";
 import ThemeManagement from "./pages/master/ThemeManagement";
 import MetricManagement from "./pages/master/MetricManagement";
 import DataEntry from "./pages/DataEntry";
+import BackupData from "./pages/BackupData";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -150,6 +151,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AuditLog />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/backup-data"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <BackupData />
                   </ProtectedRoute>
                 }
               />

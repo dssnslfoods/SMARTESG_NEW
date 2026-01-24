@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Pencil, Search, Trash2 } from 'lucide-react';
+import { ExportExcelButton } from '@/components/ExportExcelButton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -272,12 +273,33 @@ export default function MetricManagement() {
               if (!open) resetForm();
             }}
           >
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                {t('add')}
-              </Button>
-            </DialogTrigger>
+            <div className="flex gap-2">
+              <ExportExcelButton
+                data={filteredMetrics.map(m => ({
+                  ...m,
+                  theme_name: themes.find(t => t.theme_id === m.theme_id)?.theme_name || '-'
+                })) as unknown as Record<string, unknown>[]}
+                filenamePrefix="metrics_masterdata"
+                sourcePage="Metric Management"
+                appliedFilters={{ 
+                  search: searchTerm || 'None',
+                  theme: filterTheme === 'all' ? 'All' : (themes.find(t => t.theme_id === filterTheme)?.theme_name || filterTheme)
+                }}
+                columnOrder={['metric_name', 'theme_name', 'unit']}
+                columnLabels={{
+                  metric_name: language === 'th' ? 'ชื่อตัวชี้วัด' : 'Metric Name',
+                  theme_name: language === 'th' ? 'หัวข้อ' : 'Theme',
+                  unit: language === 'th' ? 'หน่วย' : 'Unit',
+                }}
+                sheetName="Metrics"
+              />
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  {t('add')}
+                </Button>
+              </DialogTrigger>
+            </div>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>

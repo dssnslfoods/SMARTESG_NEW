@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Pencil, Search, Trash2 } from 'lucide-react';
+import { ExportExcelButton } from '@/components/ExportExcelButton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -268,12 +269,32 @@ export default function ThemeManagement() {
               if (!open) resetForm();
             }}
           >
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                {t('add')}
-              </Button>
-            </DialogTrigger>
+            <div className="flex gap-2">
+              <ExportExcelButton
+                data={filteredThemes.map(t => ({
+                  ...t,
+                  dimension_name: dimensions.find(d => d.dimension_id === t.dimension_id)?.dimension_name || '-'
+                })) as unknown as Record<string, unknown>[]}
+                filenamePrefix="themes_masterdata"
+                sourcePage="Theme Management"
+                appliedFilters={{ 
+                  search: searchTerm || 'None',
+                  dimension: filterDimension === 'all' ? 'All' : (dimensions.find(d => d.dimension_id === filterDimension)?.dimension_name || filterDimension)
+                }}
+                columnOrder={['theme_name', 'dimension_name']}
+                columnLabels={{
+                  theme_name: language === 'th' ? 'ชื่อหัวข้อ' : 'Theme Name',
+                  dimension_name: language === 'th' ? 'มิติ' : 'Dimension',
+                }}
+                sheetName="Themes"
+              />
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  {t('add')}
+                </Button>
+              </DialogTrigger>
+            </div>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>

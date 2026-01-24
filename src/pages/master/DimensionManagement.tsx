@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Pencil, Search, Trash2 } from 'lucide-react';
+import { ExportExcelButton } from '@/components/ExportExcelButton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -247,12 +248,25 @@ export default function DimensionManagement() {
               if (!open) resetForm();
             }}
           >
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                {t('add')}
-              </Button>
-            </DialogTrigger>
+            <div className="flex gap-2">
+              <ExportExcelButton
+                data={filteredDimensions as unknown as Record<string, unknown>[]}
+                filenamePrefix="dimensions_masterdata"
+                sourcePage="Dimension Management"
+                appliedFilters={{ search: searchTerm || 'None' }}
+                columnOrder={['dimension_name']}
+                columnLabels={{
+                  dimension_name: language === 'th' ? 'ชื่อมิติ' : 'Dimension Name',
+                }}
+                sheetName="Dimensions"
+              />
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  {t('add')}
+                </Button>
+              </DialogTrigger>
+            </div>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>

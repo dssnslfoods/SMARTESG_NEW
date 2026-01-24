@@ -10,6 +10,7 @@ import {
   Users,
   History,
   LogOut,
+  HardDrive,
   Building2,
   MapPin,
   Calendar,
@@ -110,6 +111,12 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       href: '/audit-log',
       icon: History,
       roles: ['admin', 'guest'],
+    },
+    {
+      label: language === 'th' ? 'สำรองข้อมูล' : 'Backup Data',
+      href: '/backup-data',
+      icon: HardDrive,
+      roles: ['admin'],
     },
   ];
 
