@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Download, Loader2, Database, Shield, Calendar } from 'lucide-react';
-import { exportToExcel, generateExportFilename, ExportMetadata } from '@/lib/excelExport';
+import { exportToExcel, generateExportFilename, ExportMetadata, AdditionalSheet } from '@/lib/excelExport';
 
 // Lookup types for human-readable mapping
 interface Company {
@@ -431,6 +431,80 @@ export default function BackupData() {
         remark: 'Remark',
       };
 
+      // Prepare master data sheets
+      const additionalSheets: AdditionalSheet[] = [
+        {
+          sheetName: 'Companies',
+          data: companies.map(c => ({
+            company_id: c.company_id,
+            company_name: c.company_name,
+          })),
+          columnOrder: ['company_id', 'company_name'],
+          columnLabels: { company_id: 'Company ID', company_name: 'Company Name' },
+        },
+        {
+          sheetName: 'Sites',
+          data: sites.map(s => {
+            const companyName = companies.find(c => c.company_id === s.company_id)?.company_name || '';
+            return {
+              site_id: s.site_id,
+              site_name: s.site_name,
+              company_name: companyName,
+            };
+          }),
+          columnOrder: ['site_id', 'site_name', 'company_name'],
+          columnLabels: { site_id: 'Site ID', site_name: 'Site Name', company_name: 'Company' },
+        },
+        {
+          sheetName: 'Periods',
+          data: periods.map(p => ({
+            period_id: p.period_id,
+            year: p.year,
+            month: p.month,
+            month_name: p.month_name,
+          })),
+          columnOrder: ['period_id', 'year', 'month', 'month_name'],
+          columnLabels: { period_id: 'Period ID', year: 'Year', month: 'Month', month_name: 'Month Name' },
+        },
+        {
+          sheetName: 'Dimensions',
+          data: dimensions.map(d => ({
+            dimension_id: d.dimension_id,
+            dimension_name: d.dimension_name,
+          })),
+          columnOrder: ['dimension_id', 'dimension_name'],
+          columnLabels: { dimension_id: 'Dimension ID', dimension_name: 'Dimension Name' },
+        },
+        {
+          sheetName: 'Themes',
+          data: themes.map(t => {
+            const dimensionName = dimensions.find(d => d.dimension_id === t.dimension_id)?.dimension_name || '';
+            return {
+              theme_id: t.theme_id,
+              theme_name: t.theme_name,
+              dimension_name: dimensionName,
+            };
+          }),
+          columnOrder: ['theme_id', 'theme_name', 'dimension_name'],
+          columnLabels: { theme_id: 'Theme ID', theme_name: 'Theme Name', dimension_name: 'Dimension' },
+        },
+        {
+          sheetName: 'Metrics',
+          data: metrics.map(m => {
+            const themeInfo = themes.find(t => t.theme_id === m.theme_id);
+            const themeName = themeInfo?.theme_name || '';
+            return {
+              metric_id: m.metric_id,
+              metric_name: m.metric_name,
+              theme_name: themeName,
+              unit: m.unit || '',
+            };
+          }),
+          columnOrder: ['metric_id', 'metric_name', 'theme_name', 'unit'],
+          columnLabels: { metric_id: 'Metric ID', metric_name: 'Metric Name', theme_name: 'Theme', unit: 'Unit' },
+        },
+      ];
+
       exportToExcel({
         data: humanReadableData as unknown as Record<string, unknown>[],
         filename,
@@ -438,6 +512,7 @@ export default function BackupData() {
         metadata,
         columnOrder,
         columnLabels,
+        additionalSheets,
       });
 
       toast({
@@ -703,8 +778,13 @@ export default function BackupData() {
                   </li>
                   <li>
                     {language === 'th'
-                      ? 'ไฟล์ Excel มี 11 คอลัมน์: Company, Site, Period, Dimension, Theme, Metric, Value, Unit, Status, Data Source, Remark'
-                      : 'Excel contains 11 columns: Company, Site, Period, Dimension, Theme, Metric, Value, Unit, Status, Data Source, Remark'}
+                      ? 'ไฟล์ Excel มีหลาย Worksheet: KPI Data (ข้อมูลหลัก), Companies, Sites, Periods, Dimensions, Themes, Metrics, และ Metadata'
+                      : 'Excel contains multiple worksheets: KPI Data (main), Companies, Sites, Periods, Dimensions, Themes, Metrics, and Metadata'}
+                  </li>
+                  <li>
+                    {language === 'th'
+                      ? 'Master Data ทั้งหมดจะถูกรวมอยู่ในไฟล์เดียวกันเพื่อการสำรองข้อมูลที่สมบูรณ์'
+                      : 'All Master Data is included in the same file for complete backup'}
                   </li>
                   <li>
                     {language === 'th'

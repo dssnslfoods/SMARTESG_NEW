@@ -19,6 +19,18 @@ interface ExportOptions {
   columnLabels?: Record<string, string>;
 }
 
+// Additional sheet configuration for multi-sheet export
+export interface AdditionalSheet {
+  sheetName: string;
+  data: Record<string, unknown>[];
+  columnOrder?: string[];
+  columnLabels?: Record<string, string>;
+}
+
+interface MultiSheetExportOptions extends ExportOptions {
+  additionalSheets?: AdditionalSheet[];
+}
+
 /**
  * Generates a formatted filename with timestamp
  * Format: <prefix>_<YYYY-MM-DD>_<HHmm>.xlsx
@@ -31,26 +43,15 @@ export function generateExportFilename(prefix: string): string {
 }
 
 /**
- * Exports data to an Excel file with optional metadata sheet
- * This is a READ-ONLY operation - no database writes
+ * Creates a worksheet from data with optional column ordering and labels
  */
-export function exportToExcel({
-  data,
-  filename,
-  sheetName = 'Data',
-  metadata,
-  columnOrder,
-  columnLabels,
-}: ExportOptions): void {
-  if (!data || data.length === 0) {
-    throw new Error('No data to export');
-  }
-
-  // Create workbook
-  const workbook = XLSX.utils.book_new();
-
-  // Prepare data with custom column order and labels if provided
+function createWorksheet(
+  data: Record<string, unknown>[],
+  columnOrder?: string[],
+  columnLabels?: Record<string, string>
+): XLSX.WorkSheet {
   let exportData = data;
+  
   if (columnOrder) {
     exportData = data.map((row) => {
       const orderedRow: Record<string, unknown> = {};
@@ -71,8 +72,7 @@ export function exportToExcel({
     });
   }
 
-  // Create data sheet
-  const dataSheet = XLSX.utils.json_to_sheet(exportData);
+  const sheet = XLSX.utils.json_to_sheet(exportData);
   
   // Auto-size columns
   const maxWidths: number[] = [];
@@ -82,15 +82,54 @@ export function exportToExcel({
       maxWidths[idx] = Math.max(maxWidths[idx] || 10, len, 10);
     });
   });
-  // Include header widths
+  
   if (exportData.length > 0) {
     Object.keys(exportData[0]).forEach((key, idx) => {
       maxWidths[idx] = Math.max(maxWidths[idx] || 10, key.length);
     });
   }
-  dataSheet['!cols'] = maxWidths.map((w) => ({ wch: Math.min(w + 2, 50) }));
+  sheet['!cols'] = maxWidths.map((w) => ({ wch: Math.min(w + 2, 50) }));
+  
+  return sheet;
+}
 
+/**
+ * Exports data to an Excel file with optional metadata sheet and additional sheets
+ * This is a READ-ONLY operation - no database writes
+ */
+export function exportToExcel({
+  data,
+  filename,
+  sheetName = 'Data',
+  metadata,
+  columnOrder,
+  columnLabels,
+  additionalSheets,
+}: MultiSheetExportOptions): void {
+  if (!data || data.length === 0) {
+    throw new Error('No data to export');
+  }
+
+  // Create workbook
+  const workbook = XLSX.utils.book_new();
+
+  // Create main data sheet
+  const dataSheet = createWorksheet(data, columnOrder, columnLabels);
   XLSX.utils.book_append_sheet(workbook, dataSheet, sheetName);
+
+  // Add additional sheets (master data)
+  if (additionalSheets && additionalSheets.length > 0) {
+    additionalSheets.forEach((sheet) => {
+      if (sheet.data && sheet.data.length > 0) {
+        const additionalSheet = createWorksheet(
+          sheet.data,
+          sheet.columnOrder,
+          sheet.columnLabels
+        );
+        XLSX.utils.book_append_sheet(workbook, additionalSheet, sheet.sheetName);
+      }
+    });
+  }
 
   // Create metadata sheet if provided
   if (metadata) {
