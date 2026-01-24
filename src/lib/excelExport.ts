@@ -7,6 +7,7 @@ export interface ExportMetadata {
   source_page: string;
   applied_filters: Record<string, string>;
   total_rows: number;
+  note?: string;
 }
 
 interface ExportOptions {
@@ -93,15 +94,21 @@ export function exportToExcel({
 
   // Create metadata sheet if provided
   if (metadata) {
-    const metadataRows = [
+    const metadataRows: { Field: string; Value: string | number }[] = [
       { Field: 'Exported At (ISO)', Value: metadata.exported_at },
       { Field: 'Exported By (User ID)', Value: metadata.exported_by_id || 'N/A' },
       { Field: 'Exported By (Email)', Value: metadata.exported_by_email || 'N/A' },
       { Field: 'Source Page', Value: metadata.source_page },
       { Field: 'Total Rows', Value: metadata.total_rows },
-      { Field: '---', Value: '---' },
-      { Field: 'Applied Filters', Value: '' },
     ];
+
+    // Add note if provided
+    if (metadata.note) {
+      metadataRows.push({ Field: 'Note', Value: metadata.note });
+    }
+
+    metadataRows.push({ Field: '---', Value: '---' });
+    metadataRows.push({ Field: 'Applied Filters', Value: '' });
 
     // Add filter details
     Object.entries(metadata.applied_filters).forEach(([key, value]) => {
@@ -109,7 +116,7 @@ export function exportToExcel({
     });
 
     const metadataSheet = XLSX.utils.json_to_sheet(metadataRows);
-    metadataSheet['!cols'] = [{ wch: 25 }, { wch: 50 }];
+    metadataSheet['!cols'] = [{ wch: 25 }, { wch: 60 }];
     XLSX.utils.book_append_sheet(workbook, metadataSheet, 'Metadata');
   }
 
