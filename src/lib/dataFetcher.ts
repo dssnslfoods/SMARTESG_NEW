@@ -56,19 +56,17 @@ interface MetricValueFull {
 
 /**
  * Fetch total count efficiently
- * Note: Supabase with `head: true` can be limited by default row limit
- * We fetch a minimal field with limit 0 to get just the count from Content-Range header
+ * Uses count: 'exact' with limit(1) to get accurate count without loading all data
  */
 export async function fetchTotalCount(): Promise<number> {
-  // Using range(0, 0) forces Supabase to return Content-Range header with exact count
-  // without returning any actual rows - this bypasses the 1000 row limit issue
+  // Using limit(1) with count: 'exact' returns the true total count
+  // The count is calculated from Content-Range header which shows full table count
   const { count, error } = await supabase
     .from('metric_value')
     .select('value_id', { count: 'exact' })
-    .range(0, 0);
+    .limit(1);
   
   if (error) throw error;
-  // The count from exact mode gives us the true total, not limited by pagination
   return count || 0;
 }
 
