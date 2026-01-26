@@ -50,9 +50,10 @@ import {
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { LoadingOverlay } from "@/components/ui/loading-progress";
 import { Button } from "@/components/ui/button";
 import { TrendAnalytics } from "@/components/reports/TrendAnalytics";
-import { fetchMetricValuesFull, FETCH_CONFIG } from "@/lib/dataFetcher";
+import { fetchMetricValuesFull, fetchTotalCount, FETCH_CONFIG } from "@/lib/dataFetcher";
 import { invalidateMetricValueCache } from "@/hooks/useOptimizedData";
 
 interface Company {
@@ -137,6 +138,7 @@ export default function Reports() {
   const [metrics, setMetrics] = useState<EsgMetric[]>([]);
   const [metricValues, setMetricValues] = useState<MetricValue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number | null }>({ loaded: 0, total: null });
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   // Filters
@@ -173,7 +175,12 @@ export default function Reports() {
 
   const fetchData = async () => {
     setLoading(true);
+    setLoadProgress({ loaded: 0, total: null });
     try {
+      // Get total count first for progress tracking
+      const dbCount = await fetchTotalCount();
+      setLoadProgress(prev => ({ ...prev, total: dbCount }));
+
       // Use optimized fetcher with larger batch size for 100K+ records
       const [
         { data: companiesData },
@@ -190,7 +197,10 @@ export default function Reports() {
         supabase.from("esg_dimension").select("*").order("dimension_name"),
         supabase.from("esg_theme").select("*").order("theme_name"),
         supabase.from("esg_metric").select("*").order("metric_name"),
-        fetchMetricValuesFull({ pageSize: FETCH_CONFIG.PAGE_SIZE }),
+        fetchMetricValuesFull({ 
+          pageSize: FETCH_CONFIG.PAGE_SIZE,
+          onProgress: (loaded) => setLoadProgress(prev => ({ ...prev, loaded })),
+        }),
       ]);
 
       setCompanies(companiesData || []);
@@ -480,7 +490,17 @@ export default function Reports() {
   }));
 
   if (loading) {
-    return <ReportsLoadingSkeleton />;
+    return (
+      <>
+        <LoadingOverlay
+          loaded={loadProgress.loaded}
+          total={loadProgress.total}
+          isLoading={loading && loadProgress.loaded > 0}
+          message="กำลังโหลดรายงาน ESG"
+        />
+        <ReportsLoadingSkeleton />
+      </>
+    );
   }
 
   return (
