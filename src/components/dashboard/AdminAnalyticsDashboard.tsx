@@ -51,6 +51,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, differenceInDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { fetchMetricValuesWithTimestamp, FETCH_CONFIG } from '@/lib/dataFetcher';
 
 interface MetricValueRecord {
   value_id: string;
@@ -105,46 +106,34 @@ export default function AdminAnalyticsDashboard() {
 
   const fetchRawData = async () => {
     try {
-      // Use pagination to fetch ALL metric values (same as Data Entry page)
-      const fetchAllMetricValues = async () => {
-        const PAGE_SIZE = 1000;
-        let allValues: MetricValueRecord[] = [];
-        let from = 0;
-        let hasMore = true;
-
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from('metric_value')
-            .select('value_id, submitted_by, created_at, status')
-            .order('created_at', { ascending: false })
-            .range(from, from + PAGE_SIZE - 1);
-
-          if (error) throw error;
-
-          if (data && data.length > 0) {
-            allValues = [...allValues, ...data];
-            from += PAGE_SIZE;
-            hasMore = data.length === PAGE_SIZE;
-          } else {
-            hasMore = false;
-          }
-        }
-
-        return allValues;
-      };
-
-      const metricValues = await fetchAllMetricValues();
+      // Use optimized fetcher with larger batch size for 100K+ records
+      const metricValues = await fetchMetricValuesWithTimestamp({
+        pageSize: FETCH_CONFIG.PAGE_SIZE,
+      });
 
       if (metricValues && metricValues.length > 0) {
-        setAllMetricValues(metricValues);
+        setAllMetricValues(metricValues.map(v => ({
+          value_id: v.value_id,
+          submitted_by: v.submitted_by,
+          created_at: v.created_at,
+          status: v.status,
+        })));
 
+        // Fetch user profiles for the unique submitters
         const uniqueUserIds = [...new Set(metricValues.filter(m => m.submitted_by).map(m => m.submitted_by))] as string[];
-        const { data: profiles } = await supabase
-          .from('app_user_profile')
-          .select('user_id, full_name')
-          .in('user_id', uniqueUserIds);
+        
+        if (uniqueUserIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('app_user_profile')
+            .select('user_id, full_name')
+            .in('user_id', uniqueUserIds);
 
-        setUserProfiles(profiles || []);
+          setUserProfiles(profiles || []);
+        }
+        
+        if (FETCH_CONFIG.DEBUG_MODE) {
+          console.log(`[AdminAnalytics] Loaded ${metricValues.length} records`);
+        }
       }
     } catch (error) {
       console.error('Error fetching analytics data:', error);

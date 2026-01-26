@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -44,6 +44,8 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '@/components/ui/pull-to-refresh';
 import { DashboardLoadingSkeleton } from '@/components/ui/loading-skeleton';
 import AdminAnalyticsDashboard from '@/components/dashboard/AdminAnalyticsDashboard';
+import { useOptimizedMetricValues, invalidateMetricValueCache } from '@/hooks/useOptimizedData';
+import { FETCH_CONFIG } from '@/lib/dataFetcher';
 
 interface DetailData {
   type: 'companies' | 'sites' | 'metrics' | 'pending' | 'drafts' | 'submitted';
@@ -51,17 +53,10 @@ interface DetailData {
   items: any[];
 }
 
-interface DashboardStats {
+interface MasterStats {
   totalCompanies: number;
   totalSites: number;
   totalMetrics: number;
-  // KPI counts matching Data Entry page calculation
-  totalDbRecords: number;      // Total metric_value in database (before RLS)
-  visibleRecords: number;      // Records visible after RLS
-  draftCount: number;          // status === 'draft' from visible records
-  submittedCount: number;      // status === 'submitted' from visible records
-  myDrafts: number;
-  mySubmitted: number;
 }
 
 interface UserRole {
@@ -75,109 +70,81 @@ interface UserRole {
 export default function Dashboard() {
   const { role, user } = useAuth();
   const { t, language } = useLanguage();
-  const [stats, setStats] = useState<DashboardStats>({
+  
+  // Use optimized hook for metric values
+  const { 
+    stats: metricStats, 
+    loading: metricLoading, 
+    refresh: refreshMetrics,
+    progress 
+  } = useOptimizedMetricValues(user?.id);
+
+  const [masterStats, setMasterStats] = useState<MasterStats>({
     totalCompanies: 0,
     totalSites: 0,
     totalMetrics: 0,
-    totalDbRecords: 0,
-    visibleRecords: 0,
-    draftCount: 0,
-    submittedCount: 0,
-    myDrafts: 0,
-    mySubmitted: 0,
   });
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [masterLoading, setMasterLoading] = useState(true);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailData, setDetailData] = useState<DetailData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Combined loading state
+  const loading = metricLoading || masterLoading;
+
+  // Combined stats for compatibility
+  const stats = useMemo(() => ({
+    ...masterStats,
+    totalDbRecords: metricStats.totalDbRecords,
+    visibleRecords: metricStats.visibleRecords,
+    draftCount: metricStats.draftCount,
+    submittedCount: metricStats.submittedCount,
+    myDrafts: metricStats.myDrafts,
+    mySubmitted: metricStats.mySubmitted,
+  }), [masterStats, metricStats]);
+
   const handleRefresh = useCallback(async () => {
-    await fetchStats();
-    if (role === 'admin') {
-      await fetchUserRoles();
-    }
-  }, [role]);
+    invalidateMetricValueCache();
+    await Promise.all([
+      refreshMetrics(),
+      fetchMasterStats(),
+      role === 'admin' ? fetchUserRoles() : Promise.resolve(),
+    ]);
+  }, [role, refreshMetrics]);
 
   const { pullDistance, isRefreshing, containerRef } = usePullToRefresh({
     onRefresh: handleRefresh,
   });
 
   useEffect(() => {
-    fetchStats();
+    fetchMasterStats();
     if (role === 'admin') {
       fetchUserRoles();
     }
   }, [user, role]);
 
-  const fetchStats = async () => {
+  const fetchMasterStats = async () => {
     try {
-      // Fetch all metric values using pagination to get ALL visible records (same as Data Entry)
-      const fetchAllMetricValues = async () => {
-        const PAGE_SIZE = 1000;
-        let allValues: { value_id: string; status: string; submitted_by: string | null }[] = [];
-        let from = 0;
-        let hasMore = true;
-
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from('metric_value')
-            .select('value_id, status, submitted_by')
-            .order('created_at', { ascending: false })
-            .range(from, from + PAGE_SIZE - 1);
-
-          if (error) throw error;
-
-          if (data && data.length > 0) {
-            allValues = [...allValues, ...data];
-            from += PAGE_SIZE;
-            hasMore = data.length === PAGE_SIZE;
-          } else {
-            hasMore = false;
-          }
-        }
-
-        return allValues;
-      };
-
       const [
         { count: companiesCount },
         { count: sitesCount },
         { count: metricsCount },
-        { count: totalDbCount },
-        metricValues,
       ] = await Promise.all([
-        supabase.from('company').select('*', { count: 'exact', head: true }),
-        supabase.from('site').select('*', { count: 'exact', head: true }),
-        supabase.from('esg_metric').select('*', { count: 'exact', head: true }),
-        supabase.from('metric_value').select('*', { count: 'exact', head: true }),
-        fetchAllMetricValues(),
+        supabase.from('company').select('company_id', { count: 'exact', head: true }),
+        supabase.from('site').select('site_id', { count: 'exact', head: true }),
+        supabase.from('esg_metric').select('metric_id', { count: 'exact', head: true }),
       ]);
 
-      // Calculate counts from visible records (same logic as Data Entry)
-      const visibleRecords = metricValues.length;
-      const draftCount = metricValues.filter(v => v.status === 'draft').length;
-      const submittedCount = metricValues.filter(v => v.status === 'submitted').length;
-      
-      // Staff-specific counts (my drafts, my submissions)
-      const myDrafts = metricValues.filter(v => v.status === 'draft' && v.submitted_by === user?.id).length;
-      const mySubmitted = metricValues.filter(v => v.submitted_by === user?.id).length;
-
-      setStats({
+      setMasterStats({
         totalCompanies: companiesCount || 0,
         totalSites: sitesCount || 0,
         totalMetrics: metricsCount || 0,
-        totalDbRecords: totalDbCount || 0,
-        visibleRecords,
-        draftCount,
-        submittedCount,
-        myDrafts,
-        mySubmitted,
       });
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('Error fetching master stats:', error);
     } finally {
-      setLoading(false);
+      setMasterLoading(false);
     }
   };
 
