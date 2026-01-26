@@ -191,7 +191,7 @@ export default function BackupData() {
   // NEW isolated read-only fetch function for backup export with optimized batch size
   const fetchTransactionsForBackup = async (): Promise<MetricValue[]> => {
     const PAGE_SIZE = FETCH_CONFIG.PAGE_SIZE; // Use optimized batch size
-    let allValues: MetricValue[] = [];
+    const allValues: MetricValue[] = [];
     let from = 0;
     let hasMore = true;
 
@@ -268,9 +268,13 @@ export default function BackupData() {
       }
 
       if (data && data.length > 0) {
-        allValues = [...allValues, ...data];
-        from += PAGE_SIZE;
-        hasMore = data.length === PAGE_SIZE;
+        // Some backends enforce a max rows-per-request (commonly 1000).
+        // Advance by actual returned rows to ensure we can fetch beyond that cap.
+        for (const row of data) {
+          allValues.push(row);
+        }
+        from += data.length;
+        hasMore = true;
       } else {
         hasMore = false;
       }
