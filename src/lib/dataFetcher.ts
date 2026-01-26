@@ -79,11 +79,12 @@ export async function fetchStatusCounts(): Promise<{
   draft: number;
   submitted: number;
 }> {
-  // Use parallel count queries - more efficient than loading all data
+  // Use parallel count queries.
+  // Avoid `head: true` here because some deployments can return capped counts.
   const [totalRes, draftRes, submittedRes] = await Promise.all([
-    supabase.from('metric_value').select('value_id', { count: 'exact', head: true }),
-    supabase.from('metric_value').select('value_id', { count: 'exact', head: true }).eq('status', 'draft'),
-    supabase.from('metric_value').select('value_id', { count: 'exact', head: true }).eq('status', 'submitted'),
+    supabase.from('metric_value').select('value_id', { count: 'exact' }).limit(1),
+    supabase.from('metric_value').select('value_id', { count: 'exact' }).eq('status', 'draft').limit(1),
+    supabase.from('metric_value').select('value_id', { count: 'exact' }).eq('status', 'submitted').limit(1),
   ]);
 
   return {
