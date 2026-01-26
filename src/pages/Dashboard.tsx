@@ -43,6 +43,7 @@ import {
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '@/components/ui/pull-to-refresh';
 import { DashboardLoadingSkeleton } from '@/components/ui/loading-skeleton';
+import { LoadingOverlay } from '@/components/ui/loading-progress';
 import AdminAnalyticsDashboard from '@/components/dashboard/AdminAnalyticsDashboard';
 import { useOptimizedMetricValues, invalidateMetricValueCache } from '@/hooks/useOptimizedData';
 import { FETCH_CONFIG } from '@/lib/dataFetcher';
@@ -408,7 +409,17 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return <DashboardLoadingSkeleton />;
+    return (
+      <>
+        <LoadingOverlay
+          loaded={progress.loaded}
+          total={progress.total}
+          isLoading={metricLoading && progress.loaded > 0}
+          message="กำลังโหลดข้อมูล Dashboard"
+        />
+        <DashboardLoadingSkeleton />
+      </>
+    );
   }
 
   return (
