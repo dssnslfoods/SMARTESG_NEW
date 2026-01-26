@@ -122,13 +122,15 @@ export async function fetchMetricValuesMinimal(
 
     if (error) throw error;
 
+    // NOTE: Some backends enforce a max rows-per-request (commonly 1000) even if we ask for more.
+    // Therefore we advance by `data.length` (not `pageSize`) and keep fetching until we get 0 rows.
     if (data && data.length > 0) {
       // Push all items at once instead of spread (more memory efficient)
       for (const item of data) {
         allValues.push(item);
       }
-      from += pageSize;
-      hasMore = data.length === pageSize;
+      from += data.length;
+      hasMore = true;
       batchCount++;
       
       options.onProgress?.(allValues.length, null);
@@ -175,8 +177,9 @@ export async function fetchMetricValuesWithTimestamp(
       for (const item of data) {
         allValues.push(item);
       }
-      from += pageSize;
-      hasMore = data.length === pageSize;
+      // Advance by actual returned rows to avoid being stuck at server-enforced caps (e.g. 1000 rows)
+      from += data.length;
+      hasMore = true;
       batchCount++;
       
       options.onProgress?.(allValues.length, null);
@@ -223,8 +226,9 @@ export async function fetchMetricValuesFull(
       for (const item of data) {
         allValues.push(item as MetricValueFull);
       }
-      from += pageSize;
-      hasMore = data.length === pageSize;
+      // Advance by actual returned rows to avoid being stuck at server-enforced caps (e.g. 1000 rows)
+      from += data.length;
+      hasMore = true;
       batchCount++;
       
       options.onProgress?.(allValues.length, null);
