@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Download, Loader2, Database, Shield, Calendar, Upload } from 'lucide-react';
 import { exportToExcel, generateExportFilename, ExportMetadata, AdditionalSheet } from '@/lib/excelExport';
 import { ImportExcelDialog } from '@/components/import/ImportExcelDialog';
+import { FETCH_CONFIG } from '@/lib/dataFetcher';
 
 // Lookup types for human-readable mapping
 interface Company {
@@ -187,9 +188,9 @@ export default function BackupData() {
     ? metrics
     : metrics.filter(m => m.theme_id === filterTheme);
 
-  // NEW isolated read-only fetch function for backup export
+  // NEW isolated read-only fetch function for backup export with optimized batch size
   const fetchTransactionsForBackup = async (): Promise<MetricValue[]> => {
-    const PAGE_SIZE = 1000;
+    const PAGE_SIZE = FETCH_CONFIG.PAGE_SIZE; // Use optimized batch size
     let allValues: MetricValue[] = [];
     let from = 0;
     let hasMore = true;

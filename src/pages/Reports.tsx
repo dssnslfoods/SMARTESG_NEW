@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +52,8 @@ import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { Button } from "@/components/ui/button";
 import { TrendAnalytics } from "@/components/reports/TrendAnalytics";
+import { fetchMetricValuesFull, FETCH_CONFIG } from "@/lib/dataFetcher";
+import { invalidateMetricValueCache } from "@/hooks/useOptimizedData";
 
 interface Company {
   company_id: string;
@@ -157,6 +159,7 @@ export default function Reports() {
   const { isSectionVisible } = useReportSections();
 
   const handleRefresh = useCallback(async () => {
+    invalidateMetricValueCache();
     await fetchData();
   }, []);
 
@@ -171,34 +174,7 @@ export default function Reports() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch all metric values using pagination to get ALL records (same as DataEntry)
-      const fetchAllMetricValues = async (): Promise<MetricValue[]> => {
-        const PAGE_SIZE = 1000;
-        let allValues: MetricValue[] = [];
-        let from = 0;
-        let hasMore = true;
-
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from('metric_value')
-            .select('*')
-            .order('updated_at', { ascending: false })
-            .range(from, from + PAGE_SIZE - 1);
-
-          if (error) throw error;
-
-          if (data && data.length > 0) {
-            allValues = [...allValues, ...data];
-            from += PAGE_SIZE;
-            hasMore = data.length === PAGE_SIZE;
-          } else {
-            hasMore = false;
-          }
-        }
-
-        return allValues;
-      };
-
+      // Use optimized fetcher with larger batch size for 100K+ records
       const [
         { data: companiesData },
         { data: sitesData },
@@ -214,7 +190,7 @@ export default function Reports() {
         supabase.from("esg_dimension").select("*").order("dimension_name"),
         supabase.from("esg_theme").select("*").order("theme_name"),
         supabase.from("esg_metric").select("*").order("metric_name"),
-        fetchAllMetricValues(),
+        fetchMetricValuesFull({ pageSize: FETCH_CONFIG.PAGE_SIZE }),
       ]);
 
       setCompanies(companiesData || []);

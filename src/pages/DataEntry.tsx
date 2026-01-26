@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +53,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { DataEntryLoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { fetchMetricValuesFull, fetchTotalCount, FETCH_CONFIG } from "@/lib/dataFetcher";
+import { invalidateMetricValueCache } from "@/hooks/useOptimizedData";
 
 interface Site {
   site_id: string;
@@ -185,41 +187,11 @@ export default function DataEntry() {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      // First, get the actual count from database
-      const { count: dbCount } = await supabase
-        .from('metric_value')
-        .select('*', { count: 'exact', head: true });
-      
-      setTotalDbCount(dbCount || 0);
+      // First, get the actual count from database using optimized fetcher
+      const dbCount = await fetchTotalCount();
+      setTotalDbCount(dbCount);
 
-      // Fetch all metric values using pagination to get ALL records
-      const fetchAllMetricValues = async (): Promise<MetricValue[]> => {
-        const PAGE_SIZE = 1000;
-        let allValues: MetricValue[] = [];
-        let from = 0;
-        let hasMore = true;
-
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from('metric_value')
-            .select('*')
-            .order('updated_at', { ascending: false })
-            .range(from, from + PAGE_SIZE - 1);
-
-          if (error) throw error;
-
-          if (data && data.length > 0) {
-            allValues = [...allValues, ...data];
-            from += PAGE_SIZE;
-            hasMore = data.length === PAGE_SIZE;
-          } else {
-            hasMore = false;
-          }
-        }
-
-        return allValues;
-      };
-
+      // Use optimized fetcher with larger batch size for 100K+ records
       const [
         { data: sitesData },
         { data: companiesData },
@@ -235,7 +207,7 @@ export default function DataEntry() {
         supabase.from('esg_dimension').select('*').order('dimension_name'),
         supabase.from('esg_theme').select('*').order('theme_name'),
         supabase.from('esg_metric').select('*').order('metric_name'),
-        fetchAllMetricValues(),
+        fetchMetricValuesFull({ pageSize: FETCH_CONFIG.PAGE_SIZE }),
       ]);
 
       setSites(sitesData || []);
@@ -244,9 +216,25 @@ export default function DataEntry() {
       setDimensions(dimensionsData || []);
       setThemes(themesData || []);
       setMetrics(metricsData || []);
-      setMetricValues(valuesData);
+      setMetricValues(valuesData.map(v => ({
+        value_id: v.value_id,
+        metric_id: v.metric_id,
+        site_id: v.site_id,
+        period_id: v.period_id,
+        value: v.value,
+        status: v.status,
+        data_source: v.data_source,
+        remark: v.remark,
+        submitted_by: v.submitted_by,
+        created_at: v.created_at,
+      })));
       
-      console.log(`[DataEntry] Loaded ${valuesData.length} metric values (DB total: ${dbCount})`);
+      // Invalidate cache after data modification
+      invalidateMetricValueCache();
+      
+      if (FETCH_CONFIG.DEBUG_MODE) {
+        console.log(`[DataEntry] Loaded ${valuesData.length} metric values (DB total: ${dbCount})`);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
