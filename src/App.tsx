@@ -26,6 +26,7 @@ import ThemeManagement from "./pages/master/ThemeManagement";
 import MetricManagement from "./pages/master/MetricManagement";
 import DataEntry from "./pages/DataEntry";
 import BackupData from "./pages/BackupData";
+import HelpCenter from "./pages/HelpCenter";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -168,6 +169,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <BackupData />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/help-center"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                    <HelpCenter />
                   </ProtectedRoute>
                 }
               />
