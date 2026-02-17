@@ -653,56 +653,85 @@ export default function HelpCenter() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 px-3 font-semibold">{th ? "รหัส" : "ID"}</th>
-                    <th className="text-left py-2 px-3 font-semibold">{th ? "ตัวชี้วัด" : "Metric"}</th>
-                    <th className="text-left py-2 px-3 font-semibold">{th ? "มิติ" : "Dimension"}</th>
-                    <th className="text-left py-2 px-3 font-semibold">{th ? "หน่วย" : "Unit"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { id: "MET001", name: th ? "ไฟฟ้าจากกริด" : "Grid Electricity", dim: "E", unit: "kWh" },
-                    { id: "MET002", name: th ? "พลังงานหมุนเวียน" : "Renewable Energy", dim: "E", unit: "kWh" },
-                    { id: "MET003", name: "GHG Scope 1", dim: "E", unit: "tCO2e" },
-                    { id: "MET004", name: "GHG Scope 2", dim: "E", unit: "tCO2e" },
-                    { id: "MET005", name: th ? "น้ำที่ใช้" : "Water Withdrawal", dim: "E", unit: "m³" },
-                    { id: "MET006", name: th ? "น้ำรีไซเคิล" : "Water Recycled", dim: "E", unit: "m³" },
-                    { id: "MET007", name: th ? "น้ำทิ้ง" : "Wastewater", dim: "E", unit: "m³" },
-                    { id: "MET018", name: th ? "ขยะทั้งหมด" : "Total Waste", dim: "E", unit: "kg" },
-                    { id: "MET021", name: th ? "ขยะรีไซเคิล" : "Waste Recycled", dim: "E", unit: "kg" },
-                    { id: "MET008", name: th ? "ชั่วโมงอบรม" : "Training Hours", dim: "S", unit: th ? "ชม." : "hrs" },
-                    { id: "MET009", name: "LTI", dim: "S", unit: th ? "ครั้ง" : "cases" },
-                    { id: "MET010", name: th ? "Well-being Access" : "Well-being Access", dim: "S", unit: th ? "คน" : "people" },
-                    { id: "MET017", name: th ? "การละเมิดสิทธิมนุษยชน" : "Human Rights Violations", dim: "S", unit: th ? "ข้อ" : "cases" },
-                    { id: "MET020", name: th ? "บริจาคอาหาร" : "Food Donation", dim: "S", unit: "kg" },
-                    { id: "MET035", name: th ? "ชั่วโมงทำงาน" : "Working Hours", dim: "S", unit: th ? "ชม." : "hrs" },
-                    { id: "MET012", name: th ? "เหตุการณ์ธรรมาภิบาล" : "Governance Incidents", dim: "G", unit: th ? "เรื่อง" : "cases" },
-                    { id: "MET013", name: th ? "ความเสี่ยงใหม่" : "Emerging Risk", dim: "G", unit: th ? "ข้อ" : "items" },
-                    { id: "MET014", name: th ? "เหตุการณ์ทุจริต" : "Corruption Incidents", dim: "G", unit: th ? "ข้อ" : "cases" },
-                    { id: "MET015", name: th ? "อบรมภาษี" : "Tax Training", dim: "G", unit: th ? "ชม." : "hrs" },
-                  ].map((m, i) => (
-                    <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
-                      <td className="py-2 px-3 font-mono text-xs">{m.id}</td>
-                      <td className="py-2 px-3">{m.name}</td>
-                      <td className="py-2 px-3">
-                        <Badge variant="outline" className={`text-xs ${
-                          m.dim === "E" ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" :
-                          m.dim === "S" ? "bg-blue-500/10 text-blue-700 border-blue-500/20" :
-                          "bg-purple-500/10 text-purple-700 border-purple-500/20"
-                        }`}>
-                          {m.dim}
-                        </Badge>
-                      </td>
-                      <td className="py-2 px-3 text-muted-foreground">{m.unit}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Accordion type="multiple" className="w-full">
+              {[
+                {
+                  key: "env-metrics",
+                  label: th ? "สิ่งแวดล้อม (Environmental)" : "Environmental",
+                  icon: <Leaf className="h-4 w-4 text-emerald-600" />,
+                  dim: "E",
+                  metrics: [
+                    { id: "MET001", name: th ? "ไฟฟ้าจากกริด" : "Grid Electricity", unit: "kWh" },
+                    { id: "MET002", name: th ? "พลังงานหมุนเวียน" : "Renewable Energy", unit: "kWh" },
+                    { id: "MET003", name: "GHG Scope 1", unit: "tCO2e" },
+                    { id: "MET004", name: "GHG Scope 2", unit: "tCO2e" },
+                    { id: "MET005", name: th ? "น้ำที่ใช้" : "Water Withdrawal", unit: "m³" },
+                    { id: "MET006", name: th ? "น้ำรีไซเคิล" : "Water Recycled", unit: "m³" },
+                    { id: "MET007", name: th ? "น้ำทิ้ง" : "Wastewater", unit: "m³" },
+                    { id: "MET018", name: th ? "ขยะทั้งหมด" : "Total Waste", unit: "kg" },
+                    { id: "MET021", name: th ? "ขยะรีไซเคิล" : "Waste Recycled", unit: "kg" },
+                  ],
+                },
+                {
+                  key: "soc-metrics",
+                  label: th ? "สังคม (Social)" : "Social",
+                  icon: <Heart className="h-4 w-4 text-blue-600" />,
+                  dim: "S",
+                  metrics: [
+                    { id: "MET008", name: th ? "ชั่วโมงอบรม" : "Training Hours", unit: th ? "ชม." : "hrs" },
+                    { id: "MET009", name: "LTI", unit: th ? "ครั้ง" : "cases" },
+                    { id: "MET010", name: "Well-being Access", unit: th ? "คน" : "people" },
+                    { id: "MET017", name: th ? "การละเมิดสิทธิมนุษยชน" : "Human Rights Violations", unit: th ? "ข้อ" : "cases" },
+                    { id: "MET020", name: th ? "บริจาคอาหาร" : "Food Donation", unit: "kg" },
+                    { id: "MET035", name: th ? "ชั่วโมงทำงาน" : "Working Hours", unit: th ? "ชม." : "hrs" },
+                  ],
+                },
+                {
+                  key: "gov-metrics",
+                  label: th ? "ธรรมาภิบาล (Governance)" : "Governance",
+                  icon: <Scale className="h-4 w-4 text-purple-600" />,
+                  dim: "G",
+                  metrics: [
+                    { id: "MET012", name: th ? "เหตุการณ์ธรรมาภิบาล" : "Governance Incidents", unit: th ? "เรื่อง" : "cases" },
+                    { id: "MET013", name: th ? "ความเสี่ยงใหม่" : "Emerging Risk", unit: th ? "ข้อ" : "items" },
+                    { id: "MET014", name: th ? "เหตุการณ์ทุจริต" : "Corruption Incidents", unit: th ? "ข้อ" : "cases" },
+                    { id: "MET015", name: th ? "อบรมภาษี" : "Tax Training", unit: th ? "ชม." : "hrs" },
+                  ],
+                },
+              ].map((group) => (
+                <AccordionItem key={group.key} value={group.key}>
+                  <AccordionTrigger className="text-sm font-semibold">
+                    <div className="flex items-center gap-2">
+                      {group.icon}
+                      {group.label}
+                      <Badge variant="outline" className="text-[10px] ml-1">{group.metrics.length}</Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-2 px-3 font-semibold">{th ? "รหัส" : "ID"}</th>
+                            <th className="text-left py-2 px-3 font-semibold">{th ? "ตัวชี้วัด" : "Metric"}</th>
+                            <th className="text-left py-2 px-3 font-semibold">{th ? "หน่วย" : "Unit"}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.metrics.map((m, i) => (
+                            <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                              <td className="py-2 px-3 font-mono text-xs">{m.id}</td>
+                              <td className="py-2 px-3">{m.name}</td>
+                              <td className="py-2 px-3 text-muted-foreground">{m.unit}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </CardContent>
         </Card>
 
