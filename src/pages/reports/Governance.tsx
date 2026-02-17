@@ -248,8 +248,9 @@ export default function Governance() {
 
   // ─── Computed Data ───
   const uniqueYears = useMemo(() => [...new Set(periods.map(p => p.year))].sort((a, b) => b - a), [periods]);
-  const selectedYear = filterYear ? parseInt(filterYear) : uniqueYears[0];
-  const prevYear = selectedYear ? selectedYear - 1 : null;
+  const isAllTime = !filterYear || filterYear === "__all__";
+  const selectedYear = (!isAllTime && filterYear) ? parseInt(filterYear) : uniqueYears[0];
+  const prevYear = isAllTime ? null : (selectedYear ? selectedYear - 1 : null);
 
   const filteredSites = useMemo(() =>
     filterCompany ? sites.filter(s => s.company_id === filterCompany) : sites,
@@ -263,7 +264,7 @@ export default function Governance() {
         if (site?.company_id !== filterCompany) return false;
       }
       if (filterSite && v.site_id !== filterSite) return false;
-      if (filterYear) {
+      if (!isAllTime && filterYear) {
         const period = periods.find(p => p.period_id === v.period_id);
         if (period?.year !== parseInt(filterYear)) return false;
       }
@@ -319,39 +320,46 @@ export default function Governance() {
   const emergingRiskYoY = calcYoY(totalEmergingRisk, METRIC.EMERGING_RISK, "positive");
   const taxTrainingYoY = calcYoY(totalTaxTraining, METRIC.TAX_TRAINING, "positive");
 
+  // ─── Helper: get relevant periods for charts ───
+  const chartPeriods = useMemo(() => {
+    if (isAllTime) {
+      const latestYear = uniqueYears[0];
+      return periods.filter(p => p.year === latestYear).sort((a, b) => a.month - b.month);
+    }
+    return periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
+  }, [periods, selectedYear, isAllTime, uniqueYears]);
+
+  const getMonthValues = useCallback((month: number) => {
+    if (isAllTime) {
+      const monthPeriodIds = periods.filter(p => p.month === month).map(p => p.period_id);
+      return filteredValues.filter(v => monthPeriodIds.includes(v.period_id));
+    }
+    const periodId = periods.find(p => p.year === selectedYear && p.month === month)?.period_id;
+    return periodId ? filteredValues.filter(v => v.period_id === periodId) : [];
+  }, [filteredValues, periods, selectedYear, isAllTime]);
+
   // ─── Sparkline Data (monthly) ───
   const getMonthlySparkline = (metricId: string): number[] => {
-    const monthlyData = periods
-      .filter(p => p.year === selectedYear)
-      .sort((a, b) => a.month - b.month)
-      .map(period => {
-        return filteredValues
-          .filter(v => v.metric_id === metricId && v.period_id === period.period_id)
-          .reduce((s, v) => s + v.value, 0);
-      });
-    return monthlyData;
+    return chartPeriods.map(period => {
+      const pv = getMonthValues(period.month);
+      return pv.filter(v => v.metric_id === metricId).reduce((s, v) => s + v.value, 0);
+    });
   };
 
   // ─── Chart 1: Monthly Governance Incidents Trend ───
   const monthlyIncidentData = useMemo(() => {
-    return periods
-      .filter(p => p.year === selectedYear)
-      .sort((a, b) => a.month - b.month)
-      .map(period => {
-        const govVal = filteredValues
-          .filter(v => v.metric_id === METRIC.GOVERNANCE_INCIDENTS && v.period_id === period.period_id)
-          .reduce((s, v) => s + v.value, 0);
-        const corruptVal = filteredValues
-          .filter(v => v.metric_id === METRIC.CORRUPTION_INCIDENTS && v.period_id === period.period_id)
-          .reduce((s, v) => s + v.value, 0);
-        return {
-          name: period.month_name.slice(0, 3),
-          governance: govVal,
-          corruption: corruptVal,
-          total: govVal + corruptVal,
-        };
-      });
-  }, [filteredValues, periods, selectedYear]);
+    return chartPeriods.map(period => {
+      const pv = getMonthValues(period.month);
+      const govVal = pv.filter(v => v.metric_id === METRIC.GOVERNANCE_INCIDENTS).reduce((s, v) => s + v.value, 0);
+      const corruptVal = pv.filter(v => v.metric_id === METRIC.CORRUPTION_INCIDENTS).reduce((s, v) => s + v.value, 0);
+      return {
+        name: period.month_name.slice(0, 3),
+        governance: govVal,
+        corruption: corruptVal,
+        total: govVal + corruptVal,
+      };
+    });
+  }, [chartPeriods, getMonthValues]);
 
   // ─── Chart 2: Incidents by Site (Horizontal Bar) ───
   const incidentsBySite = useMemo(() => {
@@ -397,26 +405,20 @@ export default function Governance() {
   const cumulativeData = useMemo(() => {
     let cumGov = 0;
     let cumCorrupt = 0;
-    return periods
-      .filter(p => p.year === selectedYear)
-      .sort((a, b) => a.month - b.month)
-      .map(period => {
-        const govVal = filteredValues
-          .filter(v => v.metric_id === METRIC.GOVERNANCE_INCIDENTS && v.period_id === period.period_id)
-          .reduce((s, v) => s + v.value, 0);
-        const corruptVal = filteredValues
-          .filter(v => v.metric_id === METRIC.CORRUPTION_INCIDENTS && v.period_id === period.period_id)
-          .reduce((s, v) => s + v.value, 0);
-        cumGov += govVal;
-        cumCorrupt += corruptVal;
-        return {
-          name: period.month_name.slice(0, 3),
-          govCumulative: cumGov,
-          corruptCumulative: cumCorrupt,
-          totalCumulative: cumGov + cumCorrupt,
-        };
-      });
-  }, [filteredValues, periods, selectedYear]);
+    return chartPeriods.map(period => {
+      const pv = getMonthValues(period.month);
+      const govVal = pv.filter(v => v.metric_id === METRIC.GOVERNANCE_INCIDENTS).reduce((s, v) => s + v.value, 0);
+      const corruptVal = pv.filter(v => v.metric_id === METRIC.CORRUPTION_INCIDENTS).reduce((s, v) => s + v.value, 0);
+      cumGov += govVal;
+      cumCorrupt += corruptVal;
+      return {
+        name: period.month_name.slice(0, 3),
+        govCumulative: cumGov,
+        corruptCumulative: cumCorrupt,
+        totalCumulative: cumGov + cumCorrupt,
+      };
+    });
+  }, [chartPeriods, getMonthValues]);
 
   // ─── Chart 5: YoY Comparison Bar ───
   const yoyComparisonData = useMemo(() => {
