@@ -442,35 +442,67 @@ export default function Social() {
   }, [chartPeriods, getMonthValues]);
   const hasSafetyCompositeData = safetyCompositeData.some(d => d.lti > 0 || (d.wellbeing !== null && d.wellbeing > 0));
 
+  // ─── Years with data (for multi-year table) ───
+  const yearsWithData = useMemo(() => {
+    const yearSet = new Set<number>();
+    metricValues.forEach(v => {
+      const p = periods.find(pp => pp.period_id === v.period_id);
+      if (p) yearSet.add(p.year);
+    });
+    return [...yearSet].sort((a, b) => b - a);
+  }, [metricValues, periods]);
+
   // ─── Summary Table Data ───
   const summaryTableData = useMemo(() => {
     const metricMap = new Map(metrics.map(m => [m.metric_id, m]));
-    const grouped = new Map<string, { current: number; prev: number }>();
 
+    if (isAllTime) {
+      const grouped = new Map<string, Record<number, number>>();
+      for (const v of filteredValues) {
+        if (!metricMap.has(v.metric_id)) continue;
+        const period = periods.find(p => p.period_id === v.period_id);
+        if (!period) continue;
+        const existing = grouped.get(v.metric_id) || {};
+        existing[period.year] = (existing[period.year] || 0) + v.value;
+        grouped.set(v.metric_id, existing);
+      }
+      return Array.from(grouped.entries())
+        .map(([id, yearData]) => {
+          const m = metricMap.get(id)!;
+          const latestTwo = yearsWithData.slice(0, 2);
+          const curr = yearData[latestTwo[0]] || 0;
+          const prev = latestTwo.length > 1 ? (yearData[latestTwo[1]] || 0) : 0;
+          const change = prev > 0 ? ((curr - prev) / prev * 100) : null;
+          return { id, name: m.metric_name, unit: m.unit || "", yearData, change };
+        })
+        .filter(d => Object.values(d.yearData).some(v => v > 0))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    const grouped = new Map<string, { current: number; prev: number }>();
     for (const v of filteredValues) {
-      const m = metricMap.get(v.metric_id);
-      if (!m) continue;
+      if (!metricMap.has(v.metric_id)) continue;
       const existing = grouped.get(v.metric_id) || { current: 0, prev: 0 };
       existing.current += v.value;
       grouped.set(v.metric_id, existing);
     }
     for (const v of prevYearValues) {
-      const m = metricMap.get(v.metric_id);
-      if (!m) continue;
+      if (!metricMap.has(v.metric_id)) continue;
       const existing = grouped.get(v.metric_id) || { current: 0, prev: 0 };
       existing.prev += v.value;
       grouped.set(v.metric_id, existing);
     }
-
     return Array.from(grouped.entries())
       .map(([id, data]) => {
         const m = metricMap.get(id)!;
         const change = data.prev > 0 ? ((data.current - data.prev) / data.prev * 100) : null;
-        return { id, name: m.metric_name, unit: m.unit || "", current: data.current, prev: data.prev, change };
+        return { id, name: m.metric_name, unit: m.unit || "", yearData: { [selectedYear]: data.current, ...(prevYear ? { [prevYear]: data.prev } : {}) }, change };
       })
-      .filter(d => d.current > 0 || d.prev > 0)
+      .filter(d => Object.values(d.yearData).some(v => v > 0))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [filteredValues, prevYearValues, metrics]);
+  }, [filteredValues, prevYearValues, metrics, isAllTime, periods, yearsWithData, selectedYear, prevYear]);
+
+  const tableYears = useMemo(() => isAllTime ? yearsWithData : (prevYear ? [selectedYear, prevYear] : [selectedYear]), [isAllTime, yearsWithData, selectedYear, prevYear]);
 
   // ─── Chart Colors ───
   const THEME_COLORS = {
@@ -510,13 +542,17 @@ export default function Social() {
           )}
         </div>
         <ExportExcelButton
-          data={summaryTableData.map(row => ({
-            [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.name,
-            [language === "th" ? "หน่วย" : "Unit"]: row.unit,
-            [language === "th" ? `ค่าปี ${selectedYear}` : `Value ${selectedYear}`]: row.current,
-            ...(prevYear ? { [language === "th" ? `ค่าปี ${prevYear}` : `Value ${prevYear}`]: row.prev } : {}),
-            ...(prevYear ? { [language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"]: row.change !== null ? `${row.change >= 0 ? "+" : ""}${row.change.toFixed(1)}%` : "-" } : {}),
-          }))}
+          data={summaryTableData.map(row => {
+            const exportRow: Record<string, unknown> = {
+              [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.name,
+              [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+            };
+            tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] || "-"; });
+            if (tableYears.length >= 2) {
+              exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.change !== null ? `${row.change >= 0 ? "+" : ""}${row.change.toFixed(1)}%` : "-";
+            }
+            return exportRow;
+          })}
           filenamePrefix="social_report"
           sourcePage="Social Dashboard"
           appliedFilters={{
@@ -877,7 +913,9 @@ export default function Social() {
               {language === "th" ? "สรุปตัวชี้วัดด้านสังคม" : "Social Metrics Summary"}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              {selectedYear} vs {prevYear || "-"}
+              {isAllTime
+                ? (language === "th" ? `เปรียบเทียบทุกปี (${tableYears.join(", ")})` : `All years (${tableYears.join(", ")})`)
+                : `${selectedYear} vs ${prevYear || "-"}`}
             </p>
           </div>
         </CardHeader>
@@ -889,9 +927,12 @@ export default function Social() {
                   <TableRow>
                     <TableHead>{language === "th" ? "ตัวชี้วัด" : "Metric"}</TableHead>
                     <TableHead>{language === "th" ? "หน่วย" : "Unit"}</TableHead>
-                    <TableHead className="text-right">{selectedYear}</TableHead>
-                    <TableHead className="text-right">{prevYear || "-"}</TableHead>
-                    <TableHead className="text-right">{language === "th" ? "เปลี่ยนแปลง" : "Change"}</TableHead>
+                    {tableYears.map(y => (
+                      <TableHead key={y} className="text-right">{y}</TableHead>
+                    ))}
+                    {tableYears.length >= 2 && (
+                      <TableHead className="text-right">{language === "th" ? "เปลี่ยนแปลง" : "Change"}</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -899,15 +940,20 @@ export default function Social() {
                     <TableRow key={row.id}>
                       <TableCell className="font-medium text-sm max-w-[300px]">{row.name}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{row.unit}</TableCell>
-                      <TableCell className="text-right font-semibold">{row.current.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{row.prev > 0 ? row.prev.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "-"}</TableCell>
-                      <TableCell className="text-right">
-                        {row.change !== null ? (
-                          <span className={row.change > 0 ? "text-destructive" : row.change < 0 ? "text-emerald-600" : "text-muted-foreground"}>
-                            {row.change > 0 ? "+" : ""}{row.change.toFixed(1)}%
-                          </span>
-                        ) : "-"}
-                      </TableCell>
+                      {tableYears.map((y, i) => (
+                        <TableCell key={y} className={`text-right ${i === 0 ? "font-semibold" : "text-muted-foreground"}`}>
+                          {(row.yearData[y] || 0) > 0 ? row.yearData[y].toLocaleString(undefined, { maximumFractionDigits: 2 }) : "-"}
+                        </TableCell>
+                      ))}
+                      {tableYears.length >= 2 && (
+                        <TableCell className="text-right">
+                          {row.change !== null ? (
+                            <span className={row.change > 0 ? "text-destructive" : row.change < 0 ? "text-emerald-600" : "text-muted-foreground"}>
+                              {row.change > 0 ? "+" : ""}{row.change.toFixed(1)}%
+                            </span>
+                          ) : "-"}
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

@@ -454,6 +454,16 @@ export default function Governance() {
 
   const hasRadarData = radarData.some(d => d.value > 0);
 
+  // ─── Years with data (for multi-year table) ───
+  const yearsWithData = useMemo(() => {
+    const yearSet = new Set<number>();
+    metricValues.forEach(v => {
+      const p = periods.find(pp => pp.period_id === v.period_id);
+      if (p) yearSet.add(p.year);
+    });
+    return [...yearSet].sort((a, b) => b - a);
+  }, [metricValues, periods]);
+
   // ─── Summary Table ───
   const summaryTableData = useMemo(() => {
     const metricDefs = [
@@ -462,6 +472,34 @@ export default function Governance() {
       { id: METRIC.EMERGING_RISK, context: "positive" as const },
       { id: METRIC.TAX_TRAINING, context: "positive" as const },
     ];
+
+    if (isAllTime) {
+      return metricDefs.map(def => {
+        const metricInfo = metrics.find(m => m.metric_id === def.id);
+        if (!metricInfo) return null;
+        const yearData: Record<number, number> = {};
+        filteredValues.forEach(v => {
+          if (v.metric_id !== def.id) return;
+          const period = periods.find(p => p.period_id === v.period_id);
+          if (!period) return;
+          yearData[period.year] = (yearData[period.year] || 0) + v.value;
+        });
+        const latestTwo = yearsWithData.slice(0, 2);
+        const curr = yearData[latestTwo[0]] || 0;
+        const prev = latestTwo.length > 1 ? (yearData[latestTwo[1]] || 0) : 0;
+        let changePercent: number | null = null;
+        if (prev > 0) changePercent = ((curr - prev) / prev) * 100;
+        else if (curr > 0) changePercent = 100;
+
+        return {
+          metricName: metricInfo.metric_name,
+          unit: metricInfo.unit || "-",
+          yearData,
+          changePercent,
+          context: def.context,
+        };
+      }).filter(Boolean);
+    }
 
     return metricDefs.map(def => {
       const metricInfo = metrics.find(m => m.metric_id === def.id);
@@ -475,16 +513,20 @@ export default function Governance() {
       else if (currentVal > 0) changePercent = 100;
       else if (prevYearValues.some(v => v.metric_id === def.id)) changePercent = 0;
 
+      const yearData: Record<number, number> = { [selectedYear]: currentVal };
+      if (prevYear) yearData[prevYear] = prevVal;
+
       return {
         metricName: metricInfo.metric_name,
         unit: metricInfo.unit || "-",
-        currentValue: hasMetricData ? currentVal : null,
-        previousValue: prevYearValues.some(v => v.metric_id === def.id) ? prevVal : null,
+        yearData,
         changePercent,
         context: def.context,
       };
     }).filter(Boolean);
-  }, [filteredValues, prevYearValues, metrics]);
+  }, [filteredValues, prevYearValues, metrics, isAllTime, periods, yearsWithData, selectedYear, prevYear]);
+
+  const tableYears = useMemo(() => isAllTime ? yearsWithData : (prevYear ? [selectedYear, prevYear] : [selectedYear]), [isAllTime, yearsWithData, selectedYear, prevYear]);
 
   if (loading) {
     return <ReportsLoadingSkeleton />;
@@ -523,13 +565,17 @@ export default function Governance() {
           )}
         </div>
         <ExportExcelButton
-          data={(summaryTableData.filter(Boolean) as { metricName: string; unit: string; currentValue: number | null; previousValue: number | null; changePercent: number | null }[]).map(row => ({
-            [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.metricName,
-            [language === "th" ? "หน่วย" : "Unit"]: row.unit,
-            [language === "th" ? `ค่าปี ${selectedYear}` : `Value ${selectedYear}`]: row.currentValue ?? "-",
-            ...(prevYear ? { [language === "th" ? `ค่าปี ${prevYear}` : `Value ${prevYear}`]: row.previousValue ?? "-" } : {}),
-            ...(prevYear ? { [language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"]: row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-" } : {}),
-          }))}
+          data={(summaryTableData.filter(Boolean) as any[]).map(row => {
+            const exportRow: Record<string, unknown> = {
+              [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.metricName,
+              [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+            };
+            tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] ?? "-"; });
+            if (tableYears.length >= 2) {
+              exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-";
+            }
+            return exportRow;
+          })}
           filenamePrefix="governance_report"
           sourcePage="Governance Dashboard"
           appliedFilters={{
@@ -861,11 +907,11 @@ export default function Governance() {
           <CardTitle className="text-base font-medium">
             {language === "th" ? "สรุปตัวชี้วัดธรรมาภิบาล" : "Governance Metrics Summary"}
           </CardTitle>
-          {prevYear && (
-            <Badge variant="outline" className="ml-auto text-xs">
-              {selectedYear} vs {prevYear}
-            </Badge>
-          )}
+          <Badge variant="outline" className="ml-auto text-xs">
+            {isAllTime
+              ? (language === "th" ? `ทุกปี (${tableYears.join(", ")})` : `All years (${tableYears.join(", ")})`)
+              : `${selectedYear} vs ${prevYear}`}
+          </Badge>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -874,9 +920,12 @@ export default function Governance() {
                 <TableRow>
                   <TableHead className="min-w-[200px]">{language === "th" ? "ตัวชี้วัด" : "Metric"}</TableHead>
                   <TableHead className="text-center">{language === "th" ? "หน่วย" : "Unit"}</TableHead>
-                  <TableHead className="text-right">{selectedYear}</TableHead>
-                  {prevYear && <TableHead className="text-right">{prevYear}</TableHead>}
-                  {prevYear && <TableHead className="text-right">{language === "th" ? "เปลี่ยนแปลง" : "Change"}</TableHead>}
+                  {tableYears.map(y => (
+                    <TableHead key={y} className="text-right">{y}</TableHead>
+                  ))}
+                  {tableYears.length >= 2 && (
+                    <TableHead className="text-right">{language === "th" ? "เปลี่ยนแปลง" : "Change"}</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -884,15 +933,12 @@ export default function Governance() {
                   <TableRow key={idx}>
                     <TableCell className="font-medium text-sm">{row.metricName}</TableCell>
                     <TableCell className="text-center text-sm text-muted-foreground">{row.unit}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {row.currentValue !== null ? row.currentValue.toLocaleString() : "-"}
-                    </TableCell>
-                    {prevYear && (
-                      <TableCell className="text-right text-muted-foreground">
-                        {row.previousValue !== null ? row.previousValue.toLocaleString() : "-"}
+                    {tableYears.map((y, i) => (
+                      <TableCell key={y} className={`text-right ${i === 0 ? "font-semibold" : "text-muted-foreground"}`}>
+                        {(row.yearData[y] || 0) > 0 ? row.yearData[y].toLocaleString() : row.yearData[y] === 0 ? "0" : "-"}
                       </TableCell>
-                    )}
-                    {prevYear && (
+                    ))}
+                    {tableYears.length >= 2 && (
                       <TableCell className="text-right">
                         {row.changePercent !== null ? (
                           <Badge
@@ -916,7 +962,7 @@ export default function Governance() {
                 ))}
                 {summaryTableData.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={prevYear ? 5 : 3} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={tableYears.length + 3} className="text-center text-muted-foreground py-8">
                       {language === "th" ? "ยังไม่มีข้อมูล" : "No data available"}
                     </TableCell>
                   </TableRow>
