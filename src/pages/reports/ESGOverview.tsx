@@ -273,6 +273,7 @@ export default function ESGOverview() {
 
   // ─── Computed ───
   const uniqueYears = useMemo(() => [...new Set(periods.map(p => p.year))].sort((a, b) => b - a), [periods]);
+  const isAllTime = !filterYear;
   const selectedYear = filterYear ? parseInt(filterYear) : uniqueYears[0];
   const prevYear = selectedYear ? selectedYear - 1 : null;
 
@@ -281,6 +282,9 @@ export default function ESGOverview() {
     [sites, filterCompany]
   );
 
+  // When a specific year is selected, filter to that year.
+  // When "All Time", filteredValues = all data (for charts/totals),
+  // but we also compute latestYearValues for the summary table.
   const filteredValues = useMemo(() => {
     return metricValues.filter(v => {
       if (filterCompany) {
@@ -296,6 +300,20 @@ export default function ESGOverview() {
     });
   }, [metricValues, filterCompany, filterSite, filterYear, sites, periods]);
 
+  // For summary table: values for the latest year only (used when "All Time")
+  const latestYearValues = useMemo(() => {
+    if (!isAllTime) return filteredValues;
+    return metricValues.filter(v => {
+      if (filterCompany) {
+        const site = sites.find(s => s.site_id === v.site_id);
+        if (site?.company_id !== filterCompany) return false;
+      }
+      if (filterSite && v.site_id !== filterSite) return false;
+      const period = periods.find(p => p.period_id === v.period_id);
+      return period?.year === selectedYear;
+    });
+  }, [metricValues, isAllTime, filteredValues, filterCompany, filterSite, selectedYear, sites, periods]);
+
   const prevYearValues = useMemo(() => {
     if (!prevYear) return [];
     return metricValues.filter(v => {
@@ -309,9 +327,9 @@ export default function ESGOverview() {
     });
   }, [metricValues, prevYear, filterCompany, filterSite, sites, periods]);
 
-  // ─── YoY Helper ───
+  // ─── YoY Helper (uses latestYearValues for accurate comparison) ───
   const calcYoY = (metricId: string, context: "positive" | "negative" = "positive") => {
-    const curr = sumByMetric(filteredValues, metricId);
+    const curr = sumByMetric(latestYearValues, metricId);
     const prev = sumByMetric(prevYearValues, metricId);
     if (prevYearValues.length === 0) return { trend: null as "up" | "down" | "neutral" | null, trendValue: null as string | null };
     if (prev === 0 && curr === 0) return { trend: "neutral" as const, trendValue: "0%" };
@@ -324,7 +342,7 @@ export default function ESGOverview() {
   };
 
   const calcMultiYoY = (ids: string[], context: "positive" | "negative" = "positive") => {
-    const curr = sumByMetrics(filteredValues, ids);
+    const curr = sumByMetrics(latestYearValues, ids);
     const prev = sumByMetrics(prevYearValues, ids);
     if (prevYearValues.length === 0) return { trend: null as "up" | "down" | "neutral" | null, trendValue: null as string | null };
     if (prev === 0 && curr === 0) return { trend: "neutral" as const, trendValue: "0%" };
@@ -336,23 +354,23 @@ export default function ESGOverview() {
     };
   };
 
-  // ─── KPI values ───
-  const totalGHG = sumByMetrics(filteredValues, [ENV_METRICS.GHG_SCOPE1, ENV_METRICS.GHG_SCOPE2]);
-  const totalEnergy = sumByMetrics(filteredValues, [ENV_METRICS.GRID_ELECTRICITY, ENV_METRICS.RENEWABLE_ENERGY]);
-  const totalWater = sumByMetric(filteredValues, ENV_METRICS.WATER_WITHDRAWAL);
-  const totalWaste = sumByMetric(filteredValues, ENV_METRICS.TOTAL_WASTE);
-  const wasteRecycled = sumByMetric(filteredValues, ENV_METRICS.WASTE_RECYCLED);
-  const renewableEnergy = sumByMetric(filteredValues, ENV_METRICS.RENEWABLE_ENERGY);
+  // ─── KPI values (from latestYearValues for accurate single-year display) ───
+  const totalGHG = sumByMetrics(latestYearValues, [ENV_METRICS.GHG_SCOPE1, ENV_METRICS.GHG_SCOPE2]);
+  const totalEnergy = sumByMetrics(latestYearValues, [ENV_METRICS.GRID_ELECTRICITY, ENV_METRICS.RENEWABLE_ENERGY]);
+  const totalWater = sumByMetric(latestYearValues, ENV_METRICS.WATER_WITHDRAWAL);
+  const totalWaste = sumByMetric(latestYearValues, ENV_METRICS.TOTAL_WASTE);
+  const wasteRecycled = sumByMetric(latestYearValues, ENV_METRICS.WASTE_RECYCLED);
+  const renewableEnergy = sumByMetric(latestYearValues, ENV_METRICS.RENEWABLE_ENERGY);
 
-  const totalTraining = sumByMetric(filteredValues, SOCIAL_METRICS.TRAINING_HOURS);
-  const totalLTI = sumByMetric(filteredValues, SOCIAL_METRICS.LTI);
-  const totalWellbeing = sumByMetric(filteredValues, SOCIAL_METRICS.WELLBEING_ACCESS);
-  const totalWorkingHours = sumByMetric(filteredValues, SOCIAL_METRICS.WORKING_HOURS);
+  const totalTraining = sumByMetric(latestYearValues, SOCIAL_METRICS.TRAINING_HOURS);
+  const totalLTI = sumByMetric(latestYearValues, SOCIAL_METRICS.LTI);
+  const totalWellbeing = sumByMetric(latestYearValues, SOCIAL_METRICS.WELLBEING_ACCESS);
+  const totalWorkingHours = sumByMetric(latestYearValues, SOCIAL_METRICS.WORKING_HOURS);
   const ltifr = totalWorkingHours > 0 ? (totalLTI * 1_000_000) / totalWorkingHours : 0;
 
-  const totalGovIncidents = sumByMetric(filteredValues, GOV_METRICS.GOVERNANCE_INCIDENTS);
-  const totalCorruption = sumByMetric(filteredValues, GOV_METRICS.CORRUPTION_INCIDENTS);
-  const totalTaxTraining = sumByMetric(filteredValues, GOV_METRICS.TAX_TRAINING);
+  const totalGovIncidents = sumByMetric(latestYearValues, GOV_METRICS.GOVERNANCE_INCIDENTS);
+  const totalCorruption = sumByMetric(latestYearValues, GOV_METRICS.CORRUPTION_INCIDENTS);
+  const totalTaxTraining = sumByMetric(latestYearValues, GOV_METRICS.TAX_TRAINING);
 
   // Renewable %
   const renewablePercent = totalEnergy > 0 ? ((renewableEnergy / totalEnergy) * 100).toFixed(1) : "0";
@@ -424,9 +442,9 @@ export default function ESGOverview() {
     ];
 
     return items.map(item => {
-      const curr = sumByMetrics(filteredValues, item.ids);
+      const curr = sumByMetrics(latestYearValues, item.ids);
       const prev = sumByMetrics(prevYearValues, item.ids);
-      const hasCurrData = filteredValues.some(v => item.ids.includes(v.metric_id));
+      const hasCurrData = latestYearValues.some(v => item.ids.includes(v.metric_id));
       const hasPrevData = prevYearValues.some(v => item.ids.includes(v.metric_id));
       let changePercent: number | null = null;
       if (hasPrevData && prev > 0) changePercent = ((curr - prev) / prev) * 100;
@@ -435,7 +453,7 @@ export default function ESGOverview() {
 
       return { ...item, current: hasCurrData ? curr : null, previous: hasPrevData ? prev : null, changePercent };
     });
-  }, [filteredValues, prevYearValues, language]);
+  }, [latestYearValues, prevYearValues, language]);
 
   const getDimColor = (dim: string) => {
     if (dim === "E") return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
@@ -472,7 +490,9 @@ export default function ESGOverview() {
                 {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"}
               </Badge>
               <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
-                {language === "th" ? `ปี ${selectedYear}` : `Year ${selectedYear}`}
+                {isAllTime
+                  ? (language === "th" ? "เวลาทั้งหมด" : "All Time")
+                  : (language === "th" ? `ปี ${selectedYear}` : `Year ${selectedYear}`)}
               </Badge>
             </div>
           )}
@@ -578,9 +598,9 @@ export default function ESGOverview() {
           href="/reports/environmental"
           language={language}
           kpis={[
-            { label: "GHG Scope 1", value: sumByMetric(filteredValues, ENV_METRICS.GHG_SCOPE1).toLocaleString(), unit: "tCO2e", ...calcYoY(ENV_METRICS.GHG_SCOPE1, "negative"), trendContext: "negative" },
-            { label: "GHG Scope 2", value: sumByMetric(filteredValues, ENV_METRICS.GHG_SCOPE2).toLocaleString(), unit: "tCO2e", ...calcYoY(ENV_METRICS.GHG_SCOPE2, "negative"), trendContext: "negative" },
-            { label: language === "th" ? "ไฟฟ้า Grid" : "Grid Electricity", value: sumByMetric(filteredValues, ENV_METRICS.GRID_ELECTRICITY).toLocaleString(), unit: "kWh", ...calcYoY(ENV_METRICS.GRID_ELECTRICITY, "negative"), trendContext: "negative" },
+            { label: "GHG Scope 1", value: sumByMetric(latestYearValues, ENV_METRICS.GHG_SCOPE1).toLocaleString(), unit: "tCO2e", ...calcYoY(ENV_METRICS.GHG_SCOPE1, "negative"), trendContext: "negative" },
+            { label: "GHG Scope 2", value: sumByMetric(latestYearValues, ENV_METRICS.GHG_SCOPE2).toLocaleString(), unit: "tCO2e", ...calcYoY(ENV_METRICS.GHG_SCOPE2, "negative"), trendContext: "negative" },
+            { label: language === "th" ? "ไฟฟ้า Grid" : "Grid Electricity", value: sumByMetric(latestYearValues, ENV_METRICS.GRID_ELECTRICITY).toLocaleString(), unit: "kWh", ...calcYoY(ENV_METRICS.GRID_ELECTRICITY, "negative"), trendContext: "negative" },
             { label: language === "th" ? "พลังงานหมุนเวียน" : "Renewable", value: renewableEnergy.toLocaleString(), unit: "kWh", ...calcYoY(ENV_METRICS.RENEWABLE_ENERGY, "positive"), trendContext: "positive" },
             { label: language === "th" ? "น้ำที่ใช้" : "Water", value: totalWater.toLocaleString(), unit: "m³", ...calcYoY(ENV_METRICS.WATER_WITHDRAWAL, "negative"), trendContext: "negative" },
             { label: language === "th" ? "ขยะ Diversion" : "Waste Diversion", value: `${wasteDiversionRate}`, unit: "%", trend: null, trendValue: null },
@@ -599,7 +619,7 @@ export default function ESGOverview() {
             { label: "LTI", value: totalLTI.toLocaleString(), unit: language === "th" ? "ครั้ง" : "cases", ...calcYoY(SOCIAL_METRICS.LTI, "negative"), trendContext: "negative" },
             { label: "LTIFR", value: ltifr.toFixed(2), unit: "", trend: null, trendValue: null },
             { label: "Well-being", value: totalWellbeing.toLocaleString(), unit: language === "th" ? "คน" : "people", ...calcYoY(SOCIAL_METRICS.WELLBEING_ACCESS, "positive"), trendContext: "positive" },
-            { label: language === "th" ? "บริจาคอาหาร" : "Food Donation", value: sumByMetric(filteredValues, SOCIAL_METRICS.FOOD_DONATION).toLocaleString(), unit: "kg", ...calcYoY(SOCIAL_METRICS.FOOD_DONATION, "positive"), trendContext: "positive" },
+            { label: language === "th" ? "บริจาคอาหาร" : "Food Donation", value: sumByMetric(latestYearValues, SOCIAL_METRICS.FOOD_DONATION).toLocaleString(), unit: "kg", ...calcYoY(SOCIAL_METRICS.FOOD_DONATION, "positive"), trendContext: "positive" },
             { label: language === "th" ? "ชม.ทำงาน" : "Working Hrs", value: totalWorkingHours.toLocaleString(), unit: language === "th" ? "ชม." : "hrs", ...calcYoY(SOCIAL_METRICS.WORKING_HOURS), trendContext: "positive" },
           ]}
         />
