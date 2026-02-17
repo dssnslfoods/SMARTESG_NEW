@@ -190,6 +190,20 @@ export default function HelpCenter() {
                         : "Sum of direct (Scope 1) and indirect (Scope 2) greenhouse gas emissions"}
                       context="negative"
                     />
+                    <ExampleCard
+                      th={th}
+                      inputs={[
+                        { label: "GHG Scope 1 (MET003)", value: "120", unit: "tCO2e" },
+                        { label: "GHG Scope 2 (MET004)", value: "80", unit: "tCO2e" },
+                      ]}
+                      steps={["GHG Total = 120 + 80"]}
+                      result="200"
+                      resultUnit="tCO2e"
+                      interpretation={th
+                        ? "โรงงานปล่อยก๊าซเรือนกระจกรวม 200 ตันคาร์บอนไดออกไซด์เทียบเท่า"
+                        : "The factory emitted a total of 200 tonnes of CO2 equivalent"}
+                    />
+
                     <FormulaCard
                       title={th ? "สัดส่วนพลังงานสะอาด" : "Renewable Energy Ratio"}
                       formula="Renewable % = (Renewable Energy (MET002) / (Grid Electricity (MET001) + Renewable Energy (MET002))) × 100"
@@ -199,6 +213,23 @@ export default function HelpCenter() {
                         : "Proportion of renewable energy in total energy consumption. Higher is better."}
                       context="positive"
                     />
+                    <ExampleCard
+                      th={th}
+                      inputs={[
+                        { label: th ? "ไฟฟ้าจากกริด (MET001)" : "Grid Electricity (MET001)", value: "70,000", unit: "kWh" },
+                        { label: th ? "พลังงานหมุนเวียน (MET002)" : "Renewable Energy (MET002)", value: "30,000", unit: "kWh" },
+                      ]}
+                      steps={[
+                        th ? "พลังงานรวม = 70,000 + 30,000 = 100,000 kWh" : "Total Energy = 70,000 + 30,000 = 100,000 kWh",
+                        "Renewable % = (30,000 / 100,000) × 100",
+                      ]}
+                      result="30.0"
+                      resultUnit="%"
+                      interpretation={th
+                        ? "พลังงานหมุนเวียนคิดเป็น 30% ของพลังงานทั้งหมด"
+                        : "Renewable energy accounts for 30% of total energy consumption"}
+                    />
+
                     <FormulaCard
                       title={th ? "อัตราการรีไซเคิลขยะ (Waste Diversion Rate)" : "Waste Diversion Rate"}
                       formula="Diversion Rate = (Waste Recycled (MET021) / Total Waste (MET018)) × 100"
@@ -208,6 +239,20 @@ export default function HelpCenter() {
                         : "Proportion of waste recycled vs total waste. Higher is better."}
                       context="positive"
                     />
+                    <ExampleCard
+                      th={th}
+                      inputs={[
+                        { label: th ? "ขยะทั้งหมด (MET018)" : "Total Waste (MET018)", value: "10,000", unit: "kg" },
+                        { label: th ? "ขยะรีไซเคิล (MET021)" : "Waste Recycled (MET021)", value: "4,500", unit: "kg" },
+                      ]}
+                      steps={["Diversion Rate = (4,500 / 10,000) × 100"]}
+                      result="45.0"
+                      resultUnit="%"
+                      interpretation={th
+                        ? "ขยะ 45% ถูกนำกลับมารีไซเคิล ซึ่งช่วยลดปริมาณขยะฝังกลบ"
+                        : "45% of waste was recycled, reducing landfill volume"}
+                    />
+
                     <FormulaCard
                       title={th ? "อัตราการรีไซเคิลน้ำ (Water Recycling Rate)" : "Water Recycling Rate"}
                       formula="Water Recycling Rate = (Water Recycled (MET006) / Water Withdrawal (MET005)) × 100"
@@ -217,6 +262,20 @@ export default function HelpCenter() {
                         : "Proportion of water recycled vs total water withdrawal. Higher is better."}
                       context="positive"
                     />
+                    <ExampleCard
+                      th={th}
+                      inputs={[
+                        { label: th ? "น้ำที่ใช้ (MET005)" : "Water Withdrawal (MET005)", value: "8,000", unit: "m³" },
+                        { label: th ? "น้ำรีไซเคิล (MET006)" : "Water Recycled (MET006)", value: "2,400", unit: "m³" },
+                      ]}
+                      steps={["Water Recycling Rate = (2,400 / 8,000) × 100"]}
+                      result="30.0"
+                      resultUnit="%"
+                      interpretation={th
+                        ? "น้ำ 30% ถูกนำกลับมาใช้ซ้ำ ช่วยลดการใช้น้ำจากแหล่งธรรมชาติ"
+                        : "30% of water was recycled, reducing reliance on natural water sources"}
+                    />
+
                     <FormulaCard
                       title={th ? "สัดส่วนพลังงาน (Energy Mix)" : "Energy Mix"}
                       formula={`Grid % = (Grid Electricity (MET001) / Total Energy) × 100\nRenewable % = (Renewable Energy (MET002) / Total Energy) × 100`}
@@ -722,6 +781,53 @@ function FormulaCard({
         <span className="font-medium">{unit}</span>
         <span>—</span>
         <span>{description}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Reusable Example Card ───
+function ExampleCard({
+  th,
+  inputs,
+  steps,
+  result,
+  resultUnit,
+  interpretation,
+}: {
+  th: boolean;
+  inputs: { label: string; value: string; unit: string }[];
+  steps: string[];
+  result: string;
+  resultUnit: string;
+  interpretation: string;
+}) {
+  return (
+    <div className="bg-background/60 rounded-lg p-4 border border-border/30 space-y-3 ml-2">
+      <p className="font-semibold text-sm text-foreground">
+        {th ? "📌 ตัวอย่างการคำนวณ" : "📌 Calculation Example"}
+      </p>
+      <div className="text-sm space-y-2 text-muted-foreground">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {inputs.map((inp, i) => (
+            <div key={i} className="bg-muted/30 rounded-lg px-3 py-2">
+              <span className="text-xs text-muted-foreground">{inp.label}</span>
+              <p className="font-bold text-foreground text-lg">
+                {inp.value} <span className="text-xs font-normal text-muted-foreground">{inp.unit}</span>
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className="bg-primary/5 rounded-lg px-3 py-2 border border-primary/20 space-y-0.5">
+          <p className="text-xs text-muted-foreground mb-1">{th ? "แทนค่าในสูตร:" : "Substituting:"}</p>
+          {steps.map((step, i) => (
+            <p key={i} className="font-mono text-sm text-foreground">{step}</p>
+          ))}
+          <p className="font-mono text-sm font-bold text-primary">
+            = <span className="text-lg">{result}</span> {resultUnit}
+          </p>
+        </div>
+        <p>{interpretation}</p>
       </div>
     </div>
   );
