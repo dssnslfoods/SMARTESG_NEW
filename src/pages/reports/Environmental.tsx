@@ -240,8 +240,9 @@ export default function Environmental() {
 
   // ─── Computed Data ───
   const uniqueYears = useMemo(() => [...new Set(periods.map(p => p.year))].sort((a, b) => b - a), [periods]);
-  const selectedYear = filterYear ? parseInt(filterYear) : uniqueYears[0];
-  const prevYear = selectedYear ? selectedYear - 1 : null;
+  const isAllTime = !filterYear || filterYear === "__all__";
+  const selectedYear = (!isAllTime && filterYear) ? parseInt(filterYear) : uniqueYears[0];
+  const prevYear = isAllTime ? null : (selectedYear ? selectedYear - 1 : null);
 
   const filteredSites = useMemo(() =>
     filterCompany ? sites.filter(s => s.company_id === filterCompany) : sites,
@@ -255,7 +256,7 @@ export default function Environmental() {
         if (site?.company_id !== filterCompany) return false;
       }
       if (filterSite && v.site_id !== filterSite) return false;
-      if (filterYear) {
+      if (!isAllTime && filterYear) {
         const period = periods.find(p => p.period_id === v.period_id);
         if (period?.year !== parseInt(filterYear)) return false;
       }
@@ -313,35 +314,49 @@ export default function Environmental() {
   const waterYoY = calcYoY(waterWithdrawal, [METRIC.WATER_WITHDRAWAL]);
   const wasteYoY = calcYoY(totalWaste, [METRIC.TOTAL_WASTE]);
 
+  // ─── Helper: get relevant periods for charts ───
+  const chartPeriods = useMemo(() => {
+    if (isAllTime) {
+      const latestYear = uniqueYears[0];
+      return periods.filter(p => p.year === latestYear).sort((a, b) => a.month - b.month);
+    }
+    return periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
+  }, [periods, selectedYear, isAllTime, uniqueYears]);
+
+  // When All Time, get filteredValues for a specific month (across all years)
+  const getMonthValues = useCallback((month: number) => {
+    if (isAllTime) {
+      const monthPeriodIds = periods.filter(p => p.month === month).map(p => p.period_id);
+      return filteredValues.filter(v => monthPeriodIds.includes(v.period_id));
+    }
+    const periodId = periods.find(p => p.year === selectedYear && p.month === month)?.period_id;
+    return periodId ? filteredValues.filter(v => v.period_id === periodId) : [];
+  }, [filteredValues, periods, selectedYear, isAllTime]);
+
   // ─── Monthly Sparkline ───
   const monthlySparkline = useCallback((metricIds: string[]) => {
-    if (!selectedYear) return [];
-    const yearPeriods = periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
-    return yearPeriods.map(period => {
-      return filteredValues
-        .filter(v => v.period_id === period.period_id && metricIds.includes(v.metric_id))
-        .reduce((s, v) => s + v.value, 0);
+    if (chartPeriods.length === 0) return [];
+    return chartPeriods.map(period => {
+      const pv = getMonthValues(period.month);
+      return pv.filter(v => metricIds.includes(v.metric_id)).reduce((s, v) => s + v.value, 0);
     }).filter(v => v > 0);
-  }, [filteredValues, periods, selectedYear]);
+  }, [chartPeriods, getMonthValues]);
 
   // ─── GHG Monthly Chart Data ───
   const ghgChartData = useMemo(() => {
-    if (!selectedYear) return [];
-    return periods
-      .filter(p => p.year === selectedYear)
-      .sort((a, b) => a.month - b.month)
-      .map(period => {
-        const pv = filteredValues.filter(v => v.period_id === period.period_id);
-        const scope1 = pv.filter(v => v.metric_id === METRIC.GHG_SCOPE1).reduce((s, v) => s + v.value, 0);
-        const scope2 = pv.filter(v => v.metric_id === METRIC.GHG_SCOPE2).reduce((s, v) => s + v.value, 0);
-        return {
-          name: period.month_name.slice(0, 3),
-          scope1: scope1 || null,
-          scope2: scope2 || null,
-          total: (scope1 + scope2) || null,
-        };
-      });
-  }, [filteredValues, periods, selectedYear]);
+    if (chartPeriods.length === 0) return [];
+    return chartPeriods.map(period => {
+      const pv = getMonthValues(period.month);
+      const scope1 = pv.filter(v => v.metric_id === METRIC.GHG_SCOPE1).reduce((s, v) => s + v.value, 0);
+      const scope2 = pv.filter(v => v.metric_id === METRIC.GHG_SCOPE2).reduce((s, v) => s + v.value, 0);
+      return {
+        name: period.month_name.slice(0, 3),
+        scope1: scope1 || null,
+        scope2: scope2 || null,
+        total: (scope1 + scope2) || null,
+      };
+    });
+  }, [chartPeriods, getMonthValues]);
   const hasGhgData = ghgChartData.some(d => d.total !== null);
 
   // ─── Energy Mix Pie ───
@@ -375,21 +390,18 @@ export default function Environmental() {
 
   // ─── Electricity Monthly (Grid vs Renewable) ───
   const electricityChartData = useMemo(() => {
-    if (!selectedYear) return [];
-    return periods
-      .filter(p => p.year === selectedYear)
-      .sort((a, b) => a.month - b.month)
-      .map(period => {
-        const pv = filteredValues.filter(v => v.period_id === period.period_id);
-        const grid = pv.filter(v => v.metric_id === METRIC.GRID_ELECTRICITY).reduce((s, v) => s + v.value, 0);
-        const renew = pv.filter(v => v.metric_id === METRIC.RENEWABLE_ENERGY).reduce((s, v) => s + v.value, 0);
-        return {
-          name: period.month_name.slice(0, 3),
-          grid: grid || null,
-          renewable: renew || null,
-        };
-      });
-  }, [filteredValues, periods, selectedYear]);
+    if (chartPeriods.length === 0) return [];
+    return chartPeriods.map(period => {
+      const pv = getMonthValues(period.month);
+      const grid = pv.filter(v => v.metric_id === METRIC.GRID_ELECTRICITY).reduce((s, v) => s + v.value, 0);
+      const renew = pv.filter(v => v.metric_id === METRIC.RENEWABLE_ENERGY).reduce((s, v) => s + v.value, 0);
+      return {
+        name: period.month_name.slice(0, 3),
+        grid: grid || null,
+        renewable: renew || null,
+      };
+    });
+  }, [chartPeriods, getMonthValues]);
   const hasElectricityData = electricityChartData.some(d => d.grid !== null || d.renewable !== null);
 
   // ─── Water by Site ───
@@ -410,18 +422,15 @@ export default function Environmental() {
 
   // ─── Water Balance (Withdrawal / Discharge / Recycling) ───
   const waterBalanceData = useMemo(() => {
-    if (!selectedYear) return [];
-    return periods
-      .filter(p => p.year === selectedYear)
-      .sort((a, b) => a.month - b.month)
-      .map(period => {
-        const pv = filteredValues.filter(v => v.period_id === period.period_id);
-        const wd = pv.filter(v => v.metric_id === METRIC.WATER_WITHDRAWAL).reduce((s, v) => s + v.value, 0);
-        const wdis = pv.filter(v => v.metric_id === METRIC.WATER_DISCHARGE).reduce((s, v) => s + v.value, 0);
-        const wr = pv.filter(v => v.metric_id === METRIC.WATER_RECYCLING).reduce((s, v) => s + v.value, 0);
-        return { name: period.month_name.slice(0, 3), withdrawal: wd || null, discharge: wdis || null, recycling: wr || null };
-      });
-  }, [filteredValues, periods, selectedYear]);
+    if (chartPeriods.length === 0) return [];
+    return chartPeriods.map(period => {
+      const pv = getMonthValues(period.month);
+      const wd = pv.filter(v => v.metric_id === METRIC.WATER_WITHDRAWAL).reduce((s, v) => s + v.value, 0);
+      const wdis = pv.filter(v => v.metric_id === METRIC.WATER_DISCHARGE).reduce((s, v) => s + v.value, 0);
+      const wr = pv.filter(v => v.metric_id === METRIC.WATER_RECYCLING).reduce((s, v) => s + v.value, 0);
+      return { name: period.month_name.slice(0, 3), withdrawal: wd || null, discharge: wdis || null, recycling: wr || null };
+    });
+  }, [chartPeriods, getMonthValues]);
   const hasWaterBalanceData = waterBalanceData.some(d => d.withdrawal !== null);
 
   // ─── Waste Pie (Recycled vs Landfill) ───

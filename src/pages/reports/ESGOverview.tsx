@@ -292,7 +292,7 @@ export default function ESGOverview() {
         if (site?.company_id !== filterCompany) return false;
       }
       if (filterSite && v.site_id !== filterSite) return false;
-      if (filterYear) {
+      if (!isAllTime && filterYear) {
         const period = periods.find(p => p.period_id === v.period_id);
         if (period?.year !== parseInt(filterYear)) return false;
       }
