@@ -48,6 +48,7 @@ import {
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { ExportExcelButton } from "@/components/ExportExcelButton";
 
 // ─── Metric ID Constants ───
 const METRIC = {
@@ -508,6 +509,22 @@ export default function Social() {
             </Badge>
           )}
         </div>
+        <ExportExcelButton
+          data={summaryTableData.map(row => ({
+            [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.name,
+            [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+            [language === "th" ? `ค่าปี ${selectedYear}` : `Value ${selectedYear}`]: row.current,
+            ...(prevYear ? { [language === "th" ? `ค่าปี ${prevYear}` : `Value ${prevYear}`]: row.prev } : {}),
+            ...(prevYear ? { [language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"]: row.change !== null ? `${row.change >= 0 ? "+" : ""}${row.change.toFixed(1)}%` : "-" } : {}),
+          }))}
+          filenamePrefix="social_report"
+          sourcePage="Social Dashboard"
+          appliedFilters={{
+            company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
+            site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
+            year: isAllTime ? "All Time" : String(selectedYear),
+          }}
+        />
       </div>
 
       {/* Filters */}

@@ -56,6 +56,7 @@ import {
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { ExportExcelButton } from "@/components/ExportExcelButton";
 
 // ─── All Key Metric IDs across E, S, G ───
 const ENV_METRICS = {
@@ -497,6 +498,23 @@ export default function ESGOverview() {
             </div>
           )}
         </div>
+        <ExportExcelButton
+          data={summaryData.map(row => ({
+            [language === "th" ? "มิติ" : "Dimension"]: row.dim,
+            [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.label,
+            [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+            [language === "th" ? `ค่าปี ${selectedYear}` : `Value ${selectedYear}`]: row.current ?? "-",
+            ...(prevYear ? { [language === "th" ? `ค่าปี ${prevYear}` : `Value ${prevYear}`]: row.previous ?? "-" } : {}),
+            ...(prevYear ? { [language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"]: row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-" } : {}),
+          }))}
+          filenamePrefix="esg_overview_report"
+          sourcePage="ESG Overview Dashboard"
+          appliedFilters={{
+            company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
+            site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
+            year: isAllTime ? "All Time" : String(selectedYear),
+          }}
+        />
       </div>
 
       {/* Filters */}

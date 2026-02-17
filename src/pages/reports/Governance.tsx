@@ -51,6 +51,7 @@ import {
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { ExportExcelButton } from "@/components/ExportExcelButton";
 
 // ─── Metric ID Constants ───
 const METRIC = {
@@ -521,6 +522,22 @@ export default function Governance() {
             </div>
           )}
         </div>
+        <ExportExcelButton
+          data={(summaryTableData.filter(Boolean) as { metricName: string; unit: string; currentValue: number | null; previousValue: number | null; changePercent: number | null }[]).map(row => ({
+            [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.metricName,
+            [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+            [language === "th" ? `ค่าปี ${selectedYear}` : `Value ${selectedYear}`]: row.currentValue ?? "-",
+            ...(prevYear ? { [language === "th" ? `ค่าปี ${prevYear}` : `Value ${prevYear}`]: row.previousValue ?? "-" } : {}),
+            ...(prevYear ? { [language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"]: row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-" } : {}),
+          }))}
+          filenamePrefix="governance_report"
+          sourcePage="Governance Dashboard"
+          appliedFilters={{
+            company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
+            site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
+            year: isAllTime ? "All Time" : String(selectedYear),
+          }}
+        />
       </div>
 
       {/* Filters */}
