@@ -23,6 +23,7 @@ import {
   ChevronDown,
   Scale,
   Heart,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -86,6 +87,12 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       label: language === 'th' ? 'ธรรมาภิบาล' : 'Governance',
       href: '/reports/governance',
       icon: Scale,
+      roles: ['admin', 'executive'],
+    },
+    {
+      label: language === 'th' ? 'ESG Overview' : 'ESG Overview',
+      href: '/reports/esg-overview',
+      icon: Globe,
       roles: ['admin', 'executive'],
     },
   ];
