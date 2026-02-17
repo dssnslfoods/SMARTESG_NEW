@@ -313,26 +313,26 @@ export default function ESGOverview() {
   const calcYoY = (metricId: string, context: "positive" | "negative" = "positive") => {
     const curr = sumByMetric(filteredValues, metricId);
     const prev = sumByMetric(prevYearValues, metricId);
-    if (prevYearValues.length === 0) return { trend: null as "up" | "down" | "neutral" | null, value: null as string | null };
-    if (prev === 0 && curr === 0) return { trend: "neutral" as const, value: "0%" };
-    if (prev === 0) return { trend: "up" as const, value: "+100%" };
+    if (prevYearValues.length === 0) return { trend: null as "up" | "down" | "neutral" | null, trendValue: null as string | null };
+    if (prev === 0 && curr === 0) return { trend: "neutral" as const, trendValue: "0%" };
+    if (prev === 0) return { trend: "up" as const, trendValue: "+100%" };
     const change = ((curr - prev) / prev) * 100;
     return {
       trend: (change > 0 ? "up" : change < 0 ? "down" : "neutral") as "up" | "down" | "neutral",
-      value: `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`,
+      trendValue: `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`,
     };
   };
 
   const calcMultiYoY = (ids: string[], context: "positive" | "negative" = "positive") => {
     const curr = sumByMetrics(filteredValues, ids);
     const prev = sumByMetrics(prevYearValues, ids);
-    if (prevYearValues.length === 0) return { trend: null as "up" | "down" | "neutral" | null, value: null as string | null };
-    if (prev === 0 && curr === 0) return { trend: "neutral" as const, value: "0%" };
-    if (prev === 0) return { trend: "up" as const, value: "+100%" };
+    if (prevYearValues.length === 0) return { trend: null as "up" | "down" | "neutral" | null, trendValue: null as string | null };
+    if (prev === 0 && curr === 0) return { trend: "neutral" as const, trendValue: "0%" };
+    if (prev === 0) return { trend: "up" as const, trendValue: "+100%" };
     const change = ((curr - prev) / prev) * 100;
     return {
       trend: (change > 0 ? "up" : change < 0 ? "down" : "neutral") as "up" | "down" | "neutral",
-      value: `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`,
+      trendValue: `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`,
     };
   };
 
@@ -533,10 +533,10 @@ export default function ESGOverview() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: "GHG", value: totalGHG.toLocaleString(), unit: "tCO2e", icon: Factory, color: "hsl(142 71% 45%)", yoy: calcMultiYoY([ENV_METRICS.GHG_SCOPE1, ENV_METRICS.GHG_SCOPE2], "negative"), ctx: "negative" as const },
-          { label: language === "th" ? "พลังงานสะอาด" : "Renewable %", value: `${renewablePercent}`, unit: "%", icon: Zap, color: "hsl(45 93% 47%)", yoy: { trend: null, value: null }, ctx: "positive" as const },
+          { label: language === "th" ? "พลังงานสะอาด" : "Renewable %", value: `${renewablePercent}`, unit: "%", icon: Zap, color: "hsl(45 93% 47%)", yoy: { trend: null, trendValue: null } as { trend: null; trendValue: null }, ctx: "positive" as const },
           { label: language === "th" ? "น้ำ" : "Water", value: totalWater.toLocaleString(), unit: "m³", icon: Droplets, color: "hsl(199 89% 48%)", yoy: calcYoY(ENV_METRICS.WATER_WITHDRAWAL, "negative"), ctx: "negative" as const },
           { label: language === "th" ? "อบรม" : "Training", value: totalTraining.toLocaleString(), unit: language === "th" ? "ชม." : "hrs", icon: GraduationCap, color: "hsl(217 91% 60%)", yoy: calcYoY(SOCIAL_METRICS.TRAINING_HOURS, "positive"), ctx: "positive" as const },
-          { label: "LTIFR", value: ltifr.toFixed(2), unit: "", icon: AlertTriangle, color: "hsl(0 84% 60%)", yoy: { trend: null, value: null }, ctx: "negative" as const },
+          { label: "LTIFR", value: ltifr.toFixed(2), unit: "", icon: AlertTriangle, color: "hsl(0 84% 60%)", yoy: { trend: null, trendValue: null } as { trend: null; trendValue: null }, ctx: "negative" as const },
           { label: language === "th" ? "เหตุการณ์ G" : "Gov Incidents", value: (totalGovIncidents + totalCorruption).toString(), unit: language === "th" ? "เรื่อง" : "cases", icon: Shield, color: "hsl(262 83% 58%)", yoy: calcMultiYoY([GOV_METRICS.GOVERNANCE_INCIDENTS, GOV_METRICS.CORRUPTION_INCIDENTS], "negative"), ctx: "negative" as const },
         ].map((kpi, i) => {
           const ctx = kpi.ctx;
@@ -556,10 +556,10 @@ export default function ESGOverview() {
                   <span className="text-lg font-bold text-foreground">{kpi.value}</span>
                   {kpi.unit && <span className="text-xs text-muted-foreground">{kpi.unit}</span>}
                 </div>
-                {kpi.yoy.trend && kpi.yoy.value && (
+                {kpi.yoy.trend && kpi.yoy.trendValue && (
                   <div className={`flex items-center gap-0.5 text-xs mt-0.5 ${getTrendColor()}`}>
                     {kpi.yoy.trend === "up" ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-                    <span>{kpi.yoy.value}</span>
+                    <span>{kpi.yoy.trendValue}</span>
                   </div>
                 )}
               </CardContent>
