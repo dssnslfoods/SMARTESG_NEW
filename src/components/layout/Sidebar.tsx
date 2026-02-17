@@ -24,6 +24,7 @@ import {
   Scale,
   Heart,
   Globe,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -124,6 +125,12 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       href: '/backup-data',
       icon: HardDrive,
       roles: ['admin'],
+    },
+    {
+      label: language === 'th' ? 'ศูนย์ช่วยเหลือ' : 'Help Center',
+      href: '/help-center',
+      icon: BookOpen,
+      roles: ['admin', 'supervisor'],
     },
   ];
 
