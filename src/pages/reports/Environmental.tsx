@@ -476,35 +476,70 @@ export default function Environmental() {
       .sort((a, b) => (b.scope1 + b.scope2) - (a.scope1 + a.scope2));
   }, [filteredValues, filteredSites]);
 
+  // ─── Years with data (for multi-year table) ───
+  const yearsWithData = useMemo(() => {
+    const yearSet = new Set<number>();
+    metricValues.forEach(v => {
+      const p = periods.find(pp => pp.period_id === v.period_id);
+      if (p) yearSet.add(p.year);
+    });
+    return [...yearSet].sort((a, b) => b - a);
+  }, [metricValues, periods]);
+
   // ─── Summary Table Data ───
   const summaryTableData = useMemo(() => {
     const metricMap = new Map(metrics.map(m => [m.metric_id, m]));
-    const grouped = new Map<string, { current: number; prev: number }>();
 
+    if (isAllTime) {
+      // Multi-year: compute per-year values for each metric
+      const grouped = new Map<string, Record<number, number>>();
+      for (const v of filteredValues) {
+        if (!metricMap.has(v.metric_id)) continue;
+        const period = periods.find(p => p.period_id === v.period_id);
+        if (!period) continue;
+        const existing = grouped.get(v.metric_id) || {};
+        existing[period.year] = (existing[period.year] || 0) + v.value;
+        grouped.set(v.metric_id, existing);
+      }
+      return Array.from(grouped.entries())
+        .map(([id, yearData]) => {
+          const m = metricMap.get(id)!;
+          const latestTwo = yearsWithData.slice(0, 2);
+          const curr = yearData[latestTwo[0]] || 0;
+          const prev = latestTwo.length > 1 ? (yearData[latestTwo[1]] || 0) : 0;
+          const change = prev > 0 ? ((curr - prev) / prev * 100) : null;
+          return { id, name: m.metric_name, unit: m.unit || "", yearData, change };
+        })
+        .filter(d => Object.values(d.yearData).some(v => v > 0))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    // Single year mode
+    const grouped = new Map<string, { current: number; prev: number }>();
     for (const v of filteredValues) {
-      const m = metricMap.get(v.metric_id);
-      if (!m) continue;
+      if (!metricMap.has(v.metric_id)) continue;
       const existing = grouped.get(v.metric_id) || { current: 0, prev: 0 };
       existing.current += v.value;
       grouped.set(v.metric_id, existing);
     }
     for (const v of prevYearValues) {
-      const m = metricMap.get(v.metric_id);
-      if (!m) continue;
+      if (!metricMap.has(v.metric_id)) continue;
       const existing = grouped.get(v.metric_id) || { current: 0, prev: 0 };
       existing.prev += v.value;
       grouped.set(v.metric_id, existing);
     }
-
     return Array.from(grouped.entries())
       .map(([id, data]) => {
         const m = metricMap.get(id)!;
         const change = data.prev > 0 ? ((data.current - data.prev) / data.prev * 100) : null;
-        return { id, name: m.metric_name, unit: m.unit || "", current: data.current, prev: data.prev, change };
+        return { id, name: m.metric_name, unit: m.unit || "", yearData: { [selectedYear]: data.current, ...(prevYear ? { [prevYear]: data.prev } : {}) }, change };
       })
-      .filter(d => d.current > 0 || d.prev > 0)
+      .filter(d => Object.values(d.yearData).some(v => v > 0))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [filteredValues, prevYearValues, metrics]);
+  }, [filteredValues, prevYearValues, metrics, isAllTime, periods, yearsWithData, selectedYear, prevYear]);
+
+  // Display years for table columns
+  const tableYears = useMemo(() => isAllTime ? yearsWithData : (prevYear ? [selectedYear, prevYear] : [selectedYear]), [isAllTime, yearsWithData, selectedYear, prevYear]);
 
   // ─── Chart Colors ───
   const SCOPE_COLORS = {
@@ -541,13 +576,17 @@ export default function Environmental() {
           )}
         </div>
         <ExportExcelButton
-          data={summaryTableData.map(row => ({
-            [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.name,
-            [language === "th" ? "หน่วย" : "Unit"]: row.unit,
-            [language === "th" ? `ค่าปี ${selectedYear}` : `Value ${selectedYear}`]: row.current,
-            ...(prevYear ? { [language === "th" ? `ค่าปี ${prevYear}` : `Value ${prevYear}`]: row.prev } : {}),
-            ...(prevYear ? { [language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"]: row.change !== null ? `${row.change >= 0 ? "+" : ""}${row.change.toFixed(1)}%` : "-" } : {}),
-          }))}
+          data={summaryTableData.map(row => {
+            const exportRow: Record<string, unknown> = {
+              [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.name,
+              [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+            };
+            tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] || "-"; });
+            if (tableYears.length >= 2) {
+              exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.change !== null ? `${row.change >= 0 ? "+" : ""}${row.change.toFixed(1)}%` : "-";
+            }
+            return exportRow;
+          })}
           filenamePrefix="environmental_report"
           sourcePage="Environmental Dashboard"
           appliedFilters={{
@@ -940,7 +979,9 @@ export default function Environmental() {
                 {language === "th" ? "สรุปตัวชี้วัดด้านสิ่งแวดล้อม" : "Environmental Metrics Summary"}
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                {language === "th" ? `เปรียบเทียบ ${selectedYear} vs ${prevYear}` : `${selectedYear} vs ${prevYear} comparison`}
+                {isAllTime
+                  ? (language === "th" ? `เปรียบเทียบทุกปี (${tableYears.join(", ")})` : `All years comparison (${tableYears.join(", ")})`)
+                  : (language === "th" ? `เปรียบเทียบ ${selectedYear} vs ${prevYear}` : `${selectedYear} vs ${prevYear} comparison`)}
               </p>
             </div>
           </CardHeader>
@@ -950,9 +991,12 @@ export default function Environmental() {
                 <tr className="border-b border-border/50">
                   <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">{language === "th" ? "ตัวชี้วัด" : "Metric"}</th>
                   <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">{language === "th" ? "หน่วย" : "Unit"}</th>
-                  <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">{selectedYear}</th>
-                  <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">{prevYear}</th>
-                  <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">YoY</th>
+                  {tableYears.map(y => (
+                    <th key={y} className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">{y}</th>
+                  ))}
+                  {tableYears.length >= 2 && (
+                    <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">YoY</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -960,16 +1004,21 @@ export default function Environmental() {
                   <tr key={row.id} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
                     <td className="py-2.5 px-3 text-xs">{row.name}</td>
                     <td className="py-2.5 px-3 text-xs text-right text-muted-foreground">{row.unit}</td>
-                    <td className="py-2.5 px-3 text-xs text-right font-medium">{row.current.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                    <td className="py-2.5 px-3 text-xs text-right text-muted-foreground">{row.prev > 0 ? row.prev.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "-"}</td>
-                    <td className="py-2.5 px-3 text-xs text-right">
-                      {row.change !== null ? (
-                        <span className={`inline-flex items-center gap-0.5 ${row.change < 0 ? "text-emerald-600" : row.change > 0 ? "text-destructive" : "text-muted-foreground"}`}>
-                          {row.change > 0 ? <TrendingUp className="h-3 w-3" /> : row.change < 0 ? <TrendingDown className="h-3 w-3" /> : null}
-                          {row.change > 0 ? "+" : ""}{row.change.toFixed(1)}%
-                        </span>
-                      ) : "-"}
-                    </td>
+                    {tableYears.map((y, i) => (
+                      <td key={y} className={`py-2.5 px-3 text-xs text-right ${i === 0 ? "font-medium" : "text-muted-foreground"}`}>
+                        {(row.yearData[y] || 0) > 0 ? row.yearData[y].toLocaleString(undefined, { maximumFractionDigits: 2 }) : "-"}
+                      </td>
+                    ))}
+                    {tableYears.length >= 2 && (
+                      <td className="py-2.5 px-3 text-xs text-right">
+                        {row.change !== null ? (
+                          <span className={`inline-flex items-center gap-0.5 ${row.change < 0 ? "text-emerald-600" : row.change > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                            {row.change > 0 ? <TrendingUp className="h-3 w-3" /> : row.change < 0 ? <TrendingDown className="h-3 w-3" /> : null}
+                            {row.change > 0 ? "+" : ""}{row.change.toFixed(1)}%
+                          </span>
+                        ) : "-"}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

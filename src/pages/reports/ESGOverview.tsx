@@ -274,9 +274,9 @@ export default function ESGOverview() {
 
   // ─── Computed ───
   const uniqueYears = useMemo(() => [...new Set(periods.map(p => p.year))].sort((a, b) => b - a), [periods]);
-  const isAllTime = !filterYear;
-  const selectedYear = filterYear ? parseInt(filterYear) : uniqueYears[0];
-  const prevYear = selectedYear ? selectedYear - 1 : null;
+  const isAllTime = !filterYear || filterYear === "__all__";
+  const selectedYear = (!isAllTime && filterYear) ? parseInt(filterYear) : uniqueYears[0];
+  const prevYear = isAllTime ? null : (selectedYear ? selectedYear - 1 : null);
 
   const filteredSites = useMemo(() =>
     filterCompany ? sites.filter(s => s.company_id === filterCompany) : sites,
@@ -424,6 +424,17 @@ export default function ESGOverview() {
     { subject: language === "th" ? "ความปลอดภัย" : "Safety", value: totalLTI === 0 ? 100 : Math.max(100 - totalLTI * 10, 0), fullMark: 100 },
     { subject: language === "th" ? "ธรรมาภิบาล" : "Governance", value: totalGovIncidents + totalCorruption === 0 ? 100 : Math.max(100 - (totalGovIncidents + totalCorruption) * 20, 0), fullMark: 100 },
   ], [totalGHG, totalEnergy, totalWater, totalTraining, totalLTI, totalGovIncidents, totalCorruption, language]);
+  // ─── Years with data ───
+  const yearsWithData = useMemo(() => {
+    const yearSet = new Set<number>();
+    metricValues.forEach(v => {
+      const p = periods.find(pp => pp.period_id === v.period_id);
+      if (p) yearSet.add(p.year);
+    });
+    return [...yearSet].sort((a, b) => b - a);
+  }, [metricValues, periods]);
+
+  const tableYears = useMemo(() => isAllTime ? yearsWithData : (prevYear ? [selectedYear, prevYear] : [selectedYear]), [isAllTime, yearsWithData, selectedYear, prevYear]);
 
   // ─── Summary Table ───
   const summaryData = useMemo(() => {
@@ -442,6 +453,25 @@ export default function ESGOverview() {
       { dim: "G", label: language === "th" ? "เหตุการณ์ทุจริต" : "Corruption", ids: [GOV_METRICS.CORRUPTION_INCIDENTS], unit: language === "th" ? "ข้อ" : "cases", context: "negative" as const },
     ];
 
+    if (isAllTime) {
+      return items.map(item => {
+        const yearData: Record<number, number> = {};
+        filteredValues.forEach(v => {
+          if (!item.ids.includes(v.metric_id)) return;
+          const period = periods.find(p => p.period_id === v.period_id);
+          if (!period) return;
+          yearData[period.year] = (yearData[period.year] || 0) + v.value;
+        });
+        const latestTwo = yearsWithData.slice(0, 2);
+        const curr = yearData[latestTwo[0]] || 0;
+        const prev = latestTwo.length > 1 ? (yearData[latestTwo[1]] || 0) : 0;
+        let changePercent: number | null = null;
+        if (prev > 0) changePercent = ((curr - prev) / prev) * 100;
+        else if (curr > 0) changePercent = 100;
+        return { ...item, yearData, changePercent };
+      });
+    }
+
     return items.map(item => {
       const curr = sumByMetrics(latestYearValues, item.ids);
       const prev = sumByMetrics(prevYearValues, item.ids);
@@ -452,9 +482,13 @@ export default function ESGOverview() {
       else if (hasPrevData && curr > 0) changePercent = 100;
       else if (hasPrevData) changePercent = 0;
 
-      return { ...item, current: hasCurrData ? curr : null, previous: hasPrevData ? prev : null, changePercent };
+      const yearData: Record<number, number> = {};
+      if (hasCurrData) yearData[selectedYear] = curr;
+      if (hasPrevData && prevYear) yearData[prevYear] = prev;
+
+      return { ...item, yearData, changePercent };
     });
-  }, [latestYearValues, prevYearValues, language]);
+  }, [filteredValues, latestYearValues, prevYearValues, language, isAllTime, periods, yearsWithData, selectedYear, prevYear]);
 
   const getDimColor = (dim: string) => {
     if (dim === "E") return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
@@ -499,14 +533,18 @@ export default function ESGOverview() {
           )}
         </div>
         <ExportExcelButton
-          data={summaryData.map(row => ({
-            [language === "th" ? "มิติ" : "Dimension"]: row.dim,
-            [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.label,
-            [language === "th" ? "หน่วย" : "Unit"]: row.unit,
-            [language === "th" ? `ค่าปี ${selectedYear}` : `Value ${selectedYear}`]: row.current ?? "-",
-            ...(prevYear ? { [language === "th" ? `ค่าปี ${prevYear}` : `Value ${prevYear}`]: row.previous ?? "-" } : {}),
-            ...(prevYear ? { [language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"]: row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-" } : {}),
-          }))}
+          data={summaryData.map(row => {
+            const exportRow: Record<string, unknown> = {
+              [language === "th" ? "มิติ" : "Dimension"]: row.dim,
+              [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.label,
+              [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+            };
+            tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] ?? "-"; });
+            if (tableYears.length >= 2) {
+              exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-";
+            }
+            return exportRow;
+          })}
           filenamePrefix="esg_overview_report"
           sourcePage="ESG Overview Dashboard"
           appliedFilters={{
@@ -755,11 +793,11 @@ export default function ESGOverview() {
           <CardTitle className="text-base font-medium">
             {language === "th" ? "สรุปตัวชี้วัด ESG ทั้งหมด" : "Complete ESG Metrics Summary"}
           </CardTitle>
-          {prevYear && (
-            <Badge variant="outline" className="ml-auto text-xs">
-              {selectedYear} vs {prevYear}
-            </Badge>
-          )}
+          <Badge variant="outline" className="ml-auto text-xs">
+            {isAllTime
+              ? (language === "th" ? `ทุกปี (${tableYears.join(", ")})` : `All years (${tableYears.join(", ")})`)
+              : `${selectedYear} vs ${prevYear}`}
+          </Badge>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -769,9 +807,12 @@ export default function ESGOverview() {
                   <TableHead className="w-[60px]">ESG</TableHead>
                   <TableHead className="min-w-[180px]">{language === "th" ? "ตัวชี้วัด" : "Metric"}</TableHead>
                   <TableHead className="text-center">{language === "th" ? "หน่วย" : "Unit"}</TableHead>
-                  <TableHead className="text-right">{selectedYear}</TableHead>
-                  {prevYear && <TableHead className="text-right">{prevYear}</TableHead>}
-                  {prevYear && <TableHead className="text-right">{language === "th" ? "เปลี่ยนแปลง" : "Change"}</TableHead>}
+                  {tableYears.map(y => (
+                    <TableHead key={y} className="text-right">{y}</TableHead>
+                  ))}
+                  {tableYears.length >= 2 && (
+                    <TableHead className="text-right">{language === "th" ? "เปลี่ยนแปลง" : "Change"}</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -782,15 +823,12 @@ export default function ESGOverview() {
                     </TableCell>
                     <TableCell className="font-medium text-sm">{row.label}</TableCell>
                     <TableCell className="text-center text-sm text-muted-foreground">{row.unit}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {row.current !== null ? row.current.toLocaleString() : "-"}
-                    </TableCell>
-                    {prevYear && (
-                      <TableCell className="text-right text-muted-foreground">
-                        {row.previous !== null ? row.previous.toLocaleString() : "-"}
+                    {tableYears.map((y, i) => (
+                      <TableCell key={y} className={`text-right ${i === 0 ? "font-semibold" : "text-muted-foreground"}`}>
+                        {row.yearData[y] != null && row.yearData[y] > 0 ? row.yearData[y].toLocaleString() : row.yearData[y] === 0 ? "0" : "-"}
                       </TableCell>
-                    )}
-                    {prevYear && (
+                    ))}
+                    {tableYears.length >= 2 && (
                       <TableCell className="text-right">
                         {row.changePercent !== null ? (
                           <Badge variant="outline" className={
