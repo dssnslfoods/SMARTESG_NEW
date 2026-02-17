@@ -1,5 +1,4 @@
 import { useLanguage } from "@/contexts/LanguageContext";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -34,7 +33,7 @@ export default function HelpCenter() {
   const th = language === "th";
 
   return (
-    <MainLayout>
+    <>
       <div className="space-y-6 pb-8 bg-gradient-to-br from-background via-background to-primary/5 min-h-screen -m-6 p-6">
         {/* Header */}
         <div>
@@ -599,7 +598,7 @@ export default function HelpCenter() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
+    </>
   );
 }
 
