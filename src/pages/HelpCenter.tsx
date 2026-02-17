@@ -249,6 +249,93 @@ export default function HelpCenter() {
                         : "Rate of lost-time injuries per 1 million working hours. Lower is better. If Working Hours = 0, displays as 0.00."}
                       context="negative"
                     />
+                    {/* LTIFR Detailed Explanation & Example */}
+                    <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-border/30">
+                      <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
+                        <Calculator className="h-4 w-4 text-amber-600" />
+                        {th ? "อธิบายสูตร LTIFR อย่างละเอียด" : "LTIFR Formula Explained"}
+                      </h4>
+                      <div className="text-sm text-muted-foreground space-y-2">
+                        <p>
+                          {th
+                            ? "LTIFR (Lost Time Injury Frequency Rate) เป็นดัชนีมาตรฐานสากลที่ใช้วัดอัตราการเกิดอุบัติเหตุที่ทำให้พนักงานต้องหยุดงาน โดยเทียบกับจำนวนชั่วโมงทำงานทั้งหมด 1 ล้านชั่วโมง"
+                            : "LTIFR (Lost Time Injury Frequency Rate) is an internationally recognized safety metric that measures the rate of workplace injuries causing lost work time, normalized per 1 million working hours."}
+                        </p>
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">{th ? "ตัวแปรที่ใช้:" : "Variables:"}</p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>LTI (MET009)</strong> — {th ? "จำนวนครั้งที่เกิดอุบัติเหตุจนทำให้พนักงานต้องหยุดงาน (Lost Time Injury)" : "Number of injuries resulting in lost work time"}</li>
+                            <li><strong>Working Hours (MET035)</strong> — {th ? "จำนวนชั่วโมงทำงานรวมทั้งหมดของพนักงาน" : "Total working hours of all employees"}</li>
+                            <li><strong>1,000,000</strong> — {th ? "ตัวคูณมาตรฐาน เพื่อให้ค่าอ่านง่าย (ต่อ 1 ล้านชั่วโมง)" : "Standard multiplier to normalize the rate per 1 million hours"}</li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      {/* Example */}
+                      <div className="bg-background/60 rounded-lg p-4 border border-border/30 space-y-3">
+                        <p className="font-semibold text-sm text-foreground">
+                          {th ? "📌 ตัวอย่างการคำนวณ" : "📌 Calculation Example"}
+                        </p>
+                        <div className="text-sm space-y-2 text-muted-foreground">
+                          <p>{th ? "สมมติโรงงาน A ในปี 2025 มีข้อมูลดังนี้:" : "Suppose Factory A in 2025 has the following data:"}</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="bg-muted/30 rounded-lg px-3 py-2">
+                              <span className="text-xs text-muted-foreground">{th ? "จำนวน LTI (MET009)" : "LTI Count (MET009)"}</span>
+                              <p className="font-bold text-foreground text-lg">3 <span className="text-xs font-normal text-muted-foreground">{th ? "ครั้ง" : "cases"}</span></p>
+                            </div>
+                            <div className="bg-muted/30 rounded-lg px-3 py-2">
+                              <span className="text-xs text-muted-foreground">{th ? "ชั่วโมงทำงานรวม (MET035)" : "Working Hours (MET035)"}</span>
+                              <p className="font-bold text-foreground text-lg">500,000 <span className="text-xs font-normal text-muted-foreground">{th ? "ชม." : "hrs"}</span></p>
+                            </div>
+                          </div>
+                          <div className="bg-primary/5 rounded-lg px-3 py-2 border border-primary/20">
+                            <p className="text-xs text-muted-foreground mb-1">{th ? "แทนค่าในสูตร:" : "Substituting into the formula:"}</p>
+                            <p className="font-mono text-sm text-foreground">
+                              LTIFR = (3 × 1,000,000) / 500,000
+                            </p>
+                            <p className="font-mono text-sm text-foreground">
+                              LTIFR = 3,000,000 / 500,000
+                            </p>
+                            <p className="font-mono text-sm font-bold text-primary">
+                              LTIFR = <span className="text-lg">6.00</span>
+                            </p>
+                          </div>
+                          <p>
+                            {th
+                              ? "หมายความว่า ทุกๆ 1 ล้านชั่วโมงทำงาน จะมีอุบัติเหตุที่ทำให้สูญเสียเวลาทำงาน 6 ครั้ง"
+                              : "This means for every 1 million working hours, there are 6 lost-time injuries."}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Interpretation Guide */}
+                      <div className="text-sm space-y-2">
+                        <p className="font-medium text-foreground">{th ? "การตีความค่า LTIFR:" : "Interpreting LTIFR Values:"}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="bg-emerald-500/10 rounded-lg px-3 py-2 border border-emerald-500/20">
+                            <p className="font-bold text-emerald-700 text-sm">0.00 - 1.00</p>
+                            <p className="text-xs text-emerald-600">{th ? "ดีเยี่ยม — ความปลอดภัยสูง" : "Excellent — High safety"}</p>
+                          </div>
+                          <div className="bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
+                            <p className="font-bold text-amber-700 text-sm">1.01 - 5.00</p>
+                            <p className="text-xs text-amber-600">{th ? "ปานกลาง — ควรปรับปรุง" : "Moderate — Needs improvement"}</p>
+                          </div>
+                          <div className="bg-red-500/10 rounded-lg px-3 py-2 border border-red-500/20">
+                            <p className="font-bold text-red-700 text-sm">&gt; 5.00</p>
+                            <p className="text-xs text-red-600">{th ? "สูง — ต้องดำเนินการแก้ไขเร่งด่วน" : "High — Urgent action required"}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Edge cases */}
+                      <div className="text-xs text-muted-foreground bg-muted/20 rounded-lg px-3 py-2">
+                        <p className="font-medium text-foreground mb-1">{th ? "กรณีพิเศษ:" : "Edge Cases:"}</p>
+                        <ul className="list-disc pl-4 space-y-0.5">
+                          <li>{th ? "หาก Working Hours = 0 → LTIFR จะแสดงเป็น 0.00 (ป้องกันหารด้วยศูนย์)" : "If Working Hours = 0 → LTIFR displays as 0.00 (prevents division by zero)"}</li>
+                          <li>{th ? "หาก LTI = 0 → LTIFR = 0.00 (ไม่มีอุบัติเหตุ = ดีเยี่ยม)" : "If LTI = 0 → LTIFR = 0.00 (no injuries = excellent)"}</li>
+                        </ul>
+                      </div>
+                    </div>
                     <FormulaCard
                       title={th ? "ชั่วโมงอบรมรวม" : "Total Training Hours"}
                       formula="Total Training = Σ Training Hours (MET008)"
