@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   TrendingUp,
   TrendingDown,
@@ -13,6 +14,9 @@ import {
   Trash2,
   Factory,
   BarChart3,
+  Fuel,
+  Recycle,
+  Wind,
 } from "lucide-react";
 import {
   AreaChart,
@@ -28,55 +32,50 @@ import {
   Cell,
   BarChart,
   Bar,
-  ReferenceLine,
   LineChart,
   Line,
+  ComposedChart,
+  ReferenceLine,
 } from "recharts";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { TrendAnalytics } from "@/components/reports/TrendAnalytics";
 
-interface Company {
-  company_id: string;
-  company_name: string;
-}
+// ─── Metric ID Constants ───
+const METRIC = {
+  GRID_ELECTRICITY: "MET001",
+  RENEWABLE_ENERGY: "MET002",
+  GHG_SCOPE1: "MET003",
+  GHG_SCOPE2: "MET004",
+  WATER_WITHDRAWAL: "MET005",
+  WATER_RECYCLING: "MET006",
+  LPG: "MET007",
+  TOTAL_WASTE: "MET018",
+  WASTE_RECYCLED: "MET021",
+  WATER_DISCHARGE: "MET034",
+  DIESEL_FLEET: "MET029",
+  DIESEL_FORKLIFT: "MET030",
+  GASOHOL_91: "MET032",
+  GASOHOL_95: "MET031",
+  GASOHOL_E20: "MET033",
+  DIESEL_FIREPUMP: "MET027",
+  DIESEL_GENERATOR: "MET028",
+};
 
-interface Site {
-  site_id: string;
-  site_name: string;
-  company_id: string;
-}
+const ENV_METRIC_IDS = Object.values(METRIC);
 
-interface ReportingPeriod {
-  period_id: string;
-  year: number;
-  month: number;
-  month_name: string;
-}
-
-interface EsgTheme {
-  theme_id: string;
-  theme_name: string;
-  dimension_id: string;
-}
-
-interface EsgMetric {
-  metric_id: string;
-  metric_name: string;
-  theme_id: string;
-  unit: string | null;
-}
-
+// ─── Interfaces ───
+interface Company { company_id: string; company_name: string; }
+interface Site { site_id: string; site_name: string; company_id: string; }
+interface ReportingPeriod { period_id: string; year: number; month: number; month_name: string; }
+interface EsgMetric { metric_id: string; metric_name: string; theme_id: string; unit: string | null; }
 interface MetricValue {
-  value_id: string;
-  metric_id: string;
-  site_id: string;
-  period_id: string;
-  value: number;
-  status: string;
+  value_id: string; metric_id: string; site_id: string; period_id: string;
+  value: number; status: string;
 }
 
-// Empty State Component
+// ─── Shared Components ───
 const EmptyState = ({ message }: { message: string }) => (
   <div className="flex flex-col items-center justify-center h-[280px] text-muted-foreground">
     <BarChart3 className="h-12 w-12 mb-2 opacity-50" />
@@ -84,89 +83,59 @@ const EmptyState = ({ message }: { message: string }) => (
   </div>
 );
 
-// Sparkline component for KPI cards
+const glassTooltipStyle = {
+  backgroundColor: "rgba(255, 255, 255, 0.95)",
+  backdropFilter: "blur(20px)",
+  border: "1px solid rgba(229, 231, 235, 0.5)",
+  borderRadius: "12px",
+  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
+};
+
 const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
-  if (data.length === 0) {
-    return <div className="h-8 w-20 flex items-center justify-center text-xs text-muted-foreground">-</div>;
-  }
-  
+  if (data.length === 0) return <div className="h-8 w-20 flex items-center justify-center text-xs text-muted-foreground">-</div>;
   const sparkData = data.map((value, index) => ({ value, index }));
-  
   return (
     <div className="h-8 w-20">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={sparkData}>
-          <Line
-            type="monotone"
-            dataKey="value"
-            stroke={color}
-            strokeWidth={1.5}
-            dot={false}
-          />
+          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
   );
 };
 
-// Environmental KPI Card Component with Glass Design
+// ─── KPI Card ───
 const EnvKPICard = ({
-  title,
-  value,
-  unit,
-  icon: Icon,
-  trend,
-  trendValue,
-  sparklineData,
-  color,
+  title, value, unit, icon: Icon, trend, trendValue, sparklineData, color,
 }: {
-  title: string;
-  value: string | number | null;
-  unit: string;
-  icon: React.ElementType;
-  trend?: "up" | "down" | "neutral" | null;
-  trendValue?: string | null;
-  sparklineData: number[];
-  color: string;
+  title: string; value: string | number | null; unit: string; icon: React.ElementType;
+  trend?: "up" | "down" | "neutral" | null; trendValue?: string | null;
+  sparklineData: number[]; color: string;
 }) => {
-  const isPositiveTrend = trend === "down"; // For environmental metrics, down is usually good
-
+  const isPositiveTrend = trend === "down";
   return (
     <Card className="flex-1 min-w-[220px] bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 rounded-xl bg-emerald-100" style={{ backgroundColor: `${color}20` }}>
+              <div className="p-2 rounded-xl" style={{ backgroundColor: `${color}20` }}>
                 <Icon className="h-4 w-4" style={{ color }} />
               </div>
               <p className="text-xs text-muted-foreground">{title}</p>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-xl sm:text-2xl font-bold">
-                {value !== null ? value : "-"}
-              </span>
+              <span className="text-xl sm:text-2xl font-bold">{value !== null ? value : "-"}</span>
               {value !== null && <span className="text-xs text-muted-foreground">{unit}</span>}
             </div>
             {trend && trendValue && (
-              <div
-                className={`flex items-center gap-0.5 text-xs mt-1 ${
-                  isPositiveTrend ? "text-emerald-600" : trend === "up" ? "text-destructive" : "text-muted-foreground"
-                }`}
-              >
-                {trend === "up" ? (
-                  <TrendingUp className="h-3 w-3" />
-                ) : trend === "down" ? (
-                  <TrendingDown className="h-3 w-3" />
-                ) : null}
+              <div className={`flex items-center gap-0.5 text-xs mt-1 ${isPositiveTrend ? "text-emerald-600" : trend === "up" ? "text-destructive" : "text-muted-foreground"}`}>
+                {trend === "up" ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                 <span>{trendValue} YoY</span>
               </div>
             )}
-            {!trend && !trendValue && value !== null && (
-              <div className="text-xs mt-1 text-muted-foreground">
-                -
-              </div>
-            )}
+            {!trend && value !== null && <div className="text-xs mt-1 text-muted-foreground">-</div>}
           </div>
           <Sparkline data={sparklineData} color={color} />
         </div>
@@ -175,33 +144,60 @@ const EnvKPICard = ({
   );
 };
 
+// ─── Paginated Fetch ───
+async function fetchEnvMetricValues(): Promise<MetricValue[]> {
+  const PAGE_SIZE = 2000;
+  const allValues: MetricValue[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("metric_value")
+      .select("value_id, metric_id, site_id, period_id, value, status")
+      .in("metric_id", ENV_METRIC_IDS)
+      .in("status", ["submitted", "approved", "draft"])
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (data && data.length > 0) {
+      for (const row of data) allValues.push(row);
+      from += data.length;
+      hasMore = true;
+    } else {
+      hasMore = false;
+    }
+  }
+  return allValues;
+}
+
+// ─── Helper ───
+function sumByMetric(values: MetricValue[], metricId: string): number {
+  return values.filter(v => v.metric_id === metricId).reduce((s, v) => s + v.value, 0);
+}
+function sumByMetrics(values: MetricValue[], ids: string[]): number {
+  return values.filter(v => ids.includes(v.metric_id)).reduce((s, v) => s + v.value, 0);
+}
+
+// ─── Main Component ───
 export default function Environmental() {
   const { language } = useLanguage();
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [periods, setPeriods] = useState<ReportingPeriod[]>([]);
-  const [themes, setThemes] = useState<EsgTheme[]>([]);
   const [metrics, setMetrics] = useState<EsgMetric[]>([]);
   const [metricValues, setMetricValues] = useState<MetricValue[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
   const [filterCompany, setFilterCompany] = useState<string>("");
   const [filterSite, setFilterSite] = useState<string>("");
   const [filterYear, setFilterYear] = useState<string>("");
 
-  const handleRefresh = useCallback(async () => {
-    await fetchData();
-  }, []);
+  const handleRefresh = useCallback(async () => { await fetchData(); }, []);
+  const { pullDistance, isRefreshing, containerRef } = usePullToRefresh({ onRefresh: handleRefresh });
 
-  const { pullDistance, isRefreshing, containerRef } = usePullToRefresh({
-    onRefresh: handleRefresh,
-  });
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -210,24 +206,31 @@ export default function Environmental() {
         { data: companiesData },
         { data: sitesData },
         { data: periodsData },
-        { data: themesData },
         { data: metricsData },
-        { data: valuesData },
+        envValues,
       ] = await Promise.all([
         supabase.from("company").select("*").order("company_name"),
         supabase.from("site").select("*").order("site_name"),
         supabase.from("reporting_period").select("*").order("year", { ascending: false }),
-        supabase.from("esg_theme").select("*").order("theme_name"),
-        supabase.from("esg_metric").select("*").order("metric_name"),
-        supabase.from("metric_value").select("*"),
+        supabase.from("esg_metric").select("*").in("metric_id", ENV_METRIC_IDS),
+        fetchEnvMetricValues(),
       ]);
 
       setCompanies(companiesData || []);
       setSites(sitesData || []);
       setPeriods(periodsData || []);
-      setThemes(themesData || []);
       setMetrics(metricsData || []);
-      setMetricValues(valuesData || []);
+      setMetricValues(envValues);
+
+      // Auto-select latest year with data
+      if (!filterYear && periodsData) {
+        const yearsWithData = new Set(envValues.map(v => {
+          const p = periodsData.find((pp: ReportingPeriod) => pp.period_id === v.period_id);
+          return p?.year;
+        }).filter(Boolean));
+        const latestYear = Math.max(...Array.from(yearsWithData) as number[]);
+        if (latestYear && isFinite(latestYear)) setFilterYear(String(latestYear));
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -235,134 +238,276 @@ export default function Environmental() {
     }
   };
 
-  // Get unique years
-  const uniqueYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
+  // ─── Computed Data ───
+  const uniqueYears = useMemo(() => [...new Set(periods.map(p => p.year))].sort((a, b) => b - a), [periods]);
   const selectedYear = filterYear ? parseInt(filterYear) : uniqueYears[0];
+  const prevYear = selectedYear ? selectedYear - 1 : null;
 
-  // Filter sites by company
-  const filteredSites = filterCompany ? sites.filter((s) => s.company_id === filterCompany) : sites;
+  const filteredSites = useMemo(() =>
+    filterCompany ? sites.filter(s => s.company_id === filterCompany) : sites,
+    [sites, filterCompany]
+  );
 
-  // Filter values
-  const filteredValues = metricValues.filter((v) => {
-    if (filterCompany) {
-      const site = sites.find((s) => s.site_id === v.site_id);
-      if (site?.company_id !== filterCompany) return false;
-    }
-    if (filterSite) {
-      if (v.site_id !== filterSite) return false;
-    }
-    if (filterYear) {
-      const period = periods.find((p) => p.period_id === v.period_id);
-      if (period?.year !== parseInt(filterYear)) return false;
-    }
-    return true;
-  });
+  const filteredValues = useMemo(() => {
+    return metricValues.filter(v => {
+      if (filterCompany) {
+        const site = sites.find(s => s.site_id === v.site_id);
+        if (site?.company_id !== filterCompany) return false;
+      }
+      if (filterSite && v.site_id !== filterSite) return false;
+      if (filterYear) {
+        const period = periods.find(p => p.period_id === v.period_id);
+        if (period?.year !== parseInt(filterYear)) return false;
+      }
+      return true;
+    });
+  }, [metricValues, filterCompany, filterSite, filterYear, sites, periods]);
 
-  // Calculate real values from filtered data
-  const totalValue = filteredValues.reduce((sum, v) => sum + v.value, 0);
+  // Previous year values for YoY
+  const prevYearValues = useMemo(() => {
+    if (!prevYear) return [];
+    return metricValues.filter(v => {
+      if (filterCompany) {
+        const site = sites.find(s => s.site_id === v.site_id);
+        if (site?.company_id !== filterCompany) return false;
+      }
+      if (filterSite && v.site_id !== filterSite) return false;
+      const period = periods.find(p => p.period_id === v.period_id);
+      return period?.year === prevYear;
+    });
+  }, [metricValues, prevYear, filterCompany, filterSite, sites, periods]);
+
   const hasData = filteredValues.length > 0;
 
-  // GHG Emissions by Scope (from real data if available)
-  const ghgData = periods
-    .filter((p) => p.year === selectedYear)
-    .sort((a, b) => a.month - b.month)
-    .map((period) => {
-      const periodValues = filteredValues.filter((v) => v.period_id === period.period_id);
-      
-      if (periodValues.length === 0) {
-        return {
-          name: period.month_name.slice(0, 3),
-          scope1: null,
-          scope2: null,
-          scope3: null,
-        };
-      }
-      
-      // Use actual values distributed across scopes
-      const baseValue = periodValues.reduce((sum, v) => sum + v.value, 0);
-      
-      return {
-        name: period.month_name.slice(0, 3),
-        scope1: Math.round(baseValue * 0.3),
-        scope2: Math.round(baseValue * 0.5),
-        scope3: Math.round(baseValue * 0.2),
-      };
-    });
+  // ─── KPI Calculations ───
+  const ghgScope1 = sumByMetric(filteredValues, METRIC.GHG_SCOPE1);
+  const ghgScope2 = sumByMetric(filteredValues, METRIC.GHG_SCOPE2);
+  const totalGHG = ghgScope1 + ghgScope2;
 
-  const hasGhgData = ghgData.some(d => d.scope1 !== null);
+  const gridElectricity = sumByMetric(filteredValues, METRIC.GRID_ELECTRICITY);
+  const renewableEnergy = sumByMetric(filteredValues, METRIC.RENEWABLE_ENERGY);
+  const totalElectricity = gridElectricity + renewableEnergy;
+  const renewablePercent = totalElectricity > 0 ? ((renewableEnergy / totalElectricity) * 100) : 0;
 
-  // Energy Mix (only show if we have data)
-  const energyMixData = hasData ? [
-    { name: language === "th" ? "พลังงานหมุนเวียน" : "Renewable", value: null as number | null, color: "hsl(142 71% 45%)" },
-    { name: language === "th" ? "พลังงานทั่วไป" : "Non-renewable", value: null as number | null, color: "hsl(var(--muted-foreground))" },
-  ] : [];
+  const waterWithdrawal = sumByMetric(filteredValues, METRIC.WATER_WITHDRAWAL);
+  const waterRecycling = sumByMetric(filteredValues, METRIC.WATER_RECYCLING);
+  const waterDischarge = sumByMetric(filteredValues, METRIC.WATER_DISCHARGE);
 
-  // Water Consumption by Site (from real data)
-  const waterTarget = 1000;
-  const waterData = filteredSites.slice(0, 6).map((site) => {
-    const siteValues = filteredValues.filter((v) => v.site_id === site.site_id);
-    
-    if (siteValues.length === 0) {
-      return {
-        name: site.site_name.length > 12 ? site.site_name.substring(0, 12) + "..." : site.site_name,
-        consumption: null as number | null,
-        target: waterTarget,
-      };
-    }
-    
-    const consumption = siteValues.reduce((sum, v) => sum + v.value, 0);
-    
+  const totalWaste = sumByMetric(filteredValues, METRIC.TOTAL_WASTE);
+  const wasteRecycled = sumByMetric(filteredValues, METRIC.WASTE_RECYCLED);
+  const wasteDiversionRate = totalWaste > 0 ? ((wasteRecycled / totalWaste) * 100) : 0;
+
+  // YoY calculations
+  const calcYoY = (currentVal: number, metricIds: string[]): { trend: "up" | "down" | "neutral" | null; value: string | null } => {
+    const prev = sumByMetrics(prevYearValues, metricIds);
+    if (prev === 0 || currentVal === 0) return { trend: null, value: null };
+    const change = ((currentVal - prev) / prev) * 100;
     return {
-      name: site.site_name.length > 12 ? site.site_name.substring(0, 12) + "..." : site.site_name,
-      consumption: Math.round(consumption),
-      target: waterTarget,
+      trend: change > 0 ? "up" : change < 0 ? "down" : "neutral",
+      value: `${change > 0 ? "+" : ""}${change.toFixed(1)}%`,
     };
-  }).filter(d => d.consumption !== null);
-
-  // Waste by Type (show empty if no data)
-  const wasteData: { name: string; value: number | null; color: string }[] = [];
-
-  // Calculate KPI values from real data
-  const totalGHG = hasGhgData 
-    ? ghgData.reduce((sum, d) => sum + (d.scope1 || 0) + (d.scope2 || 0) + (d.scope3 || 0), 0)
-    : null;
-  const energyIntensity = hasData ? Math.round(totalValue / filteredValues.length) : null;
-  const waterIntensity = waterData.length > 0 
-    ? Math.round(waterData.reduce((sum, d) => sum + (d.consumption || 0), 0) / waterData.length)
-    : null;
-  const wasteDiversion = null; // No real data available
-
-  // Generate sparkline data from real monthly values
-  const generateSparklineFromData = (): number[] => {
-    if (!hasData || !selectedYear) return [];
-    
-    const yearPeriods = periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
-    const monthlyValues = yearPeriods.map(period => {
-      const periodValues = filteredValues.filter(v => v.period_id === period.period_id);
-      return periodValues.length > 0 ? periodValues.reduce((sum, v) => sum + v.value, 0) : 0;
-    }).filter(v => v > 0);
-    
-    return monthlyValues;
   };
 
-  const sparklineData = generateSparklineFromData();
+  const ghgYoY = calcYoY(totalGHG, [METRIC.GHG_SCOPE1, METRIC.GHG_SCOPE2]);
+  const electricityYoY = calcYoY(totalElectricity, [METRIC.GRID_ELECTRICITY, METRIC.RENEWABLE_ENERGY]);
+  const waterYoY = calcYoY(waterWithdrawal, [METRIC.WATER_WITHDRAWAL]);
+  const wasteYoY = calcYoY(totalWaste, [METRIC.TOTAL_WASTE]);
 
-  // Chart colors
+  // ─── Monthly Sparkline ───
+  const monthlySparkline = useCallback((metricIds: string[]) => {
+    if (!selectedYear) return [];
+    const yearPeriods = periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
+    return yearPeriods.map(period => {
+      return filteredValues
+        .filter(v => v.period_id === period.period_id && metricIds.includes(v.metric_id))
+        .reduce((s, v) => s + v.value, 0);
+    }).filter(v => v > 0);
+  }, [filteredValues, periods, selectedYear]);
+
+  // ─── GHG Monthly Chart Data ───
+  const ghgChartData = useMemo(() => {
+    if (!selectedYear) return [];
+    return periods
+      .filter(p => p.year === selectedYear)
+      .sort((a, b) => a.month - b.month)
+      .map(period => {
+        const pv = filteredValues.filter(v => v.period_id === period.period_id);
+        const scope1 = pv.filter(v => v.metric_id === METRIC.GHG_SCOPE1).reduce((s, v) => s + v.value, 0);
+        const scope2 = pv.filter(v => v.metric_id === METRIC.GHG_SCOPE2).reduce((s, v) => s + v.value, 0);
+        return {
+          name: period.month_name.slice(0, 3),
+          scope1: scope1 || null,
+          scope2: scope2 || null,
+          total: (scope1 + scope2) || null,
+        };
+      });
+  }, [filteredValues, periods, selectedYear]);
+  const hasGhgData = ghgChartData.some(d => d.total !== null);
+
+  // ─── Energy Mix Pie ───
+  const energyMixData = useMemo(() => {
+    if (totalElectricity === 0) return [];
+    const lpg = sumByMetric(filteredValues, METRIC.LPG);
+    const diesel = sumByMetrics(filteredValues, [METRIC.DIESEL_FLEET, METRIC.DIESEL_FORKLIFT, METRIC.DIESEL_FIREPUMP, METRIC.DIESEL_GENERATOR]);
+    const gasohol = sumByMetrics(filteredValues, [METRIC.GASOHOL_91, METRIC.GASOHOL_95, METRIC.GASOHOL_E20]);
+    const items: { name: string; value: number; color: string; unit: string }[] = [];
+    if (gridElectricity > 0) items.push({
+      name: language === "th" ? "ไฟฟ้าโครงข่าย" : "Grid Electricity",
+      value: gridElectricity, color: "hsl(45 93% 47%)", unit: "kWh",
+    });
+    if (renewableEnergy > 0) items.push({
+      name: language === "th" ? "พลังงานหมุนเวียน" : "Renewable Energy",
+      value: renewableEnergy, color: "hsl(142 71% 45%)", unit: "kWh",
+    });
+    if (lpg > 0) items.push({
+      name: "LPG", value: lpg, color: "hsl(25 95% 53%)", unit: "kg",
+    });
+    if (diesel > 0) items.push({
+      name: language === "th" ? "ดีเซล" : "Diesel",
+      value: diesel, color: "hsl(var(--muted-foreground))", unit: "L",
+    });
+    if (gasohol > 0) items.push({
+      name: language === "th" ? "แก๊สโซฮอล์" : "Gasohol",
+      value: gasohol, color: "hsl(280 65% 60%)", unit: "L",
+    });
+    return items;
+  }, [filteredValues, totalElectricity, gridElectricity, renewableEnergy, language]);
+
+  // ─── Electricity Monthly (Grid vs Renewable) ───
+  const electricityChartData = useMemo(() => {
+    if (!selectedYear) return [];
+    return periods
+      .filter(p => p.year === selectedYear)
+      .sort((a, b) => a.month - b.month)
+      .map(period => {
+        const pv = filteredValues.filter(v => v.period_id === period.period_id);
+        const grid = pv.filter(v => v.metric_id === METRIC.GRID_ELECTRICITY).reduce((s, v) => s + v.value, 0);
+        const renew = pv.filter(v => v.metric_id === METRIC.RENEWABLE_ENERGY).reduce((s, v) => s + v.value, 0);
+        return {
+          name: period.month_name.slice(0, 3),
+          grid: grid || null,
+          renewable: renew || null,
+        };
+      });
+  }, [filteredValues, periods, selectedYear]);
+  const hasElectricityData = electricityChartData.some(d => d.grid !== null || d.renewable !== null);
+
+  // ─── Water by Site ───
+  const waterBySiteData = useMemo(() => {
+    const waterMetrics = [METRIC.WATER_WITHDRAWAL];
+    return filteredSites
+      .map(site => {
+        const siteValues = filteredValues.filter(v => v.site_id === site.site_id && waterMetrics.includes(v.metric_id));
+        const total = siteValues.reduce((s, v) => s + v.value, 0);
+        return {
+          name: site.site_name.length > 15 ? site.site_name.substring(0, 15) + "…" : site.site_name,
+          withdrawal: Math.round(total),
+        };
+      })
+      .filter(d => d.withdrawal > 0)
+      .sort((a, b) => b.withdrawal - a.withdrawal);
+  }, [filteredValues, filteredSites]);
+
+  // ─── Water Balance (Withdrawal / Discharge / Recycling) ───
+  const waterBalanceData = useMemo(() => {
+    if (!selectedYear) return [];
+    return periods
+      .filter(p => p.year === selectedYear)
+      .sort((a, b) => a.month - b.month)
+      .map(period => {
+        const pv = filteredValues.filter(v => v.period_id === period.period_id);
+        const wd = pv.filter(v => v.metric_id === METRIC.WATER_WITHDRAWAL).reduce((s, v) => s + v.value, 0);
+        const wdis = pv.filter(v => v.metric_id === METRIC.WATER_DISCHARGE).reduce((s, v) => s + v.value, 0);
+        const wr = pv.filter(v => v.metric_id === METRIC.WATER_RECYCLING).reduce((s, v) => s + v.value, 0);
+        return { name: period.month_name.slice(0, 3), withdrawal: wd || null, discharge: wdis || null, recycling: wr || null };
+      });
+  }, [filteredValues, periods, selectedYear]);
+  const hasWaterBalanceData = waterBalanceData.some(d => d.withdrawal !== null);
+
+  // ─── Waste Pie (Recycled vs Landfill) ───
+  const wastePieData = useMemo(() => {
+    if (totalWaste === 0) return [];
+    const landfill = totalWaste - wasteRecycled;
+    return [
+      { name: language === "th" ? "นำกลับมาใช้ (Recycle/Reuse)" : "Recycled/Reused", value: wasteRecycled, color: "hsl(142 71% 45%)" },
+      { name: language === "th" ? "ฝังกลบ (Landfill)" : "Landfill", value: Math.max(0, landfill), color: "hsl(var(--muted-foreground))" },
+    ].filter(d => d.value > 0);
+  }, [totalWaste, wasteRecycled, language]);
+
+  // ─── Waste Monthly Trend ───
+  const wasteChartData = useMemo(() => {
+    if (!selectedYear) return [];
+    return periods
+      .filter(p => p.year === selectedYear)
+      .sort((a, b) => a.month - b.month)
+      .map(period => {
+        const pv = filteredValues.filter(v => v.period_id === period.period_id);
+        const total = pv.filter(v => v.metric_id === METRIC.TOTAL_WASTE).reduce((s, v) => s + v.value, 0);
+        const recycled = pv.filter(v => v.metric_id === METRIC.WASTE_RECYCLED).reduce((s, v) => s + v.value, 0);
+        return { name: period.month_name.slice(0, 3), total: total || null, recycled: recycled || null };
+      });
+  }, [filteredValues, periods, selectedYear]);
+  const hasWasteChartData = wasteChartData.some(d => d.total !== null);
+
+  // ─── GHG by Site ───
+  const ghgBySiteData = useMemo(() => {
+    return filteredSites
+      .map(site => {
+        const sv = filteredValues.filter(v => v.site_id === site.site_id);
+        const s1 = sv.filter(v => v.metric_id === METRIC.GHG_SCOPE1).reduce((s, v) => s + v.value, 0);
+        const s2 = sv.filter(v => v.metric_id === METRIC.GHG_SCOPE2).reduce((s, v) => s + v.value, 0);
+        return {
+          name: site.site_name.length > 15 ? site.site_name.substring(0, 15) + "…" : site.site_name,
+          scope1: parseFloat(s1.toFixed(2)),
+          scope2: parseFloat(s2.toFixed(2)),
+        };
+      })
+      .filter(d => d.scope1 > 0 || d.scope2 > 0)
+      .sort((a, b) => (b.scope1 + b.scope2) - (a.scope1 + a.scope2));
+  }, [filteredValues, filteredSites]);
+
+  // ─── Summary Table Data ───
+  const summaryTableData = useMemo(() => {
+    const metricMap = new Map(metrics.map(m => [m.metric_id, m]));
+    const grouped = new Map<string, { current: number; prev: number }>();
+
+    for (const v of filteredValues) {
+      const m = metricMap.get(v.metric_id);
+      if (!m) continue;
+      const existing = grouped.get(v.metric_id) || { current: 0, prev: 0 };
+      existing.current += v.value;
+      grouped.set(v.metric_id, existing);
+    }
+    for (const v of prevYearValues) {
+      const m = metricMap.get(v.metric_id);
+      if (!m) continue;
+      const existing = grouped.get(v.metric_id) || { current: 0, prev: 0 };
+      existing.prev += v.value;
+      grouped.set(v.metric_id, existing);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([id, data]) => {
+        const m = metricMap.get(id)!;
+        const change = data.prev > 0 ? ((data.current - data.prev) / data.prev * 100) : null;
+        return { id, name: m.metric_name, unit: m.unit || "", current: data.current, prev: data.prev, change };
+      })
+      .filter(d => d.current > 0 || d.prev > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredValues, prevYearValues, metrics]);
+
+  // ─── Chart Colors ───
   const SCOPE_COLORS = {
     scope1: "hsl(var(--destructive))",
     scope2: "hsl(45 93% 47%)",
-    scope3: "hsl(199 89% 48%)",
   };
 
-  if (loading) {
-    return <ReportsLoadingSkeleton />;
-  }
+  if (loading) return <ReportsLoadingSkeleton />;
 
   return (
     <div ref={containerRef} className="space-y-6 pb-8 bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 min-h-screen -m-6 p-6">
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
-      {/* Gradient Accent Line */}
       <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 rounded-full" />
 
       {/* Header */}
@@ -372,54 +517,49 @@ export default function Environmental() {
             <div className="p-2 bg-emerald-100 rounded-xl">
               <Leaf className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
             </div>
-            {language === "th" ? "Environmental Dashboard" : "Environmental Dashboard"}
+            Environmental Dashboard
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {language === "th"
-              ? "ตัวชี้วัดด้านสิ่งแวดล้อมและการจัดการทรัพยากร"
-              : "Environmental metrics and resource management"}
+              ? "วิเคราะห์ตัวชี้วัดด้านสิ่งแวดล้อมครบทุกมิติ — พลังงาน, GHG, น้ำ, ของเสีย"
+              : "Comprehensive environmental analysis — Energy, GHG, Water, Waste"}
           </p>
+          {hasData && (
+            <Badge variant="outline" className="mt-2 text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+              {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"} | {selectedYear}
+            </Badge>
+          )}
         </div>
       </div>
 
-      {/* Filters - Glass Card */}
+      {/* Filters */}
       <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-2xl">
         <CardContent className="p-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "บริษัท" : "Company"}</Label>
-              <Select value={filterCompany} onValueChange={setFilterCompany}>
+              <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v === "__all__" ? "" : v); setFilterSite(""); }}>
                 <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
                 </SelectTrigger>
                 <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {companies.map((c) => (
-                    <SelectItem key={c.company_id} value={c.company_id}>
-                      {c.company_name}
-                    </SelectItem>
-                  ))}
+                  {companies.map(c => <SelectItem key={c.company_id} value={c.company_id}>{c.company_name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "สถานที่" : "Site"}</Label>
-              <Select value={filterSite} onValueChange={setFilterSite}>
+              <Select value={filterSite} onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
                   <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
                 </SelectTrigger>
                 <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {filteredSites.map((s) => (
-                    <SelectItem key={s.site_id} value={s.site_id}>
-                      {s.site_name}
-                    </SelectItem>
-                  ))}
+                  {filteredSites.map(s => <SelectItem key={s.site_id} value={s.site_id}>{s.site_name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-1.5">
               <Label className="text-xs">{language === "th" ? "ปี" : "Year"}</Label>
               <Select value={filterYear} onValueChange={setFilterYear}>
@@ -428,11 +568,7 @@ export default function Environmental() {
                 </SelectTrigger>
                 <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
                   <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {uniqueYears.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
+                  {uniqueYears.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -440,43 +576,63 @@ export default function Environmental() {
         </CardContent>
       </Card>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Cards - 6 cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <EnvKPICard
-          title={language === "th" ? "GHG รวม" : "Total GHG"}
-          value={totalGHG !== null ? totalGHG.toLocaleString() : null}
+          title={language === "th" ? "GHG รวม (Scope 1+2)" : "Total GHG (Scope 1+2)"}
+          value={hasData && totalGHG > 0 ? totalGHG.toLocaleString(undefined, { maximumFractionDigits: 2 }) : null}
           unit="tCO₂e"
           icon={Factory}
-          trend={null}
-          trendValue={null}
-          sparklineData={sparklineData}
-          color="hsl(var(--destructive))"
+          trend={ghgYoY.trend}
+          trendValue={ghgYoY.value}
+          sparklineData={monthlySparkline([METRIC.GHG_SCOPE1, METRIC.GHG_SCOPE2])}
+          color="hsl(0 84% 60%)"
         />
         <EnvKPICard
-          title={language === "th" ? "ความเข้มข้นพลังงาน" : "Energy Intensity"}
-          value={energyIntensity !== null ? energyIntensity.toLocaleString() : null}
-          unit="MJ/unit"
+          title={language === "th" ? "ไฟฟ้ารวม" : "Total Electricity"}
+          value={hasData && totalElectricity > 0 ? totalElectricity.toLocaleString() : null}
+          unit="kWh"
           icon={Zap}
-          trend={null}
-          trendValue={null}
-          sparklineData={sparklineData}
+          trend={electricityYoY.trend}
+          trendValue={electricityYoY.value}
+          sparklineData={monthlySparkline([METRIC.GRID_ELECTRICITY, METRIC.RENEWABLE_ENERGY])}
           color="hsl(45 93% 47%)"
         />
         <EnvKPICard
-          title={language === "th" ? "ความเข้มข้นน้ำ" : "Water Intensity"}
-          value={waterIntensity !== null ? waterIntensity.toLocaleString() : null}
-          unit="m³/unit"
-          icon={Droplets}
+          title={language === "th" ? "สัดส่วน Renewable" : "Renewable %"}
+          value={hasData && totalElectricity > 0 ? renewablePercent.toFixed(1) : null}
+          unit="%"
+          icon={Wind}
           trend={null}
           trendValue={null}
-          sparklineData={sparklineData}
+          sparklineData={[]}
+          color="hsl(142 71% 45%)"
+        />
+        <EnvKPICard
+          title={language === "th" ? "น้ำที่ใช้ทั้งหมด" : "Water Withdrawal"}
+          value={hasData && waterWithdrawal > 0 ? waterWithdrawal.toLocaleString() : null}
+          unit="m³"
+          icon={Droplets}
+          trend={waterYoY.trend}
+          trendValue={waterYoY.value}
+          sparklineData={monthlySparkline([METRIC.WATER_WITHDRAWAL])}
           color="hsl(199 89% 48%)"
         />
         <EnvKPICard
-          title={language === "th" ? "อัตราการนำกลับมาใช้" : "Waste Diversion"}
-          value={wasteDiversion}
-          unit="%"
+          title={language === "th" ? "ขยะทั้งหมด" : "Total Waste"}
+          value={hasData && totalWaste > 0 ? (totalWaste / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 }) : null}
+          unit={language === "th" ? "ตัน" : "tons"}
           icon={Trash2}
+          trend={wasteYoY.trend}
+          trendValue={wasteYoY.value}
+          sparklineData={monthlySparkline([METRIC.TOTAL_WASTE])}
+          color="hsl(25 95% 53%)"
+        />
+        <EnvKPICard
+          title={language === "th" ? "อัตราการ Recycle" : "Waste Diversion Rate"}
+          value={hasData && totalWaste > 0 ? wasteDiversionRate.toFixed(1) : null}
+          unit="%"
+          icon={Recycle}
           trend={null}
           trendValue={null}
           sparklineData={[]}
@@ -484,148 +640,59 @@ export default function Environmental() {
         />
       </div>
 
-      {/* Charts Grid */}
+      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* GHG Emissions Stacked Area Chart */}
+
+        {/* 1. GHG Emissions Scope 1 & 2 Monthly */}
         <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
           <CardHeader className="flex flex-row items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-xl">
-              <Factory className="h-4 w-4 text-emerald-600" />
+            <div className="p-2 bg-emerald-100 rounded-xl"><Factory className="h-4 w-4 text-emerald-600" /></div>
+            <div>
+              <CardTitle className="text-base font-medium">
+                {language === "th" ? "การปล่อย GHG รายเดือน (Scope 1 & 2)" : "Monthly GHG Emissions (Scope 1 & 2)"}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">{language === "th" ? "หน่วย: tCO₂e" : "Unit: tCO₂e"}</p>
             </div>
-            <CardTitle className="text-base font-medium">
-              {language === "th" ? "การปล่อย GHG ตาม Scope (รายเดือน)" : "GHG Emissions by Scope (Monthly)"}
-            </CardTitle>
           </CardHeader>
           <CardContent>
             {hasGhgData ? (
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={ghgData.filter(d => d.scope1 !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <ComposedChart data={ghgChartData.filter(d => d.total !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                   <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "rgba(255, 255, 255, 0.95)",
-                      backdropFilter: "blur(20px)",
-                      border: "1px solid rgba(229, 231, 235, 0.5)",
-                      borderRadius: "12px",
-                      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
-                    }}
-                  />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [value.toLocaleString(undefined, { maximumFractionDigits: 2 }), ""]} />
                   <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="scope1"
-                    name="Scope 1"
-                    stackId="1"
-                    stroke={SCOPE_COLORS.scope1}
-                    fill={SCOPE_COLORS.scope1}
-                    fillOpacity={0.6}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="scope2"
-                    name="Scope 2"
-                    stackId="1"
-                    stroke={SCOPE_COLORS.scope2}
-                    fill={SCOPE_COLORS.scope2}
-                    fillOpacity={0.6}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="scope3"
-                    name="Scope 3"
-                    stackId="1"
-                    stroke={SCOPE_COLORS.scope3}
-                    fill={SCOPE_COLORS.scope3}
-                    fillOpacity={0.6}
-                  />
-                </AreaChart>
+                  <Bar dataKey="scope1" name="Scope 1" stackId="ghg" fill={SCOPE_COLORS.scope1} fillOpacity={0.8} radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="scope2" name="Scope 2" stackId="ghg" fill={SCOPE_COLORS.scope2} fillOpacity={0.8} radius={[4, 4, 0, 0]} />
+                  <Line type="monotone" dataKey="total" name="Total" stroke="hsl(var(--foreground))" strokeWidth={2} dot={{ r: 3 }} />
+                </ComposedChart>
               </ResponsiveContainer>
             ) : (
-              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล GHG" : "No GHG data available"} />
             )}
           </CardContent>
         </Card>
 
-        {/* Energy Mix Donut Chart */}
+        {/* 2. GHG by Site */}
         <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
           <CardHeader className="flex flex-row items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-xl">
-              <Zap className="h-4 w-4 text-emerald-600" />
-            </div>
+            <div className="p-2 bg-emerald-100 rounded-xl"><Factory className="h-4 w-4 text-emerald-600" /></div>
             <CardTitle className="text-base font-medium">
-              {language === "th" ? "สัดส่วนพลังงาน" : "Energy Mix"}
+              {language === "th" ? "GHG แยกตามสถานที่" : "GHG by Site"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
-          </CardContent>
-        </Card>
-
-        {/* Waste by Type Pie Chart */}
-        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-xl">
-              <Trash2 className="h-4 w-4 text-emerald-600" />
-            </div>
-            <CardTitle className="text-base font-medium">
-              {language === "th" ? "ประเภทของเสีย" : "Waste by Type"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
-          </CardContent>
-        </Card>
-
-        {/* Water Consumption Horizontal Bar Chart */}
-        <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-xl">
-              <Droplets className="h-4 w-4 text-emerald-600" />
-            </div>
-            <CardTitle className="text-base font-medium">
-              {language === "th" ? "การใช้น้ำแต่ละสถานที่" : "Water Consumption by Site"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {waterData.length > 0 ? (
+            {ghgBySiteData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={waterData}
-                  layout="vertical"
-                  margin={{ top: 10, right: 30, left: 80, bottom: 10 }}
-                >
+                <BarChart data={ghgBySiteData} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                    width={80}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "rgba(255, 255, 255, 0.95)",
-                      backdropFilter: "blur(20px)",
-                      border: "1px solid rgba(229, 231, 235, 0.5)",
-                      borderRadius: "12px",
-                      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
-                    }}
-                    formatter={(value: number) => [`${value.toLocaleString()} m³`, ""]}
-                  />
+                  <YAxis type="category" dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} width={80} />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString()} tCO₂e`, ""]} />
                   <Legend />
-                  <Bar
-                    dataKey="consumption"
-                    name={language === "th" ? "การใช้น้ำ" : "Consumption"}
-                    fill="hsl(199 89% 48%)"
-                    radius={[0, 4, 4, 0]}
-                  />
-                  <ReferenceLine
-                    x={waterTarget}
-                    stroke="hsl(var(--destructive))"
-                    strokeDasharray="5 5"
-                  />
+                  <Bar dataKey="scope1" name="Scope 1" stackId="ghg" fill={SCOPE_COLORS.scope1} fillOpacity={0.8} />
+                  <Bar dataKey="scope2" name="Scope 2" stackId="ghg" fill={SCOPE_COLORS.scope2} fillOpacity={0.8} radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -633,7 +700,257 @@ export default function Environmental() {
             )}
           </CardContent>
         </Card>
+
+        {/* 3. Energy Mix Pie */}
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl"><Zap className="h-4 w-4 text-emerald-600" /></div>
+            <CardTitle className="text-base font-medium">
+              {language === "th" ? "สัดส่วนพลังงาน" : "Energy Mix"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {energyMixData.length > 0 ? (
+              <div className="flex flex-col items-center">
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={energyMixData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {energyMixData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => {
+                      const item = energyMixData.find(d => d.name === name);
+                      return [`${value.toLocaleString()} ${item?.unit || ""}`, name];
+                    }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap justify-center gap-3 mt-2">
+                  {energyMixData.map((item, i) => (
+                    <div key={i} className="flex items-center gap-1.5 text-xs">
+                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
+                      <span className="text-muted-foreground">{item.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลพลังงาน" : "No energy data"} />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 4. Electricity Monthly (Grid vs Renewable) */}
+        <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl"><Zap className="h-4 w-4 text-emerald-600" /></div>
+            <div>
+              <CardTitle className="text-base font-medium">
+                {language === "th" ? "ปริมาณการใช้ไฟฟ้ารายเดือน (Grid vs Renewable)" : "Monthly Electricity (Grid vs Renewable)"}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">{language === "th" ? "หน่วย: kWh" : "Unit: kWh"}</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {hasElectricityData ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={electricityChartData.filter(d => d.grid !== null || d.renewable !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [value.toLocaleString() + " kWh", ""]} />
+                  <Legend />
+                  <Area type="monotone" dataKey="grid" name={language === "th" ? "ไฟฟ้าโครงข่าย" : "Grid"} stackId="elec" stroke="hsl(45 93% 47%)" fill="hsl(45 93% 47%)" fillOpacity={0.5} />
+                  <Area type="monotone" dataKey="renewable" name={language === "th" ? "พลังงานหมุนเวียน" : "Renewable"} stackId="elec" stroke="hsl(142 71% 45%)" fill="hsl(142 71% 45%)" fillOpacity={0.5} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลไฟฟ้า" : "No electricity data"} />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 5. Water Balance Monthly */}
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl"><Droplets className="h-4 w-4 text-emerald-600" /></div>
+            <div>
+              <CardTitle className="text-base font-medium">
+                {language === "th" ? "สมดุลน้ำรายเดือน" : "Monthly Water Balance"}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">m³</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {hasWaterBalanceData ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={waterBalanceData.filter(d => d.withdrawal !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString()} m³`, ""]} />
+                  <Legend />
+                  <Bar dataKey="withdrawal" name={language === "th" ? "น้ำที่ใช้" : "Withdrawal"} fill="hsl(199 89% 48%)" fillOpacity={0.8} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="discharge" name={language === "th" ? "น้ำทิ้ง" : "Discharge"} fill="hsl(25 95% 53%)" fillOpacity={0.8} radius={[4, 4, 0, 0]} />
+                  <Line type="monotone" dataKey="recycling" name={language === "th" ? "น้ำหมุนเวียน" : "Recycling"} stroke="hsl(142 71% 45%)" strokeWidth={2} dot={{ r: 3 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลน้ำ" : "No water data"} />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 6. Water by Site */}
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl"><Droplets className="h-4 w-4 text-emerald-600" /></div>
+            <CardTitle className="text-base font-medium">
+              {language === "th" ? "การใช้น้ำแยกตามสถานที่" : "Water Withdrawal by Site"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {waterBySiteData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={waterBySiteData} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} width={80} />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString()} m³`, ""]} />
+                  <Bar dataKey="withdrawal" name={language === "th" ? "การใช้น้ำ" : "Withdrawal"} fill="hsl(199 89% 48%)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 7. Waste Composition Pie */}
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl"><Recycle className="h-4 w-4 text-emerald-600" /></div>
+            <CardTitle className="text-base font-medium">
+              {language === "th" ? "สัดส่วนการจัดการของเสีย" : "Waste Management Composition"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {wastePieData.length > 0 ? (
+              <div className="flex flex-col items-center">
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie data={wastePieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="value">
+                      {wastePieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${(value / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} ${language === "th" ? "ตัน" : "tons"}`, ""]} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap justify-center gap-4 mt-2">
+                  {wastePieData.map((item, i) => (
+                    <div key={i} className="flex items-center gap-1.5 text-xs">
+                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
+                      <span className="text-muted-foreground">{item.name}</span>
+                      <span className="font-medium">{(item.value / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}t</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลของเสีย" : "No waste data"} />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 8. Waste Monthly Trend */}
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl"><Trash2 className="h-4 w-4 text-emerald-600" /></div>
+            <div>
+              <CardTitle className="text-base font-medium">
+                {language === "th" ? "ปริมาณขยะรายเดือน" : "Monthly Waste Trend"}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">{language === "th" ? "หน่วย: ตัน" : "Unit: tons"}</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {hasWasteChartData ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={wasteChartData.filter(d => d.total !== null).map(d => ({
+                  ...d,
+                  total: d.total ? d.total / 1000 : null,
+                  recycled: d.recycled ? d.recycled / 1000 : null,
+                }))} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${language === "th" ? "ตัน" : "tons"}`, ""]} />
+                  <Legend />
+                  <Bar dataKey="total" name={language === "th" ? "ขยะทั้งหมด" : "Total Waste"} fill="hsl(25 95% 53%)" fillOpacity={0.7} radius={[4, 4, 0, 0]} />
+                  <Line type="monotone" dataKey="recycled" name={language === "th" ? "Recycle/Reuse" : "Recycled"} stroke="hsl(142 71% 45%)" strokeWidth={2} dot={{ r: 3 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Summary Table */}
+      {summaryTableData.length > 0 && (
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-3xl">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-xl"><Leaf className="h-4 w-4 text-emerald-600" /></div>
+            <div>
+              <CardTitle className="text-base font-medium">
+                {language === "th" ? "สรุปตัวชี้วัดด้านสิ่งแวดล้อม" : "Environmental Metrics Summary"}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {language === "th" ? `เปรียบเทียบ ${selectedYear} vs ${prevYear}` : `${selectedYear} vs ${prevYear} comparison`}
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/50">
+                  <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">{language === "th" ? "ตัวชี้วัด" : "Metric"}</th>
+                  <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">{language === "th" ? "หน่วย" : "Unit"}</th>
+                  <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">{selectedYear}</th>
+                  <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">{prevYear}</th>
+                  <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">YoY</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaryTableData.map(row => (
+                  <tr key={row.id} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
+                    <td className="py-2.5 px-3 text-xs">{row.name}</td>
+                    <td className="py-2.5 px-3 text-xs text-right text-muted-foreground">{row.unit}</td>
+                    <td className="py-2.5 px-3 text-xs text-right font-medium">{row.current.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-3 text-xs text-right text-muted-foreground">{row.prev > 0 ? row.prev.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "-"}</td>
+                    <td className="py-2.5 px-3 text-xs text-right">
+                      {row.change !== null ? (
+                        <span className={`inline-flex items-center gap-0.5 ${row.change < 0 ? "text-emerald-600" : row.change > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                          {row.change > 0 ? <TrendingUp className="h-3 w-3" /> : row.change < 0 ? <TrendingDown className="h-3 w-3" /> : null}
+                          {row.change > 0 ? "+" : ""}{row.change.toFixed(1)}%
+                        </span>
+                      ) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
