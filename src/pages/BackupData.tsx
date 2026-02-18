@@ -593,10 +593,10 @@ export default function BackupData() {
         </div>
 
         {/* Transaction Export Card */}
-        <Card>
+        <Card className="glass-card-solid overflow-hidden">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Calendar className="h-5 w-5 text-primary" />
               {language === 'th' ? 'ส่งออกข้อมูล KPI' : 'Export KPI Data'}
             </CardTitle>
             <CardDescription>
@@ -769,7 +769,7 @@ export default function BackupData() {
             </div>
 
             {/* Export Button */}
-            <div className="flex justify-end pt-4 border-t">
+            <div className="flex justify-end pt-4 border-t border-white/20">
               <Button
                 onClick={handleExportTransactions}
                 disabled={exporting || loading}
@@ -787,7 +787,15 @@ export default function BackupData() {
         </Card>
 
         {/* Info Card */}
-        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/50">
+        <Card
+          className="overflow-hidden rounded-2xl"
+          style={{
+            background: "rgba(219,234,254,0.35)",
+            backdropFilter: "blur(24px) saturate(160%)",
+            border: "1px solid rgba(147,197,253,0.4)",
+            boxShadow: "0 4px 24px rgba(59,130,246,0.08), inset 0 1px 0 rgba(255,255,255,0.5)",
+          }}
+        >
           <CardContent className="pt-6">
             <div className="flex gap-3">
               <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />

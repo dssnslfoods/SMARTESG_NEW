@@ -34,7 +34,7 @@ export default function HelpCenter() {
 
   return (
     <>
-      <div className="space-y-6 pb-8 bg-gradient-to-br from-background via-background to-primary/5 min-h-screen -m-6 p-6">
+      <div className="space-y-6 pb-8 min-h-screen">
         {/* Header */}
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
@@ -51,7 +51,7 @@ export default function HelpCenter() {
         </div>
 
         {/* ─── Section 1: System Overview ─── */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl">
+        <Card className="glass-card-solid rounded-2xl overflow-hidden">
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <div className="p-2 rounded-xl bg-primary/10">
               <Globe className="h-5 w-5 text-primary" />
@@ -85,7 +85,7 @@ export default function HelpCenter() {
         </Card>
 
         {/* ─── Section 2: Roles & Permissions ─── */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl">
+        <Card className="glass-card-solid rounded-2xl overflow-hidden">
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <div className="p-2 rounded-xl bg-blue-500/10">
               <Shield className="h-5 w-5 text-blue-600" />
@@ -160,7 +160,7 @@ export default function HelpCenter() {
         </Card>
 
         {/* ─── Section 3: Formulas & Calculations ─── */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl">
+        <Card className="glass-card-solid rounded-2xl overflow-hidden">
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <div className="p-2 rounded-xl bg-amber-500/10">
               <Calculator className="h-5 w-5 text-amber-600" />
@@ -506,7 +506,7 @@ export default function HelpCenter() {
         </Card>
 
         {/* ─── Section 4: Module Guide ─── */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl">
+        <Card className="glass-card-solid rounded-2xl overflow-hidden">
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <div className="p-2 rounded-xl bg-emerald-500/10">
               <HelpCircle className="h-5 w-5 text-emerald-600" />
@@ -643,7 +643,7 @@ export default function HelpCenter() {
         </Card>
 
         {/* ─── Section 5: Metric ID Reference ─── */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl">
+        <Card className="glass-card-solid rounded-2xl overflow-hidden">
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <div className="p-2 rounded-xl bg-purple-500/10">
               <Database className="h-5 w-5 text-purple-600" />
@@ -736,7 +736,7 @@ export default function HelpCenter() {
         </Card>
 
         {/* ─── Section 6: Data Status Flow ─── */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl">
+        <Card className="glass-card-solid rounded-2xl overflow-hidden">
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <div className="p-2 rounded-xl bg-cyan-500/10">
               <AlertTriangle className="h-5 w-5 text-cyan-600" />
