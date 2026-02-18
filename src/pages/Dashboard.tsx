@@ -425,30 +425,30 @@ export default function Dashboard() {
   return (
     <div 
       ref={containerRef} 
-      className="space-y-4 sm:space-y-6 h-full overflow-y-auto bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 min-h-full p-1"
+      className="space-y-4 sm:space-y-6 h-full overflow-y-auto min-h-full p-1"
     >
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
       
       {/* Page Header */}
       <div className="px-1">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('dashboard')}</h1>
-        <p className="text-xs sm:text-sm text-gray-500">
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('dashboard')}</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">
           {language === 'th' ? 'ภาพรวมข้อมูล ESG' : 'ESG Data Overview'}
         </p>
       </div>
 
-      {/* Stats Grid - Glass Cards */}
+      {/* Stats Grid - Liquid Glass Cards */}
       <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {statCards
           .filter((card) => card.roles.includes(role || ''))
           .map((card) => (
             <Card 
               key={card.title} 
-              className="cursor-pointer transition-all duration-300 bg-white/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl hover:scale-[1.02] group"
+              className="glass-card cursor-pointer transition-all duration-300 hover:scale-[1.02] group"
               onClick={() => fetchDetailData(card.detailType, card.title)}
             >
               <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium text-gray-500 line-clamp-1">
+                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground line-clamp-1">
                   {card.title}
                 </CardTitle>
                 <div className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl ${card.iconBg} flex items-center justify-center shrink-0`}>
@@ -457,8 +457,8 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl sm:text-3xl font-bold text-gray-900">{card.value}</div>
-                  <ChevronRight className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="text-2xl sm:text-3xl font-bold text-foreground">{card.value}</div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </CardContent>
             </Card>
@@ -469,11 +469,11 @@ export default function Dashboard() {
       {role === 'staff' && (
         <div className="grid gap-3 sm:gap-4 grid-cols-2">
           <Card 
-            className="cursor-pointer transition-all duration-300 bg-white/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl group"
+            className="glass-card cursor-pointer transition-all duration-300 hover:scale-[1.02] group"
             onClick={() => fetchDetailData('drafts', language === 'th' ? 'รายการร่างของฉัน' : 'My Drafts')}
           >
             <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium text-gray-500 line-clamp-1">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground line-clamp-1">
                 {language === 'th' ? 'รายการร่างของฉัน' : 'My Drafts'}
               </CardTitle>
               <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
@@ -482,17 +482,17 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
               <div className="flex items-center justify-between">
-                <div className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.myDrafts}</div>
-                <ChevronRight className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="text-2xl sm:text-3xl font-bold text-foreground">{stats.myDrafts}</div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </CardContent>
           </Card>
           <Card 
-            className="cursor-pointer transition-all duration-300 bg-white/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl group"
+            className="glass-card cursor-pointer transition-all duration-300 hover:scale-[1.02] group"
             onClick={() => fetchDetailData('submitted', language === 'th' ? 'รายการที่ส่งแล้ว' : 'My Submissions')}
           >
             <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium text-gray-500 line-clamp-1">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground line-clamp-1">
                 {language === 'th' ? 'รายการที่ส่งแล้ว' : 'My Submissions'}
               </CardTitle>
               <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
@@ -501,8 +501,8 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
               <div className="flex items-center justify-between">
-                <div className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.mySubmitted}</div>
-                <ChevronRight className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="text-2xl sm:text-3xl font-bold text-foreground">{stats.mySubmitted}</div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </CardContent>
           </Card>
@@ -512,40 +512,40 @@ export default function Dashboard() {
       {/* Admin Analytics Dashboard */}
       {role === 'admin' && <AdminAnalyticsDashboard />}
 
-      {/* User Roles Table (Admin only) - Glass Card */}
+      {/* User Roles Table (Admin only) - Liquid Glass Card */}
       {role === 'admin' && (
-        <Card className="bg-white/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-xl shadow-gray-900/5">
+        <Card className="glass-card-solid">
           <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-900">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-foreground">
               <div className="h-8 w-8 rounded-xl bg-indigo-100 flex items-center justify-center">
                 <Shield className="h-4 w-4 text-indigo-600" />
               </div>
               {language === 'th' ? 'ตารางสิทธิ์ผู้ใช้งาน' : 'User Roles Table'}
             </CardTitle>
-            <CardDescription className="text-xs sm:text-sm text-gray-500">
+            <CardDescription className="text-xs sm:text-sm">
               {language === 'th' ? 'รายการ Role ทั้งหมดในระบบ' : 'All user roles in the system'}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
             {userRoles.length === 0 ? (
-              <p className="text-gray-500 text-xs sm:text-sm">
+              <p className="text-muted-foreground text-xs sm:text-sm">
                 {language === 'th' ? 'ไม่พบข้อมูล Role' : 'No roles found'}
               </p>
             ) : (
               <div className="overflow-x-auto -mx-4 sm:mx-0">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-gray-200/50">
-                      <TableHead className="text-xs sm:text-sm text-gray-600">{language === 'th' ? 'ชื่อผู้ใช้' : 'User Name'}</TableHead>
-                      <TableHead className="text-xs sm:text-sm hidden sm:table-cell text-gray-600">{language === 'th' ? 'User ID' : 'User ID'}</TableHead>
-                      <TableHead className="text-xs sm:text-sm text-gray-600">{language === 'th' ? 'บทบาท' : 'Role'}</TableHead>
+                    <TableRow className="border-border/50">
+                      <TableHead className="text-xs sm:text-sm">{language === 'th' ? 'ชื่อผู้ใช้' : 'User Name'}</TableHead>
+                      <TableHead className="text-xs sm:text-sm hidden sm:table-cell">{language === 'th' ? 'User ID' : 'User ID'}</TableHead>
+                      <TableHead className="text-xs sm:text-sm">{language === 'th' ? 'บทบาท' : 'Role'}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {userRoles.map((item) => (
-                      <TableRow key={item.id} className="border-gray-200/50 hover:bg-gray-50/80">
-                        <TableCell className="font-medium text-xs sm:text-sm py-2 sm:py-4 text-gray-900">{item.full_name}</TableCell>
-                        <TableCell className="font-mono text-xs text-gray-400 hidden sm:table-cell">{item.user_id}</TableCell>
+                      <TableRow key={item.id} className="border-border/50 hover:bg-muted/40">
+                        <TableCell className="font-medium text-xs sm:text-sm py-2 sm:py-4 text-foreground">{item.full_name}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground hidden sm:table-cell">{item.user_id}</TableCell>
                         <TableCell className="py-2 sm:py-4">
                           {item.role === 'admin' && (
                             <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white border-0 gap-1 sm:gap-1.5 text-xs rounded-full shadow-sm">
@@ -576,7 +576,7 @@ export default function Dashboard() {
                             </Badge>
                           )}
                           {item.role === 'guest' && (
-                            <Badge className="bg-gray-100 text-gray-600 border border-gray-200 gap-1 sm:gap-1.5 text-xs rounded-full">
+                            <Badge className="bg-muted text-muted-foreground border border-border gap-1 sm:gap-1.5 text-xs rounded-full">
                               <UserX className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                               <span className="hidden sm:inline">{item.role}</span>
                               <span className="sm:hidden">G</span>
@@ -593,11 +593,11 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Quick Actions - Glass Card */}
-      <Card className="bg-white/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-xl shadow-gray-900/5">
+      {/* Quick Actions - Liquid Glass Card */}
+      <Card className="glass-card-solid">
         <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="text-base sm:text-lg text-gray-900">{t('quickActions')}</CardTitle>
-          <CardDescription className="text-xs sm:text-sm text-gray-500">
+          <CardTitle className="text-base sm:text-lg text-foreground">{t('quickActions')}</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             {language === 'th' ? 'การดำเนินการที่ใช้บ่อย' : 'Frequently used actions'}
           </CardDescription>
         </CardHeader>
@@ -608,10 +608,10 @@ export default function Dashboard() {
                 key={action.href} 
                 variant="outline" 
                 asChild 
-                className="w-full sm:w-auto justify-start sm:justify-center h-10 sm:h-9 text-sm bg-gray-50/80 hover:bg-white hover:shadow-lg border-gray-200/50 hover:border-emerald-200/50 rounded-2xl transition-all duration-200"
+                className="w-full sm:w-auto justify-start sm:justify-center h-10 sm:h-9 text-sm hover:shadow-lg hover:border-primary/40 rounded-2xl transition-all duration-200"
               >
                 <Link to={action.href} className="gap-2">
-                  <action.icon className="h-4 w-4 text-emerald-600" />
+                  <action.icon className="h-4 w-4 text-primary" />
                   {action.label}
                 </Link>
               </Button>
@@ -620,17 +620,17 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Detail Dialog - Glass Style */}
+      {/* Detail Dialog - Liquid Glass Style */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[85vh] overflow-auto p-4 sm:p-6 bg-white/90 backdrop-blur-2xl border-gray-200/50 rounded-3xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[85vh] overflow-auto p-4 sm:p-6 glass-card-solid rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-900">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg text-foreground">
               <div className="h-8 w-8 rounded-xl bg-emerald-100 flex items-center justify-center">
                 <Eye className="h-4 w-4 text-emerald-600" />
               </div>
               {detailData?.title}
             </DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm text-gray-500">
+            <DialogDescription className="text-xs sm:text-sm">
               {language === 'th' ? 'รายละเอียดข้อมูล' : 'Data details'}
             </DialogDescription>
           </DialogHeader>
