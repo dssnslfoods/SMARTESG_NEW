@@ -7,7 +7,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Globe, Leaf, Shield, BarChart3, Users, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
+import {
+  Loader2,
+  Globe,
+  Leaf,
+  Shield,
+  BarChart3,
+  Users,
+  Mail,
+  Lock,
+  User,
+  ArrowRight,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,12 +67,12 @@ export default function Auth() {
 
   if (loading) {
     return (
-      <div 
+      <div
         className="flex h-screen items-center justify-center"
         style={{
           backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4), transparent), url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&q=80')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
       >
         <div className="flex flex-col items-center gap-4">
@@ -179,12 +192,12 @@ export default function Auth() {
   return (
     <div className="flex min-h-screen">
       {/* Left Panel - Nature Background with Content Overlay */}
-      <div 
+      <div
         className="hidden lg:flex lg:w-[60%] flex-col justify-between relative overflow-hidden"
         style={{
           backgroundImage: `url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&q=80')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
       >
         {/* Dark Overlay Gradient */}
@@ -193,17 +206,14 @@ export default function Auth() {
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between h-full p-16">
           {/* Logo Section - Fade in from top */}
-          <div 
-            className="animate-fadeInUp"
-            style={{ animationDelay: '0.1s', animationFillMode: 'both' }}
-          >
+          <div className="animate-fadeInUp" style={{ animationDelay: "0.1s", animationFillMode: "both" }}>
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-xl shadow-lg border border-white/20">
                 <Leaf className="h-8 w-8 text-white" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-white">ESG Smart Performance</h1>
-                <p className="text-sm text-white/70 font-medium">Sustainability Platform v2.0</p>
+                <p className="text-sm text-white/70 font-medium">Sustainability Platform v2.5</p>
               </div>
             </div>
           </div>
@@ -211,10 +221,7 @@ export default function Auth() {
           {/* Main Heading & Features */}
           <div className="space-y-12">
             {/* Heading - Fade in from left */}
-            <div 
-              className="animate-fadeInLeft"
-              style={{ animationDelay: '0.2s', animationFillMode: 'both' }}
-            >
+            <div className="animate-fadeInLeft" style={{ animationDelay: "0.2s", animationFillMode: "both" }}>
               <h2 className="text-4xl font-bold leading-tight tracking-tight text-white">
                 {language === "th" ? "ขับเคลื่อนองค์กร" : "Driving Your Organization"}
               </h2>
@@ -235,9 +242,9 @@ export default function Auth() {
                 <div
                   key={index}
                   className="flex items-start gap-4 rounded-2xl bg-white/10 backdrop-blur-md p-4 border border-white/20 transition-all duration-300 hover:bg-white/20 cursor-pointer animate-fadeInLeft"
-                  style={{ 
+                  style={{
                     animationDelay: `${0.3 + index * 0.1}s`,
-                    animationFillMode: 'both'
+                    animationFillMode: "both",
                   }}
                 >
                   <span className="text-2xl">{feature.icon}</span>
@@ -251,26 +258,25 @@ export default function Auth() {
           </div>
 
           {/* Footer */}
-          <p className="text-sm text-white/50">
-            © 2026 ESG Smart Performance | Developed by Arnon Arpaket
-          </p>
+          <p className="text-sm text-white/50">© 2026 ESG Smart Performance | Developed by Arnon Arpaket</p>
         </div>
       </div>
 
       {/* Right Panel - Frosted Glass Login Form */}
-      <div 
+      <div
         className="flex flex-1 flex-col items-center justify-center relative min-h-screen lg:w-[40%]"
         style={{
-          background: 'linear-gradient(to bottom right, rgba(255,255,255,0.9), rgba(255,255,255,0.7), rgba(236,253,245,0.5))',
+          background:
+            "linear-gradient(to bottom right, rgba(255,255,255,0.9), rgba(255,255,255,0.7), rgba(236,253,245,0.5))",
         }}
       >
         {/* Mobile: Nature Background */}
-        <div 
+        <div
           className="lg:hidden absolute inset-0 -z-10"
           style={{
             backgroundImage: `url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&q=80')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
+            backgroundSize: "cover",
+            backgroundPosition: "center",
           }}
         >
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -292,7 +298,10 @@ export default function Auth() {
                 <span className="font-medium text-gray-700">{language === "th" ? "ไทย" : "EN"}</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[120px] bg-white/80 backdrop-blur-xl border-white/50 rounded-xl">
+            <DropdownMenuContent
+              align="end"
+              className="min-w-[120px] bg-white/80 backdrop-blur-xl border-white/50 rounded-xl"
+            >
               <DropdownMenuItem onClick={() => setLanguage("th")} className="gap-3 cursor-pointer rounded-lg">
                 <span>🇹🇭</span>
                 <span>ไทย</span>
@@ -306,9 +315,9 @@ export default function Auth() {
         </div>
 
         {/* Login Form Container */}
-        <div 
+        <div
           className="w-full max-w-[400px] px-4 lg:px-0 relative z-10 animate-fadeInRight"
-          style={{ animationDelay: '0.3s', animationFillMode: 'both' }}
+          style={{ animationDelay: "0.3s", animationFillMode: "both" }}
         >
           {/* Mobile Card Wrapper */}
           <div className="lg:bg-transparent lg:shadow-none lg:p-0 bg-white/90 backdrop-blur-2xl rounded-3xl shadow-2xl p-8 mx-0">
@@ -321,9 +330,7 @@ export default function Auth() {
 
             {/* Welcome Text */}
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-800">
-                {language === "th" ? "ยินดีต้อนรับ" : "Welcome"}
-              </h1>
+              <h1 className="text-3xl font-bold text-gray-800">{language === "th" ? "ยินดีต้อนรับ" : "Welcome"}</h1>
               <p className="text-gray-500 mt-2">
                 {language === "th" ? "เข้าสู่ระบบเพื่อดำเนินการต่อ" : "Sign in to continue"}
               </p>
@@ -399,8 +406,8 @@ export default function Auth() {
                   {/* Remember Me & Forgot Password */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Checkbox 
-                        id="remember" 
+                      <Checkbox
+                        id="remember"
                         checked={rememberMe}
                         onCheckedChange={(checked) => setRememberMe(checked as boolean)}
                         className="w-5 h-5 rounded-lg border-gray-300 text-emerald-500 focus:ring-emerald-500"
@@ -412,10 +419,13 @@ export default function Auth() {
                     <button
                       type="button"
                       className="text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
-                      onClick={() => toast({
-                        title: language === "th" ? "ลืมรหัสผ่าน" : "Forgot Password",
-                        description: language === "th" ? "กรุณาติดต่อผู้ดูแลระบบ" : "Please contact your administrator",
-                      })}
+                      onClick={() =>
+                        toast({
+                          title: language === "th" ? "ลืมรหัสผ่าน" : "Forgot Password",
+                          description:
+                            language === "th" ? "กรุณาติดต่อผู้ดูแลระบบ" : "Please contact your administrator",
+                        })
+                      }
                     >
                       {language === "th" ? "ลืมรหัสผ่าน?" : "Forgot password?"}
                     </button>
@@ -533,9 +543,7 @@ export default function Auth() {
                         {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    {errors.confirmPassword && (
-                      <p className="text-xs text-red-500 mt-1">{errors.confirmPassword}</p>
-                    )}
+                    {errors.confirmPassword && <p className="text-xs text-red-500 mt-1">{errors.confirmPassword}</p>}
                   </div>
 
                   {/* Signup Button */}
