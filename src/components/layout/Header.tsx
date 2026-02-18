@@ -49,7 +49,16 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const roleInfo = role ? roleConfig[role] : null;
 
   return (
-    <header className="sticky top-0 z-10 flex h-14 sm:h-16 items-center justify-between border-b border-gray-200/50 bg-white/70 backdrop-blur-xl px-3 sm:px-6">
+    <header
+      className="sticky top-0 z-10 flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6"
+      style={{
+        background: "rgba(255,255,255,0.65)",
+        backdropFilter: "blur(48px) saturate(200%)",
+        WebkitBackdropFilter: "blur(48px) saturate(200%)",
+        borderBottom: "1px solid rgba(255,255,255,0.5)",
+        boxShadow: "0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 24px rgba(16,185,129,0.07)",
+      }}
+    >
       <div className="flex items-center gap-2 sm:gap-4">
         {/* Mobile Menu Button */}
         <Button
