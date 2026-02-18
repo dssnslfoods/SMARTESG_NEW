@@ -4,6 +4,7 @@ import { Header } from './Header';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import { PageTransition } from './PageTransition';
+import { useTVMode } from '@/contexts/TVModeContext';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -11,7 +12,8 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
+  const { isTVMode } = useTVMode();
+
   // Enable realtime notifications for data changes
   useRealtimeNotifications();
 
@@ -39,6 +41,14 @@ export function MainLayout({ children }: MainLayoutProps) {
           </div>
         </main>
       </div>
+
+      {/* TV Mode fullscreen overlay — covers sidebar + header */}
+      {isTVMode && (
+        <div className="fixed inset-0 z-[9999] bg-background overflow-hidden flex flex-col">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
+
