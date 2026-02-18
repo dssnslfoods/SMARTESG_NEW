@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +53,7 @@ import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
 import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
+import { FullscreenButton } from "@/components/reports/FullscreenButton";
 
 // ─── Metric ID Constants ───
 const METRIC = {
@@ -191,6 +192,7 @@ function sumByMetric(values: MetricValue[], metricId: string): number {
 
 // ─── Main Component ───
 export default function Governance() {
+  const fullscreenRef = useRef<HTMLDivElement>(null);
   const { language } = useLanguage();
 
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -542,7 +544,8 @@ export default function Governance() {
   }
 
   return (
-    <div ref={containerRef} className="space-y-6 pb-8 bg-gradient-to-br from-background via-background to-primary/5 min-h-screen -m-6 p-6">
+    <div ref={fullscreenRef} className="space-y-6 pb-8 bg-gradient-to-br from-background via-background to-primary/5 min-h-screen -m-6 p-6">
+      <div ref={containerRef} />
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
       {/* Gradient Accent Line */}
@@ -573,26 +576,29 @@ export default function Governance() {
             </div>
           )}
         </div>
-        <ExportExcelButton
-          data={(summaryTableData.filter(Boolean) as any[]).map(row => {
-            const exportRow: Record<string, unknown> = {
-              [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.metricName,
-              [language === "th" ? "หน่วย" : "Unit"]: row.unit,
-            };
-            tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] ?? "-"; });
-            if (tableYears.length >= 2) {
-              exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-";
-            }
-            return exportRow;
-          })}
-          filenamePrefix="governance_report"
-          sourcePage="Governance Dashboard"
-          appliedFilters={{
-            company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
-            site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
-            year: isAllTime ? "All Time" : String(selectedYear),
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <FullscreenButton targetRef={fullscreenRef} language={language} />
+          <ExportExcelButton
+            data={(summaryTableData.filter(Boolean) as any[]).map(row => {
+              const exportRow: Record<string, unknown> = {
+                [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.metricName,
+                [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+              };
+              tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] ?? "-"; });
+              if (tableYears.length >= 2) {
+                exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-";
+              }
+              return exportRow;
+            })}
+            filenamePrefix="governance_report"
+            sourcePage="Governance Dashboard"
+            appliedFilters={{
+              company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
+              site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
+              year: isAllTime ? "All Time" : String(selectedYear),
+            }}
+          />
+        </div>
       </div>
 
       {/* Filters */}
