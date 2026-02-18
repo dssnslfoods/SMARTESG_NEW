@@ -49,6 +49,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
+import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 
 // ─── Metric ID Constants ───
 const METRIC = {
@@ -700,17 +701,17 @@ export default function Social() {
           </CardHeader>
           <CardContent>
             {hasTrainingData ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ChartScrollWrapper dataLength={trainingChartData.length} minBarWidth={52} height={300}>
                 <ComposedChart data={trainingChartData.filter(d => d.hours !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString()} ${language === "th" ? "ชั่วโมง" : "hrs"}`, ""]} />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString()} ${language === "th" ? "ชั่วโมง" : "hrs"}`, name]} labelFormatter={(label) => `📅 ${label}`} />
                   <Legend />
                   <Bar dataKey="hours" name={language === "th" ? "ชั่วโมงอบรม" : "Training Hours"} fill={THEME_COLORS.training} fillOpacity={0.8} radius={[4, 4, 0, 0]} />
                   <Line type="monotone" dataKey="hours" name={language === "th" ? "แนวโน้ม" : "Trend"} stroke="hsl(var(--foreground))" strokeWidth={2} dot={{ r: 3 }} />
                 </ComposedChart>
-              </ResponsiveContainer>
+              </ChartScrollWrapper>
             ) : (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลการอบรม" : "No training data"} />
             )}
@@ -801,18 +802,18 @@ export default function Social() {
           </CardHeader>
           <CardContent>
             {hasSafetyCompositeData ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ChartScrollWrapper dataLength={safetyCompositeData.length} minBarWidth={52} height={300}>
                 <ComposedChart data={safetyCompositeData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis yAxisId="left" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip contentStyle={glassTooltipStyle} />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <YAxis yAxisId="left" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <Tooltip contentStyle={glassTooltipStyle} labelFormatter={(label) => `📅 ${label}`} />
                   <Legend />
                   <Bar yAxisId="left" dataKey="lti" name={language === "th" ? "LTI (ครั้ง)" : "LTI (cases)"} fill={THEME_COLORS.lti} fillOpacity={0.8} radius={[4, 4, 0, 0]} />
                   <Line yAxisId="right" type="monotone" dataKey="wellbeing" name={language === "th" ? "Well-being (คน)" : "Well-being (people)"} stroke={THEME_COLORS.wellbeing} strokeWidth={2} dot={{ r: 3 }} />
                 </ComposedChart>
-              </ResponsiveContainer>
+              </ChartScrollWrapper>
             ) : (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลความปลอดภัย" : "No safety data"} />
             )}
@@ -857,15 +858,15 @@ export default function Social() {
           </CardHeader>
           <CardContent>
             {hasWellbeingData ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ChartScrollWrapper dataLength={wellbeingChartData.length} minBarWidth={52} height={300}>
                 <AreaChart data={wellbeingChartData.filter(d => d.participants !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString()} ${language === "th" ? "คน" : "people"}`, ""]} />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString()} ${language === "th" ? "คน" : "people"}`, name]} labelFormatter={(label) => `📅 ${label}`} />
                   <Area type="monotone" dataKey="participants" name={language === "th" ? "ผู้เข้าร่วม" : "Participants"} stroke={THEME_COLORS.wellbeing} fill={THEME_COLORS.wellbeing} fillOpacity={0.3} />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ChartScrollWrapper>
             ) : (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล Well-being" : "No well-being data"} />
             )}
@@ -888,15 +889,15 @@ export default function Social() {
           <CardContent>
             {hasHumanRightsData ? (
               <div>
-                <ResponsiveContainer width="100%" height={250}>
+                <ChartScrollWrapper dataLength={humanRightsChartData.length} minBarWidth={52} height={250}>
                   <BarChart data={humanRightsChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} allowDecimals={false} />
-                    <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value} ${language === "th" ? "ครั้ง" : "cases"}`, ""]} />
+                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} allowDecimals={false} />
+                    <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value} ${language === "th" ? "ครั้ง" : "cases"}`, name]} labelFormatter={(label) => `📅 ${label}`} />
                     <Bar dataKey="violations" name={language === "th" ? "เหตุการณ์ละเมิด" : "Violations"} fill={THEME_COLORS.humanRights} fillOpacity={0.8} radius={[4, 4, 0, 0]} />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartScrollWrapper>
                 {totalHumanRightsViolations === 0 && (
                   <div className="text-center mt-3">
                     <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-sm px-4 py-1">
