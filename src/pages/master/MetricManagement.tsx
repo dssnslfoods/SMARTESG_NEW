@@ -300,7 +300,7 @@ export default function MetricManagement() {
                 </Button>
               </DialogTrigger>
             </div>
-            <DialogContent className="max-w-md">
+            <DialogContent className="glass-card-solid max-w-md rounded-3xl">
               <DialogHeader>
                 <DialogTitle>
                   {editingMetric
@@ -356,7 +356,7 @@ export default function MetricManagement() {
           </Dialog>
         </div>
 
-        <Card>
+        <Card className="glass-card-solid">
           <CardHeader>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="relative flex-1 w-full">
