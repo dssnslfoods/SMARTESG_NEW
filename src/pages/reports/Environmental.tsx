@@ -45,6 +45,7 @@ import { TrendAnalytics } from "@/components/reports/TrendAnalytics";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
 import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 import { FullscreenButton, useFullscreen } from "@/components/reports/FullscreenButton";
+import { TVNavBar } from "@/components/reports/TVNavBar";
 
 // ─── Metric ID Constants ───
 const METRIC = {
@@ -591,13 +592,13 @@ export default function Environmental() {
       {!isFullscreen && <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 rounded-full" />}
 
       {/* Header */}
-      <div className={`flex flex-row justify-between items-center gap-2 ${isFullscreen ? "shrink-0" : "flex-col md:flex-row items-start md:items-center gap-4"}`}>
+      <div className={`flex flex-row justify-between items-center gap-2 shrink-0 ${isFullscreen ? "" : "flex-col md:flex-row items-start md:items-center gap-4"}`}>
         <div>
-          <h1 className={`font-bold text-foreground flex items-center gap-2 ${isFullscreen ? "text-lg" : "text-xl sm:text-2xl"}`}>
+          <h1 className={`font-bold text-foreground flex items-center gap-2 ${isFullscreen ? "text-base" : "text-xl sm:text-2xl"}`}>
             <div className="p-1.5 bg-emerald-100 rounded-xl">
               <Leaf className="h-4 w-4 text-emerald-600" />
             </div>
-            Environmental Dashboard
+            {language === "th" ? "สิ่งแวดล้อม" : "Environmental"}
             {isFullscreen && hasData && (
               <Badge variant="outline" className="ml-2 text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
                 {isAllTime ? (language === "th" ? "ทุกปี" : "All Time") : selectedYear}
@@ -626,6 +627,7 @@ export default function Environmental() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {isFullscreen && <TVNavBar language={language} />}
           <FullscreenButton targetRef={fullscreenRef} language={language} isFullscreen={isFullscreen} toggle={toggleFullscreen} />
           {!isFullscreen && (
             <ExportExcelButton

@@ -60,6 +60,7 @@ import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
 import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 import { FullscreenButton, useFullscreen } from "@/components/reports/FullscreenButton";
+import { TVNavBar } from "@/components/reports/TVNavBar";
 
 // ─── All Key Metric IDs across E, S, G ───
 const ENV_METRICS = {
@@ -538,120 +539,129 @@ export default function ESGOverview() {
       <div ref={containerRef} />
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
-      {/* Multi-color accent */}
-      <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-full" />
+      {!isFullscreen && <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 rounded-full" />}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className={`flex flex-row justify-between items-center gap-2 shrink-0 ${isFullscreen ? "" : "flex-col md:flex-row items-start md:items-center gap-4"}`}>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-            <div className="p-2 bg-primary/10 rounded-xl">
-              <Globe className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+          <h1 className={`font-bold text-foreground flex items-center gap-2 ${isFullscreen ? "text-base" : "text-xl sm:text-2xl"}`}>
+            <div className={`rounded-xl ${isFullscreen ? "p-1.5" : "p-2"} bg-primary/10`}>
+              <Globe className={`${isFullscreen ? "h-4 w-4" : "h-5 w-5 sm:h-6 sm:w-6"} text-primary`} />
             </div>
-            {language === "th" ? "ESG Overview Dashboard" : "ESG Overview Dashboard"}
+            {language === "th" ? "ESG Overview" : "ESG Overview"}
+            {isFullscreen && hasData && (
+              <Badge variant="outline" className="ml-2 text-xs">
+                {isAllTime ? (language === "th" ? "ทุกปี" : "All Time") : selectedYear}
+              </Badge>
+            )}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {language === "th"
-              ? "ภาพรวมตัวชี้วัดด้าน สิ่งแวดล้อม สังคม และธรรมาภิบาล"
-              : "Overview of Environmental, Social & Governance metrics"}
-          </p>
-          {hasData && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Badge variant="outline" className="text-xs">
-                {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"}
-              </Badge>
-              <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
-                {isAllTime
-                  ? (language === "th" ? "เวลาทั้งหมด" : "All Time")
-                  : (language === "th" ? `ปี ${selectedYear}` : `Year ${selectedYear}`)}
-              </Badge>
-              {formatLastUpdated(lastUpdated) && (
-                <Badge variant="outline" className="text-xs bg-muted/60 text-muted-foreground border-border/50 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {language === "th" ? "อัปเดตล่าสุด" : "Last updated"}: {formatLastUpdated(lastUpdated)}
-                </Badge>
+          {!isFullscreen && (
+            <>
+              <p className="text-sm text-muted-foreground mt-1">
+                {language === "th" ? "ภาพรวมตัวชี้วัดด้าน สิ่งแวดล้อม สังคม และธรรมาภิบาล" : "Overview of Environmental, Social & Governance metrics"}
+              </p>
+              {hasData && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
+                    {isAllTime ? (language === "th" ? "เวลาทั้งหมด" : "All Time") : (language === "th" ? `ปี ${selectedYear}` : `Year ${selectedYear}`)}
+                  </Badge>
+                  {formatLastUpdated(lastUpdated) && (
+                    <Badge variant="outline" className="text-xs bg-muted/60 text-muted-foreground border-border/50 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {language === "th" ? "อัปเดตล่าสุด" : "Last updated"}: {formatLastUpdated(lastUpdated)}
+                    </Badge>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          {isFullscreen && <TVNavBar language={language} />}
           <FullscreenButton targetRef={fullscreenRef} language={language} isFullscreen={isFullscreen} toggle={toggleFullscreen} />
-          <ExportExcelButton
-            data={summaryData.map(row => {
-              const exportRow: Record<string, unknown> = {
-                [language === "th" ? "มิติ" : "Dimension"]: row.dim,
-                [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.label,
-                [language === "th" ? "หน่วย" : "Unit"]: row.unit,
-              };
-              tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] ?? "-"; });
-              if (tableYears.length >= 2) {
-                exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-";
-              }
-              return exportRow;
-            })}
-            filenamePrefix="esg_overview_report"
-            sourcePage="ESG Overview Dashboard"
-            appliedFilters={{
-              company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
-              site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
-              year: isAllTime ? "All Time" : String(selectedYear),
-            }}
-          />
+          {!isFullscreen && (
+            <ExportExcelButton
+              data={summaryData.map(row => {
+                const exportRow: Record<string, unknown> = {
+                  [language === "th" ? "มิติ" : "Dimension"]: row.dim,
+                  [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.label,
+                  [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+                };
+                tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] ?? "-"; });
+                if (tableYears.length >= 2) {
+                  exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-";
+                }
+                return exportRow;
+              })}
+              filenamePrefix="esg_overview_report"
+              sourcePage="ESG Overview Dashboard"
+              appliedFilters={{
+                company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
+                site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
+                year: isAllTime ? "All Time" : String(selectedYear),
+              }}
+            />
+          )}
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">{language === "th" ? "บริษัท" : "Company"}</Label>
-              <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v === "__all__" ? "" : v); setFilterSite(""); }}>
-                <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
-                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
-                </SelectTrigger>
-                <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
-                  <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {companies.map(c => (
-                    <SelectItem key={c.company_id} value={c.company_id}>{c.company_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Filters - hidden in TV mode */}
+      {!isFullscreen && (
+        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl">
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">{language === "th" ? "บริษัท" : "Company"}</Label>
+                <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v === "__all__" ? "" : v); setFilterSite(""); }}>
+                  <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
+                    <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
+                    <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                    {companies.map(c => (
+                      <SelectItem key={c.company_id} value={c.company_id}>{c.company_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{language === "th" ? "สถานที่" : "Site"}</Label>
+                <Select value={filterSite} onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}>
+                  <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
+                    <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
+                    <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                    {filteredSites.map(s => (
+                      <SelectItem key={s.site_id} value={s.site_id}>{s.site_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{language === "th" ? "ปี" : "Year"}</Label>
+                <Select value={filterYear} onValueChange={(v) => setFilterYear(v === "__all__" ? "" : v)}>
+                  <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
+                    <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
+                    <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                    {uniqueYears.map(year => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{language === "th" ? "สถานที่" : "Site"}</Label>
-              <Select value={filterSite} onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
-                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
-                </SelectTrigger>
-                <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
-                  <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {filteredSites.map(s => (
-                    <SelectItem key={s.site_id} value={s.site_id}>{s.site_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{language === "th" ? "ปี" : "Year"}</Label>
-              <Select value={filterYear} onValueChange={(v) => setFilterYear(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
-                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
-                </SelectTrigger>
-                <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
-                  <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {uniqueYears.map(year => (
-                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top-Level KPI Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className={`grid gap-2 shrink-0 ${isFullscreen ? "grid-cols-4" : "grid-cols-2 sm:grid-cols-4 gap-3"}`}>
         {[
           { label: "GHG", value: totalGHG.toLocaleString(), unit: "tCO2e", icon: Factory, color: "hsl(142 71% 45%)", yoy: calcMultiYoY([ENV_METRICS.GHG_SCOPE1, ENV_METRICS.GHG_SCOPE2], "negative"), ctx: "negative" as const },
           { label: language === "th" ? "พลังงานสะอาด" : "Renewable %", value: `${renewablePercent}`, unit: "%", icon: Zap, color: "hsl(45 93% 47%)", yoy: { trend: null, trendValue: null } as { trend: null; trendValue: null }, ctx: "positive" as const },
@@ -739,10 +749,10 @@ export default function ESGOverview() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={isFullscreen ? "flex-1 overflow-hidden grid grid-cols-3 grid-rows-1 gap-2 min-h-0" : "grid grid-cols-1 lg:grid-cols-3 gap-6"}>
         {/* ESG Data Distribution Pie */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3 pb-2">
+        <Card className={`bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl ${isFullscreen ? "flex flex-col min-h-0 overflow-hidden" : "hover:shadow-2xl transition-all duration-300 rounded-3xl"}`}>
+          <CardHeader className={`flex flex-row items-center gap-2 ${isFullscreen ? "py-2 px-3 shrink-0" : "gap-3 pb-2"}`}>
             <div className="p-2 bg-primary/10 rounded-xl">
               <BarChart3 className="h-4 w-4 text-primary" />
             </div>
@@ -750,7 +760,7 @@ export default function ESGOverview() {
               {language === "th" ? "สัดส่วนข้อมูล ESG" : "ESG Data Distribution"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={isFullscreen ? "flex-1 min-h-0 p-2" : "p-6 pt-0"}>
             {dimensionDistribution.length === 0 ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data"} />
             ) : (
