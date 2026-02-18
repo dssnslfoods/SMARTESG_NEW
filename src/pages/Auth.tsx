@@ -70,7 +70,7 @@ export default function Auth() {
       <div
         className="flex h-screen items-center justify-center"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4), transparent), url('https://images.unsplash.com/photo-1509391366360-2e959784a276?w=1920&q=80')`,
+          backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.78), rgba(0,0,0,0.6), transparent), url('https://images.unsplash.com/photo-1509391366360-2e959784a276?w=1920&q=80')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -201,7 +201,7 @@ export default function Auth() {
         }}
       >
         {/* Dark Overlay Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/55 to-black/10" />
 
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between h-full p-16">
