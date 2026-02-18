@@ -55,6 +55,7 @@ import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
 import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 import { FullscreenButton, useFullscreen } from "@/components/reports/FullscreenButton";
+import { TVNavBar } from "@/components/reports/TVNavBar";
 
 // ─── Metric ID Constants ───
 const METRIC = {
@@ -574,119 +575,128 @@ export default function Governance() {
       <div ref={containerRef} />
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
-      {/* Gradient Accent Line */}
-      <div className="h-1 w-full bg-gradient-to-r from-purple-500 via-purple-600 to-violet-500 rounded-full" />
+      {!isFullscreen && <div className="h-1 w-full bg-gradient-to-r from-purple-500 via-purple-600 to-violet-500 rounded-full" />}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className={`flex flex-row justify-between items-center gap-2 shrink-0 ${isFullscreen ? "" : "flex-col md:flex-row items-start md:items-center gap-4"}`}>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-            <div className="p-2 bg-primary/10 rounded-xl">
-              <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+          <h1 className={`font-bold text-foreground flex items-center gap-2 ${isFullscreen ? "text-base" : "text-xl sm:text-2xl"}`}>
+            <div className={`rounded-xl ${isFullscreen ? "p-1.5" : "p-2"} bg-primary/10`}>
+              <Shield className={`${isFullscreen ? "h-4 w-4" : "h-5 w-5 sm:h-6 sm:w-6"} text-primary`} />
             </div>
-            {language === "th" ? "Governance Dashboard" : "Governance Dashboard"}
+            {language === "th" ? "ธรรมาภิบาล" : "Governance"}
+            {isFullscreen && hasData && (
+              <Badge variant="outline" className="ml-2 text-xs">
+                {isAllTime ? (language === "th" ? "ทุกปี" : "All Time") : selectedYear}
+              </Badge>
+            )}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {language === "th"
-              ? "ตัวชี้วัดด้านธรรมาภิบาลและการกำกับดูแลกิจการ"
-              : "Governance metrics and corporate oversight"}
-          </p>
-          {hasData && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Badge variant="outline" className="text-xs">
-                {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"}
-              </Badge>
-              <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
-                {language === "th" ? `ปี ${selectedYear}` : `Year ${selectedYear}`}
-              </Badge>
-              {formatLastUpdated(lastUpdated) && (
-                <Badge variant="outline" className="text-xs bg-muted/60 text-muted-foreground border-border/50 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {language === "th" ? "อัปเดตล่าสุด" : "Last updated"}: {formatLastUpdated(lastUpdated)}
-                </Badge>
+          {!isFullscreen && (
+            <>
+              <p className="text-sm text-muted-foreground mt-1">
+                {language === "th" ? "ตัวชี้วัดด้านธรรมาภิบาลและการกำกับดูแลกิจการ" : "Governance metrics and corporate oversight"}
+              </p>
+              {hasData && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
+                    {language === "th" ? `ปี ${selectedYear}` : `Year ${selectedYear}`}
+                  </Badge>
+                  {formatLastUpdated(lastUpdated) && (
+                    <Badge variant="outline" className="text-xs bg-muted/60 text-muted-foreground border-border/50 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {language === "th" ? "อัปเดตล่าสุด" : "Last updated"}: {formatLastUpdated(lastUpdated)}
+                    </Badge>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          {isFullscreen && <TVNavBar language={language} />}
           <FullscreenButton targetRef={fullscreenRef} language={language} isFullscreen={isFullscreen} toggle={toggleFullscreen} />
-          <ExportExcelButton
-            data={(summaryTableData.filter(Boolean) as any[]).map(row => {
-              const exportRow: Record<string, unknown> = {
-                [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.metricName,
-                [language === "th" ? "หน่วย" : "Unit"]: row.unit,
-              };
-              tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] ?? "-"; });
-              if (tableYears.length >= 2) {
-                exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-";
-              }
-              return exportRow;
-            })}
-            filenamePrefix="governance_report"
-            sourcePage="Governance Dashboard"
-            appliedFilters={{
-              company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
-              site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
-              year: isAllTime ? "All Time" : String(selectedYear),
-            }}
-          />
+          {!isFullscreen && (
+            <ExportExcelButton
+              data={(summaryTableData.filter(Boolean) as any[]).map(row => {
+                const exportRow: Record<string, unknown> = {
+                  [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.metricName,
+                  [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+                };
+                tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] ?? "-"; });
+                if (tableYears.length >= 2) {
+                  exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.changePercent !== null ? `${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(1)}%` : "-";
+                }
+                return exportRow;
+              })}
+              filenamePrefix="governance_report"
+              sourcePage="Governance Dashboard"
+              appliedFilters={{
+                company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
+                site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
+                year: isAllTime ? "All Time" : String(selectedYear),
+              }}
+            />
+          )}
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">{language === "th" ? "บริษัท" : "Company"}</Label>
-              <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v === "__all__" ? "" : v); setFilterSite(""); }}>
-                <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
-                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
-                </SelectTrigger>
-                <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
-                  <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {companies.map(c => (
-                    <SelectItem key={c.company_id} value={c.company_id}>{c.company_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Filters - hidden in TV mode */}
+      {!isFullscreen && (
+        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl">
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">{language === "th" ? "บริษัท" : "Company"}</Label>
+                <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v === "__all__" ? "" : v); setFilterSite(""); }}>
+                  <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
+                    <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
+                    <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                    {companies.map(c => (
+                      <SelectItem key={c.company_id} value={c.company_id}>{c.company_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{language === "th" ? "สถานที่" : "Site"}</Label>
+                <Select value={filterSite} onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}>
+                  <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
+                    <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
+                    <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                    {filteredSites.map(s => (
+                      <SelectItem key={s.site_id} value={s.site_id}>{s.site_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{language === "th" ? "ปี" : "Year"}</Label>
+                <Select value={filterYear} onValueChange={(v) => setFilterYear(v === "__all__" ? "" : v)}>
+                  <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
+                    <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
+                    <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                    {uniqueYears.map(year => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs">{language === "th" ? "สถานที่" : "Site"}</Label>
-              <Select value={filterSite} onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
-                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
-                </SelectTrigger>
-                <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
-                  <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {filteredSites.map(s => (
-                    <SelectItem key={s.site_id} value={s.site_id}>{s.site_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs">{language === "th" ? "ปี" : "Year"}</Label>
-              <Select value={filterYear} onValueChange={(v) => setFilterYear(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 bg-card/60 backdrop-blur border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30">
-                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
-                </SelectTrigger>
-                <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl">
-                  <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {uniqueYears.map(year => (
-                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid gap-2 shrink-0 ${isFullscreen ? "grid-cols-4" : "grid-cols-2 lg:grid-cols-4 gap-4"}`}>
         <GovKPICard
           title={language === "th" ? "เหตุการณ์ด้านการกำกับดูแล" : "Governance Incidents"}
           value={hasGovIncidentData ? totalGovIncidents : null}
@@ -755,10 +765,10 @@ export default function Governance() {
       )}
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className={isFullscreen ? "flex-1 overflow-hidden grid grid-cols-2 grid-rows-2 gap-2 min-h-0" : "grid grid-cols-1 lg:grid-cols-2 gap-6"}>
         {/* Chart 1: Monthly Incident Trend */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
+        <Card className={`bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl ${isFullscreen ? "flex flex-col min-h-0 overflow-hidden" : "hover:shadow-2xl transition-all duration-300 rounded-3xl"}`}>
+          <CardHeader className={`flex flex-row items-center gap-2 ${isFullscreen ? "py-2 px-3 shrink-0" : "gap-3"}`}>
             <div className="p-2 bg-primary/10 rounded-xl">
               <Activity className="h-4 w-4 text-primary" />
             </div>
@@ -766,7 +776,7 @@ export default function Governance() {
               {language === "th" ? "แนวโน้มเหตุการณ์รายเดือน" : "Monthly Incident Trend"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={isFullscreen ? "flex-1 min-h-0 p-2" : "p-6 pt-0"}>
             {!hasData ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
             ) : (
