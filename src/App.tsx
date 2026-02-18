@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ReportSectionsProvider } from "@/contexts/ReportSectionsContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
+import { TVModeProvider } from "@/contexts/TVModeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -35,12 +36,13 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <LanguageProvider>
-        <NotificationsProvider>
-          <ReportSectionsProvider>
-            <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+        <TVModeProvider>
+          <NotificationsProvider>
+            <ReportSectionsProvider>
+              <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/auth" element={<Auth />} />
@@ -182,10 +184,11 @@ const App = () => (
               />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-            </TooltipProvider>
-          </ReportSectionsProvider>
-        </NotificationsProvider>
+            </BrowserRouter>
+              </TooltipProvider>
+            </ReportSectionsProvider>
+          </NotificationsProvider>
+        </TVModeProvider>
       </LanguageProvider>
     </AuthProvider>
   </QueryClientProvider>
