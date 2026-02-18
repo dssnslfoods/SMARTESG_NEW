@@ -875,7 +875,7 @@ export default function DataEntry() {
 
       {/* Database Sync Status Banner */}
       {totalDbCount > 0 && metricValues.length !== totalDbCount && (
-        <Card className="bg-amber-50/80 backdrop-blur-xl border-amber-200/50 shadow-lg rounded-2xl overflow-hidden">
+        <Card className="glass-card border-amber-200/60 overflow-hidden">
           <CardContent className="py-3">
             <div className="flex items-center gap-3 text-amber-700">
               <AlertTriangle className="h-5 w-5" />
@@ -891,7 +891,7 @@ export default function DataEntry() {
 
       {/* Summary Cards - Glass Style */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+        <Card className="glass-card relative cursor-pointer hover:scale-[1.02] transition-all duration-300 overflow-hidden group">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-400 to-violet-500" />
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2 text-gray-600">
@@ -907,7 +907,7 @@ export default function DataEntry() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+        <Card className="glass-card relative cursor-pointer hover:scale-[1.02] transition-all duration-300 overflow-hidden group">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2 text-gray-600">
@@ -923,7 +923,7 @@ export default function DataEntry() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+        <Card className="glass-card relative cursor-pointer hover:scale-[1.02] transition-all duration-300 overflow-hidden group">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2 text-gray-600">
@@ -939,7 +939,7 @@ export default function DataEntry() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+        <Card className="glass-card relative cursor-pointer hover:scale-[1.02] transition-all duration-300 overflow-hidden group">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-500" />
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2 text-gray-600">
@@ -957,7 +957,7 @@ export default function DataEntry() {
       </div>
 
       {/* Filters Card - Glass Style */}
-      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-2xl overflow-hidden">
+      <Card className="glass-card-solid overflow-hidden">
         <CardHeader className="border-b border-gray-100">
           <CardTitle className="text-lg flex items-center gap-2 text-gray-800">
             <div className="p-1.5 bg-gray-100 rounded-lg">
@@ -1141,7 +1141,7 @@ export default function DataEntry() {
       </Card>
 
       {/* Data Table Card - Glass Style */}
-      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-2xl overflow-hidden">
+      <Card className="glass-card-solid overflow-hidden">
         <CardHeader className="border-b border-gray-100">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <CardTitle className="flex items-center gap-3 text-gray-800">
@@ -1265,7 +1265,7 @@ export default function DataEntry() {
 
       {/* Add/Edit Dialog - Glass Style */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto [&>button]:hidden bg-white/95 backdrop-blur-2xl border-gray-200/50 shadow-2xl rounded-3xl">
+        <DialogContent className="glass-card-solid max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto [&>button]:hidden rounded-3xl">
           <DialogHeader className="relative border-b border-gray-100 pb-4">
             {/* Mobile close button */}
             <Button
@@ -1520,7 +1520,7 @@ export default function DataEntry() {
 
       {/* Bulk Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent className="bg-white/95 backdrop-blur-2xl border-gray-200/50 shadow-2xl rounded-2xl">
+        <AlertDialogContent className="glass-card-solid rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-gray-800">
               {language === 'th' ? 'ยืนยันการลบข้อมูล' : 'Confirm Deletion'}

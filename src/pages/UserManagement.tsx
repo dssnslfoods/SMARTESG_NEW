@@ -528,7 +528,7 @@ export default function UserManagement() {
                 {language === 'th' ? 'เพิ่มผู้ใช้' : 'Add User'}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogContent className="glass-card-solid max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto rounded-3xl">
             <DialogHeader>
               <DialogTitle>
                 {language === 'th' ? 'เพิ่มผู้ใช้ใหม่' : 'Add New User'}
@@ -629,7 +629,7 @@ export default function UserManagement() {
         )}
       </div>
 
-      <Card>
+      <Card className="glass-card-solid">
         <CardHeader className="pb-3 sm:pb-6">
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="relative flex-1">
@@ -806,7 +806,7 @@ export default function UserManagement() {
 
       {/* Edit User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-card-solid max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
               {language === 'th' ? 'แก้ไขผู้ใช้' : 'Edit User'}
@@ -972,7 +972,7 @@ export default function UserManagement() {
           setConfirmPassword('');
         }
       }}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+        <DialogContent className="glass-card-solid max-w-[95vw] sm:max-w-md rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
               {language === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change Password'}

@@ -267,7 +267,7 @@ export default function DimensionManagement() {
                 </Button>
               </DialogTrigger>
             </div>
-            <DialogContent className="max-w-md">
+            <DialogContent className="glass-card-solid max-w-md rounded-3xl">
               <DialogHeader>
                 <DialogTitle>
                   {editingDimension
@@ -297,7 +297,7 @@ export default function DimensionManagement() {
           </Dialog>
         </div>
 
-        <Card>
+        <Card className="glass-card-solid">
           <CardHeader>
             <div className="flex items-center gap-4">
               <div className="relative flex-1">
