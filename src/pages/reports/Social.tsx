@@ -72,7 +72,7 @@ interface ReportingPeriod { period_id: string; year: number; month: number; mont
 interface EsgMetric { metric_id: string; metric_name: string; theme_id: string; unit: string | null; }
 interface MetricValue {
   value_id: string; metric_id: string; site_id: string; period_id: string;
-  value: number; status: string;
+  value: number; status: string; last_updated: string | null;
 }
 
 // ─── Shared Components ───
@@ -161,7 +161,7 @@ async function fetchSocialMetricValues(): Promise<MetricValue[]> {
   while (hasMore) {
     const { data, error } = await supabase
       .from("metric_value")
-      .select("value_id, metric_id, site_id, period_id, value, status")
+      .select("value_id, metric_id, site_id, period_id, value, status, last_updated")
       .in("metric_id", SOCIAL_METRIC_IDS)
       .in("status", ["submitted", "approved", "draft"])
       .range(from, from + PAGE_SIZE - 1);
@@ -277,6 +277,24 @@ export default function Social() {
   }, [metricValues, prevYear, filterCompany, filterSite, sites, periods]);
 
   const hasData = filteredValues.length > 0;
+
+  // ─── Last Updated ───
+  const lastUpdated = useMemo(() => {
+    const timestamps = filteredValues
+      .map(v => v.last_updated)
+      .filter((t): t is string => !!t)
+      .map(t => new Date(t).getTime());
+    if (timestamps.length === 0) return null;
+    return new Date(Math.max(...timestamps));
+  }, [filteredValues]);
+
+  const formatLastUpdated = (date: Date | null) => {
+    if (!date) return null;
+    return date.toLocaleString(language === "th" ? "th-TH" : "en-GB", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  };
 
   // ─── KPI Calculations ───
   const totalTrainingHours = sumByMetric(filteredValues, METRIC.TRAINING_HOURS);
@@ -548,9 +566,17 @@ export default function Social() {
               : "Comprehensive social analysis — Safety, Training, Well-being, Human Rights"}
           </p>
           {hasData && (
-            <Badge variant="outline" className="mt-2 text-xs bg-blue-50 text-blue-700 border-blue-200">
-              {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"} | {isAllTime ? (language === "th" ? "ทุกปี" : "All Time") : selectedYear}
-            </Badge>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"} | {isAllTime ? (language === "th" ? "ทุกปี" : "All Time") : selectedYear}
+              </Badge>
+              {formatLastUpdated(lastUpdated) && (
+                <Badge variant="outline" className="text-xs bg-muted/60 text-muted-foreground border-border/50 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {language === "th" ? "อัปเดตล่าสุด" : "Last updated"}: {formatLastUpdated(lastUpdated)}
+                </Badge>
+              )}
+            </div>
           )}
         </div>
         <div className="flex items-center gap-2">
