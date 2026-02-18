@@ -70,7 +70,7 @@ export default function Auth() {
       <div
         className="flex h-screen items-center justify-center"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4), transparent), url('https://images.unsplash.com/photo-1542601906897-ecd7b2ce2bd8?w=1920&q=80')`,
+          backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4), transparent), url('https://images.unsplash.com/photo-1509391366360-2e959784a276?w=1920&q=80')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -195,7 +195,7 @@ export default function Auth() {
       <div
         className="hidden lg:flex lg:w-[60%] flex-col justify-between relative overflow-hidden"
         style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1542601906897-ecd7b2ce2bd8?w=1920&q=80')`,
+          backgroundImage: `url('https://images.unsplash.com/photo-1509391366360-2e959784a276?w=1920&q=80')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -275,7 +275,7 @@ export default function Auth() {
         <div
           className="lg:hidden absolute inset-0 -z-10"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1542601906897-ecd7b2ce2bd8?w=1920&q=80')`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1509391366360-2e959784a276?w=1920&q=80')`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
