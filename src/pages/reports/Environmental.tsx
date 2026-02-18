@@ -628,7 +628,7 @@ export default function Environmental() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {isFullscreen && <TVNavBar language={language} />}
-          <FullscreenButton targetRef={fullscreenRef} language={language} isFullscreen={isFullscreen} toggle={toggleFullscreen} />
+          <FullscreenButton language={language} isFullscreen={isFullscreen} toggle={toggleFullscreen} />
           {!isFullscreen && (
             <ExportExcelButton
               data={summaryTableData.map(row => {
