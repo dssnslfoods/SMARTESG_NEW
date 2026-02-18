@@ -640,7 +640,7 @@ export default function Reports() {
       {isSectionVisible("summary") && (
       <div id="section-summary" className="grid grid-cols-1 lg:grid-cols-4 gap-4 scroll-mt-4">
         {/* Data Entry Success */}
-        <Card className="lg:col-span-1 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+        <Card className="glass-card lg:col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Target className="h-5 w-5 text-primary" />
@@ -678,7 +678,7 @@ export default function Reports() {
         </Card>
 
         {/* Quick Stats */}
-        <Card className="lg:col-span-3">
+        <Card className="glass-card lg:col-span-3">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Activity className="h-5 w-5 text-primary" />
@@ -731,7 +731,7 @@ export default function Reports() {
 
       {/* ESG Dimensions Overview */}
       {isSectionVisible("dimensions") && (
-      <Card id="section-dimensions" className="scroll-mt-4">
+      <Card id="section-dimensions" className="glass-card-solid scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Globe className="h-5 w-5 text-primary" />
@@ -791,7 +791,7 @@ export default function Reports() {
 
       {/* Interactive Trend Chart */}
       {isSectionVisible("trend") && (
-      <Card id="section-trend" className="scroll-mt-4">
+      <Card id="section-trend" className="glass-card-solid scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
@@ -1237,7 +1237,7 @@ export default function Reports() {
 
       {/* Theme Trend Charts with Drill-down */}
       {isSectionVisible("themes") && (
-      <Card id="section-themes" className="scroll-mt-4">
+      <Card id="section-themes" className="glass-card-solid scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
@@ -1351,7 +1351,7 @@ export default function Reports() {
       {isSectionVisible("top-data") && (
       <div id="section-top-data" className="grid grid-cols-1 lg:grid-cols-2 gap-6 scroll-mt-4">
         {/* Top Themes by Records */}
-        <Card>
+        <Card className="glass-card-solid">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Leaf className="h-5 w-5 text-primary" />
@@ -1401,7 +1401,7 @@ export default function Reports() {
         </Card>
 
         {/* Top Metrics */}
-        <Card>
+        <Card className="glass-card-solid">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Activity className="h-5 w-5 text-primary" />
@@ -1445,7 +1445,7 @@ export default function Reports() {
 
       {/* Site Performance */}
       {isSectionVisible("sites") && (
-      <Card id="section-sites" className="scroll-mt-4">
+      <Card id="section-sites" className="glass-card-solid scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
@@ -1498,7 +1498,7 @@ export default function Reports() {
 
       {/* Dimension Bar Chart */}
       {isSectionVisible("comparison") && (
-      <Card id="section-comparison" className="scroll-mt-4">
+      <Card id="section-comparison" className="glass-card-solid scroll-mt-4">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-primary" />
@@ -1545,7 +1545,7 @@ export default function Reports() {
 
       {/* Drill-down Dialog */}
       <Dialog open={drilldownDialogOpen} onOpenChange={setDrilldownDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+        <DialogContent className="glass-card-solid max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl">
           {selectedThemeDetails && (
             <>
               <DialogHeader>
