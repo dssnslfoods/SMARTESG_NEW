@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +50,7 @@ import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
 import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
+import { FullscreenButton } from "@/components/reports/FullscreenButton";
 
 // ─── Metric ID Constants ───
 const METRIC = {
@@ -186,6 +187,7 @@ function sumByMetrics(values: MetricValue[], ids: string[]): number {
 
 // ─── Main Component ───
 export default function Social() {
+  const fullscreenRef = useRef<HTMLDivElement>(null);
   const { language } = useLanguage();
 
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -525,7 +527,8 @@ export default function Social() {
   if (loading) return <ReportsLoadingSkeleton />;
 
   return (
-    <div ref={containerRef} className="space-y-6 pb-8 bg-gradient-to-br from-gray-50 via-white to-blue-50/30 min-h-screen -m-6 p-6">
+    <div ref={fullscreenRef} className="space-y-6 pb-8 bg-gradient-to-br from-gray-50 via-white to-blue-50/30 min-h-screen -m-6 p-6">
+      <div ref={containerRef} />
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
       <div className="h-1 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full" />
@@ -550,26 +553,29 @@ export default function Social() {
             </Badge>
           )}
         </div>
-        <ExportExcelButton
-          data={summaryTableData.map(row => {
-            const exportRow: Record<string, unknown> = {
-              [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.name,
-              [language === "th" ? "หน่วย" : "Unit"]: row.unit,
-            };
-            tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] || "-"; });
-            if (tableYears.length >= 2) {
-              exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.change !== null ? `${row.change >= 0 ? "+" : ""}${row.change.toFixed(1)}%` : "-";
-            }
-            return exportRow;
-          })}
-          filenamePrefix="social_report"
-          sourcePage="Social Dashboard"
-          appliedFilters={{
-            company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
-            site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
-            year: isAllTime ? "All Time" : String(selectedYear),
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <FullscreenButton targetRef={fullscreenRef} language={language} />
+          <ExportExcelButton
+            data={summaryTableData.map(row => {
+              const exportRow: Record<string, unknown> = {
+                [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.name,
+                [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+              };
+              tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] || "-"; });
+              if (tableYears.length >= 2) {
+                exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.change !== null ? `${row.change >= 0 ? "+" : ""}${row.change.toFixed(1)}%` : "-";
+              }
+              return exportRow;
+            })}
+            filenamePrefix="social_report"
+            sourcePage="Social Dashboard"
+            appliedFilters={{
+              company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
+              site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
+              year: isAllTime ? "All Time" : String(selectedYear),
+            }}
+          />
+        </div>
       </div>
 
       {/* Filters */}
