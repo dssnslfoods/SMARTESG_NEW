@@ -137,9 +137,24 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
   return (
-    <aside className="flex h-full w-64 flex-col bg-white/80 backdrop-blur-xl border-r border-gray-200/50">
+    <aside
+      className="flex h-full w-64 flex-col border-r"
+      style={{
+        background: "rgba(255,255,255,0.72)",
+        backdropFilter: "blur(48px) saturate(200%)",
+        WebkitBackdropFilter: "blur(48px) saturate(200%)",
+        borderColor: "rgba(255,255,255,0.5)",
+        boxShadow: "inset -1px 0 0 rgba(255,255,255,0.6), 4px 0 24px rgba(16,185,129,0.06)",
+      }}
+    >
       {/* Brand */}
-      <div className="flex h-16 items-center justify-between border-b border-gray-200/50 px-5">
+      <div
+        className="flex h-16 items-center justify-between px-5"
+        style={{
+          borderBottom: "1px solid rgba(255,255,255,0.4)",
+          background: "rgba(255,255,255,0.15)",
+        }}
+      >
         <Link to="/dashboard" className="flex items-center gap-3 group" onClick={onNavigate}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25 transition-transform group-hover:scale-105">
             <Leaf className="h-5 w-5 text-white" />
@@ -170,7 +185,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         <div className="mb-3 px-3">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "rgba(16,185,129,0.7)" }}>
             {language === 'th' ? 'เมนูหลัก' : 'Main Menu'}
           </span>
         </div>
@@ -186,11 +201,17 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                     to={item.href}
                     onClick={onNavigate}
                     className={cn(
-                      'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200',
+                      'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border',
                       isActive(item.href)
-                        ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-200/50 text-emerald-700 shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-100/80 border border-transparent'
+                        ? 'border-emerald-200/60 text-emerald-700'
+                        : 'text-gray-600 hover:text-gray-900 border-transparent'
                     )}
+                    style={isActive(item.href) ? {
+                      background: "linear-gradient(135deg, rgba(16,185,129,0.12), rgba(20,184,166,0.08))",
+                      boxShadow: "0 2px 12px rgba(16,185,129,0.15), inset 0 1px 0 rgba(255,255,255,0.6)",
+                    } : { background: "transparent" }}
+                    onMouseEnter={e => { if (!isActive(item.href)) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.5)"; }}
+                    onMouseLeave={e => { if (!isActive(item.href)) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                   >
                     <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-emerald-600")} />
                     {item.label}
@@ -262,9 +283,13 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                 className={cn(
                   'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border',
                   isActive(item.href)
-                    ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-200/50 text-emerald-700 shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100/80 border-transparent'
+                    ? 'border-emerald-200/60 text-emerald-700'
+                    : 'text-gray-600 hover:text-gray-900 border-transparent'
                 )}
+                style={isActive(item.href) ? {
+                  background: "linear-gradient(135deg, rgba(16,185,129,0.12), rgba(20,184,166,0.08))",
+                  boxShadow: "0 2px 12px rgba(16,185,129,0.15), inset 0 1px 0 rgba(255,255,255,0.6)",
+                } : undefined}
               >
                 <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-emerald-600")} />
                 {item.label}
@@ -360,9 +385,13 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
                     className={cn(
                       'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border',
                       isActive(item.href)
-                        ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-200/50 text-emerald-700 shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-100/80 border-transparent'
+                        ? 'border-emerald-200/60 text-emerald-700'
+                        : 'text-gray-600 hover:text-gray-900 border-transparent'
                     )}
+                    style={isActive(item.href) ? {
+                      background: "linear-gradient(135deg, rgba(16,185,129,0.12), rgba(20,184,166,0.08))",
+                      boxShadow: "0 2px 12px rgba(16,185,129,0.15), inset 0 1px 0 rgba(255,255,255,0.6)",
+                    } : undefined}
                   >
                     <item.icon className={cn("h-4 w-4", isActive(item.href) && "text-emerald-600")} />
                     {item.label}
@@ -374,7 +403,10 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
       </nav>
 
       {/* Logout */}
-      <div className="border-t border-gray-200/50 p-3">
+      <div
+        className="p-3"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.1)" }}
+      >
         <Button
           variant="ghost"
           className="w-full justify-start gap-3 text-gray-500 hover:text-red-600 hover:bg-red-50/80 transition-colors rounded-xl"
