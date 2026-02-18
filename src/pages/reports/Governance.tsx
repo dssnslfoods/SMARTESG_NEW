@@ -321,8 +321,10 @@ export default function Governance() {
         const latestYear = uniqueYears[0];
         return periods.filter(p => p.year === latestYear).sort((a, b) => a.month - b.month);
       }
-      const latestWithData = Math.max(...allRelevant.map(p => p.year));
-      return periods.filter(p => p.year === latestWithData).sort((a, b) => a.month - b.month);
+      const yearCounts = new Map<number, number>();
+      allRelevant.forEach(p => yearCounts.set(p.year, (yearCounts.get(p.year) || 0) + 1));
+      const mostDataYear = [...yearCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+      return periods.filter(p => p.year === mostDataYear).sort((a, b) => a.month - b.month);
     }
     return periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
   }, [periods, selectedYear, isAllTime, uniqueYears, filteredValues]);

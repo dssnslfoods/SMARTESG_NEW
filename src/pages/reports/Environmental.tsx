@@ -309,17 +309,17 @@ export default function Environmental() {
   // ─── Helper: get relevant periods for charts ───
   const chartPeriods = useMemo(() => {
     if (isAllTime) {
-      // Show all periods that have data, sorted by year then month
       const periodsWithData = new Set(filteredValues.map(v => v.period_id));
       const allRelevant = periods.filter(p => periodsWithData.has(p.period_id));
       if (allRelevant.length === 0) {
-        // Fallback: use latest year's periods
         const latestYear = uniqueYears[0];
         return periods.filter(p => p.year === latestYear).sort((a, b) => a.month - b.month);
       }
-      // Use latest year with data for monthly chart axis
-      const latestWithData = Math.max(...allRelevant.map(p => p.year));
-      return periods.filter(p => p.year === latestWithData).sort((a, b) => a.month - b.month);
+      // Use year with MOST months of data (not just latest) to avoid sparse years like 2026 (2 months only)
+      const yearCounts = new Map<number, number>();
+      allRelevant.forEach(p => yearCounts.set(p.year, (yearCounts.get(p.year) || 0) + 1));
+      const mostDataYear = [...yearCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+      return periods.filter(p => p.year === mostDataYear).sort((a, b) => a.month - b.month);
     }
     return periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
   }, [periods, selectedYear, isAllTime, uniqueYears, filteredValues]);

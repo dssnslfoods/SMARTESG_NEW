@@ -393,12 +393,15 @@ export default function ESGOverview() {
     const socIds = new Set(Object.values(SOCIAL_METRICS));
     const govIds = new Set(Object.values(GOV_METRICS));
 
-    // Use latest year with actual data for chart axis
+    // Use year with MOST months of data to avoid sparse years (e.g. 2026 with only 2 months)
     const periodsWithData = new Set(filteredValues.map(v => v.period_id));
     const allRelevant = periods.filter(p => periodsWithData.has(p.period_id));
-    const chartYear = allRelevant.length > 0
-      ? Math.max(...allRelevant.map(p => p.year))
-      : selectedYear;
+    let chartYear = selectedYear;
+    if (allRelevant.length > 0) {
+      const yearCounts = new Map<number, number>();
+      allRelevant.forEach(p => yearCounts.set(p.year, (yearCounts.get(p.year) || 0) + 1));
+      chartYear = [...yearCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    }
 
     return periods
       .filter(p => p.year === chartYear)
