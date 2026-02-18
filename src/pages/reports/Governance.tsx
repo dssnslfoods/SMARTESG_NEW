@@ -24,6 +24,7 @@ import {
   GraduationCap,
   Gavel,
   Activity,
+  Clock,
 } from "lucide-react";
 import {
   AreaChart,
@@ -80,7 +81,7 @@ interface ReportingPeriod { period_id: string; year: number; month: number; mont
 interface EsgMetric { metric_id: string; metric_name: string; theme_id: string; unit: string | null; }
 interface MetricValue {
   value_id: string; metric_id: string; site_id: string; period_id: string;
-  value: number; status: string;
+  value: number; status: string; last_updated: string | null;
 }
 
 // ─── Shared Components ───
@@ -169,7 +170,7 @@ async function fetchGovernanceMetricValues(): Promise<MetricValue[]> {
   while (hasMore) {
     const { data, error } = await supabase
       .from("metric_value")
-      .select("value_id, metric_id, site_id, period_id, value, status")
+      .select("value_id, metric_id, site_id, period_id, value, status, last_updated")
       .in("metric_id", GOVERNANCE_METRIC_IDS)
       .in("status", ["submitted", "approved", "draft"])
       .range(from, from + PAGE_SIZE - 1);
@@ -281,6 +282,24 @@ export default function Governance() {
   }, [metricValues, prevYear, filterCompany, filterSite, sites, periods]);
 
   const hasData = filteredValues.length > 0;
+
+  // ─── Last Updated ───
+  const lastUpdated = useMemo(() => {
+    const timestamps = filteredValues
+      .map(v => v.last_updated)
+      .filter((t): t is string => !!t)
+      .map(t => new Date(t).getTime());
+    if (timestamps.length === 0) return null;
+    return new Date(Math.max(...timestamps));
+  }, [filteredValues]);
+
+  const formatLastUpdated = (date: Date | null) => {
+    if (!date) return null;
+    return date.toLocaleString(language === "th" ? "th-TH" : "en-GB", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  };
 
   // ─── KPI Calculations ───
   const totalGovIncidents = sumByMetric(filteredValues, METRIC.GOVERNANCE_INCIDENTS);
@@ -566,13 +585,19 @@ export default function Governance() {
               : "Governance metrics and corporate oversight"}
           </p>
           {hasData && (
-            <div className="flex gap-2 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               <Badge variant="outline" className="text-xs">
                 {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"}
               </Badge>
               <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
                 {language === "th" ? `ปี ${selectedYear}` : `Year ${selectedYear}`}
               </Badge>
+              {formatLastUpdated(lastUpdated) && (
+                <Badge variant="outline" className="text-xs bg-muted/60 text-muted-foreground border-border/50 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {language === "th" ? "อัปเดตล่าสุด" : "Last updated"}: {formatLastUpdated(lastUpdated)}
+                </Badge>
+              )}
             </div>
           )}
         </div>
