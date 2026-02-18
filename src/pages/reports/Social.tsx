@@ -305,11 +305,17 @@ export default function Social() {
   // ─── Helper: get relevant periods for charts ───
   const chartPeriods = useMemo(() => {
     if (isAllTime) {
-      const latestYear = uniqueYears[0];
-      return periods.filter(p => p.year === latestYear).sort((a, b) => a.month - b.month);
+      const periodsWithData = new Set(filteredValues.map(v => v.period_id));
+      const allRelevant = periods.filter(p => periodsWithData.has(p.period_id));
+      if (allRelevant.length === 0) {
+        const latestYear = uniqueYears[0];
+        return periods.filter(p => p.year === latestYear).sort((a, b) => a.month - b.month);
+      }
+      const latestWithData = Math.max(...allRelevant.map(p => p.year));
+      return periods.filter(p => p.year === latestWithData).sort((a, b) => a.month - b.month);
     }
     return periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
-  }, [periods, selectedYear, isAllTime, uniqueYears]);
+  }, [periods, selectedYear, isAllTime, uniqueYears, filteredValues]);
 
   const getMonthValues = useCallback((month: number) => {
     if (isAllTime) {
@@ -528,7 +534,7 @@ export default function Social() {
           </p>
           {hasData && (
             <Badge variant="outline" className="mt-2 text-xs bg-blue-50 text-blue-700 border-blue-200">
-              {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"} | {selectedYear}
+              {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"} | {isAllTime ? (language === "th" ? "ทุกปี" : "All Time") : selectedYear}
             </Badge>
           )}
         </div>

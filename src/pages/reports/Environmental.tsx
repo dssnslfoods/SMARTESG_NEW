@@ -309,11 +309,20 @@ export default function Environmental() {
   // ─── Helper: get relevant periods for charts ───
   const chartPeriods = useMemo(() => {
     if (isAllTime) {
-      const latestYear = uniqueYears[0];
-      return periods.filter(p => p.year === latestYear).sort((a, b) => a.month - b.month);
+      // Show all periods that have data, sorted by year then month
+      const periodsWithData = new Set(filteredValues.map(v => v.period_id));
+      const allRelevant = periods.filter(p => periodsWithData.has(p.period_id));
+      if (allRelevant.length === 0) {
+        // Fallback: use latest year's periods
+        const latestYear = uniqueYears[0];
+        return periods.filter(p => p.year === latestYear).sort((a, b) => a.month - b.month);
+      }
+      // Use latest year with data for monthly chart axis
+      const latestWithData = Math.max(...allRelevant.map(p => p.year));
+      return periods.filter(p => p.year === latestWithData).sort((a, b) => a.month - b.month);
     }
     return periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
-  }, [periods, selectedYear, isAllTime, uniqueYears]);
+  }, [periods, selectedYear, isAllTime, uniqueYears, filteredValues]);
 
   // When All Time, get filteredValues for a specific month (across all years)
   const getMonthValues = useCallback((month: number) => {
@@ -437,17 +446,14 @@ export default function Environmental() {
 
   // ─── Waste Monthly Trend ───
   const wasteChartData = useMemo(() => {
-    if (!selectedYear) return [];
-    return periods
-      .filter(p => p.year === selectedYear)
-      .sort((a, b) => a.month - b.month)
-      .map(period => {
-        const pv = filteredValues.filter(v => v.period_id === period.period_id);
-        const total = pv.filter(v => v.metric_id === METRIC.TOTAL_WASTE).reduce((s, v) => s + v.value, 0);
-        const recycled = pv.filter(v => v.metric_id === METRIC.WASTE_RECYCLED).reduce((s, v) => s + v.value, 0);
-        return { name: period.month_name.slice(0, 3), total: total || null, recycled: recycled || null };
-      });
-  }, [filteredValues, periods, selectedYear]);
+    if (chartPeriods.length === 0) return [];
+    return chartPeriods.map(period => {
+      const pv = getMonthValues(period.month);
+      const total = pv.filter(v => v.metric_id === METRIC.TOTAL_WASTE).reduce((s, v) => s + v.value, 0);
+      const recycled = pv.filter(v => v.metric_id === METRIC.WASTE_RECYCLED).reduce((s, v) => s + v.value, 0);
+      return { name: period.month_name.slice(0, 3), total: total || null, recycled: recycled || null };
+    });
+  }, [chartPeriods, getMonthValues]);
   const hasWasteChartData = wasteChartData.some(d => d.total !== null);
 
   // ─── GHG by Site ───
@@ -562,7 +568,7 @@ export default function Environmental() {
           </p>
           {hasData && (
             <Badge variant="outline" className="mt-2 text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-              {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"} | {selectedYear}
+              {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"} | {isAllTime ? (language === "th" ? "ทุกปี" : "All Time") : selectedYear}
             </Badge>
           )}
         </div>
