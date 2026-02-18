@@ -3,6 +3,8 @@ import { Minimize2, Tv2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+const TV_MODE_KEY = "esg_tv_mode";
+
 interface FullscreenButtonProps {
   targetRef: React.RefObject<HTMLElement>;
   language?: string;
@@ -11,28 +13,50 @@ interface FullscreenButtonProps {
 }
 
 export function useFullscreen(targetRef: React.RefObject<HTMLElement>) {
+  // isTVMode = logical "TV mode" (persisted in sessionStorage)
+  const [isTVMode, setIsTVMode] = useState(() => sessionStorage.getItem(TV_MODE_KEY) === "1");
+  // isFullscreen = actual browser fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Sync browser fullscreen changes
   useEffect(() => {
     const onFsChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const fs = !!document.fullscreenElement;
+      setIsFullscreen(fs);
+      // If user pressed Escape to exit, clear TV mode too
+      if (!fs) {
+        setIsTVMode(false);
+        sessionStorage.removeItem(TV_MODE_KEY);
+      }
     };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
+
+  // Auto-enter fullscreen when page loads and TV mode was active
+  useEffect(() => {
+    if (isTVMode && !document.fullscreenElement && targetRef.current) {
+      targetRef.current.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+    }
+  }, [isTVMode, targetRef]);
 
   const toggle = useCallback(async () => {
     if (!document.fullscreenElement) {
       const el = targetRef.current;
       if (el) {
         await el.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+        setIsTVMode(true);
+        sessionStorage.setItem(TV_MODE_KEY, "1");
       }
     } else {
       await document.exitFullscreen().catch(() => {});
+      setIsTVMode(false);
+      sessionStorage.removeItem(TV_MODE_KEY);
     }
   }, [targetRef]);
 
-  return { isFullscreen, toggle };
+  // Expose isTVMode as the "isFullscreen" flag so TV layout stays consistent
+  return { isFullscreen: isTVMode, toggle };
 }
 
 export function FullscreenButton({ targetRef, language = "en", isFullscreen, toggle }: FullscreenButtonProps) {
