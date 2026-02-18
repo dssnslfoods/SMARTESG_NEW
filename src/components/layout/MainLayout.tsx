@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
+import { PageTransition } from './PageTransition';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -32,7 +33,9 @@ export function MainLayout({ children }: MainLayoutProps) {
         <Header onMenuToggle={() => setMobileMenuOpen(true)} />
         <main className="flex-1 overflow-y-auto bg-gradient-subtle">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 sm:py-8">
-            {children}
+            <PageTransition>
+              {children}
+            </PageTransition>
           </div>
         </main>
       </div>
