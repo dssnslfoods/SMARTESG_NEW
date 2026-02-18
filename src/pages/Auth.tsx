@@ -258,6 +258,7 @@ export default function Auth() {
           </div>
 
           {/* Footer */}
+          <br></br>
           <p className="text-sm text-white/50">© 2026 ESG Smart Performance | Developed by Arnon Arpaket</p>
         </div>
       </div>
