@@ -198,10 +198,10 @@ export default function AuditLog() {
         </div>
 
         {/* Filters */}
-        <Card>
+        <Card className="glass-card-solid overflow-hidden">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Filter className="h-4 w-4" />
+            <CardTitle className="text-lg flex items-center gap-2 text-foreground">
+              <Filter className="h-4 w-4 text-primary" />
               {language === "th" ? "ตัวกรอง" : "Filters"}
             </CardTitle>
           </CardHeader>
@@ -273,9 +273,9 @@ export default function AuditLog() {
         </Card>
 
         {/* Logs Table */}
-        <Card>
+        <Card className="glass-card-solid overflow-hidden">
           <CardHeader>
-            <CardTitle>
+            <CardTitle className="text-foreground">
               {language === "th" ? "รายการบันทึก" : "Log Entries"}
               <Badge variant="secondary" className="ml-2">
                 {filteredLogs.length} {language === "th" ? "รายการ" : "records"}
@@ -359,7 +359,7 @@ export default function AuditLog() {
 
         {/* Detail Dialog */}
         <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="glass-card-solid max-w-2xl max-h-[80vh] overflow-y-auto rounded-3xl border-white/30">
             <DialogHeader>
               <DialogTitle>
                 {language === "th" ? "รายละเอียดบันทึก" : "Log Details"}
