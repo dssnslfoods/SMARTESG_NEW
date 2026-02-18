@@ -42,6 +42,7 @@ import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { TrendAnalytics } from "@/components/reports/TrendAnalytics";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
+import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 
 // ─── Metric ID Constants ───
 const METRIC = {
@@ -726,19 +727,26 @@ export default function Environmental() {
             </div>
           </CardHeader>
           <CardContent>
-            {hasGhgData ? (
-              <ResponsiveContainer width="100%" height={300}>
+        {hasGhgData ? (
+              <ChartScrollWrapper dataLength={ghgChartData.length} minBarWidth={52} height={300}>
                 <ComposedChart data={ghgChartData.filter(d => d.total !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [value.toLocaleString(undefined, { maximumFractionDigits: 2 }), ""]} />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <Tooltip
+                    contentStyle={glassTooltipStyle}
+                    formatter={(value: number, name: string) => [
+                      `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} tCO₂e`,
+                      name === "scope1" ? "Scope 1" : name === "scope2" ? "Scope 2" : "Total"
+                    ]}
+                    labelFormatter={(label) => `📅 ${label}`}
+                  />
                   <Legend />
                   <Bar dataKey="scope1" name="Scope 1" stackId="ghg" fill={SCOPE_COLORS.scope1} fillOpacity={0.8} radius={[0, 0, 0, 0]} />
                   <Bar dataKey="scope2" name="Scope 2" stackId="ghg" fill={SCOPE_COLORS.scope2} fillOpacity={0.8} radius={[4, 4, 0, 0]} />
                   <Line type="monotone" dataKey="total" name="Total" stroke="hsl(var(--foreground))" strokeWidth={2} dot={{ r: 3 }} />
                 </ComposedChart>
-              </ResponsiveContainer>
+              </ChartScrollWrapper>
             ) : (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล GHG" : "No GHG data available"} />
             )}
@@ -832,17 +840,17 @@ export default function Environmental() {
           </CardHeader>
           <CardContent>
             {hasElectricityData ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ChartScrollWrapper dataLength={electricityChartData.length} minBarWidth={52} height={300}>
                 <AreaChart data={electricityChartData.filter(d => d.grid !== null || d.renewable !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [value.toLocaleString() + " kWh", ""]} />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString()} kWh`, name]} labelFormatter={(label) => `📅 ${label}`} />
                   <Legend />
                   <Area type="monotone" dataKey="grid" name={language === "th" ? "ไฟฟ้าโครงข่าย" : "Grid"} stackId="elec" stroke="hsl(45 93% 47%)" fill="hsl(45 93% 47%)" fillOpacity={0.5} />
                   <Area type="monotone" dataKey="renewable" name={language === "th" ? "พลังงานหมุนเวียน" : "Renewable"} stackId="elec" stroke="hsl(142 71% 45%)" fill="hsl(142 71% 45%)" fillOpacity={0.5} />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ChartScrollWrapper>
             ) : (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลไฟฟ้า" : "No electricity data"} />
             )}
@@ -862,18 +870,18 @@ export default function Environmental() {
           </CardHeader>
           <CardContent>
             {hasWaterBalanceData ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ChartScrollWrapper dataLength={waterBalanceData.length} minBarWidth={52} height={300}>
                 <ComposedChart data={waterBalanceData.filter(d => d.withdrawal !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString()} m³`, ""]} />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString()} m³`, name]} labelFormatter={(label) => `📅 ${label}`} />
                   <Legend />
                   <Bar dataKey="withdrawal" name={language === "th" ? "น้ำที่ใช้" : "Withdrawal"} fill="hsl(199 89% 48%)" fillOpacity={0.8} radius={[4, 4, 0, 0]} />
                   <Bar dataKey="discharge" name={language === "th" ? "น้ำทิ้ง" : "Discharge"} fill="hsl(25 95% 53%)" fillOpacity={0.8} radius={[4, 4, 0, 0]} />
                   <Line type="monotone" dataKey="recycling" name={language === "th" ? "น้ำหมุนเวียน" : "Recycling"} stroke="hsl(142 71% 45%)" strokeWidth={2} dot={{ r: 3 }} />
                 </ComposedChart>
-              </ResponsiveContainer>
+              </ChartScrollWrapper>
             ) : (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลน้ำ" : "No water data"} />
             )}
@@ -953,21 +961,21 @@ export default function Environmental() {
           </CardHeader>
           <CardContent>
             {hasWasteChartData ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ChartScrollWrapper dataLength={wasteChartData.length} minBarWidth={52} height={300}>
                 <ComposedChart data={wasteChartData.filter(d => d.total !== null).map(d => ({
                   ...d,
                   total: d.total ? d.total / 1000 : null,
                   recycled: d.recycled ? d.recycled / 1000 : null,
                 }))} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${language === "th" ? "ตัน" : "tons"}`, ""]} />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${language === "th" ? "ตัน" : "tons"}`, name]} labelFormatter={(label) => `📅 ${label}`} />
                   <Legend />
                   <Bar dataKey="total" name={language === "th" ? "ขยะทั้งหมด" : "Total Waste"} fill="hsl(25 95% 53%)" fillOpacity={0.7} radius={[4, 4, 0, 0]} />
                   <Line type="monotone" dataKey="recycled" name={language === "th" ? "Recycle/Reuse" : "Recycled"} stroke="hsl(142 71% 45%)" strokeWidth={2} dot={{ r: 3 }} />
                 </ComposedChart>
-              </ResponsiveContainer>
+              </ChartScrollWrapper>
             ) : (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
             )}

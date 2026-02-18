@@ -52,6 +52,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
+import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 
 // ─── Metric ID Constants ───
 const METRIC = {
@@ -731,18 +732,18 @@ export default function Governance() {
             {!hasData ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
+              <ChartScrollWrapper dataLength={monthlyIncidentData.length} minBarWidth={52} height={300}>
                 <ComposedChart data={monthlyIncidentData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={glassTooltipStyle} />
+                  <Tooltip contentStyle={glassTooltipStyle} labelFormatter={(label) => `📅 ${label}`} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="governance" name={language === "th" ? "กำกับดูแล" : "Governance"} fill="hsl(262 83% 58%)" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="corruption" name={language === "th" ? "ทุจริต" : "Corruption"} fill="hsl(0 84% 60%)" radius={[4, 4, 0, 0]} />
                   <Line type="monotone" dataKey="total" name={language === "th" ? "รวม" : "Total"} stroke="hsl(var(--foreground))" strokeWidth={2} dot={{ r: 3 }} />
                 </ComposedChart>
-              </ResponsiveContainer>
+              </ChartScrollWrapper>
             )}
           </CardContent>
         </Card>
@@ -829,17 +830,17 @@ export default function Governance() {
             {!hasData ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
+              <ChartScrollWrapper dataLength={cumulativeData.length} minBarWidth={52} height={300}>
                 <AreaChart data={cumulativeData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={glassTooltipStyle} />
+                  <Tooltip contentStyle={glassTooltipStyle} labelFormatter={(label) => `📅 ${label}`} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Area type="monotone" dataKey="govCumulative" name={language === "th" ? "กำกับดูแล (สะสม)" : "Governance (Cum.)"} stroke="hsl(262 83% 58%)" fill="hsl(262 83% 58%)" fillOpacity={0.2} strokeWidth={2} />
                   <Area type="monotone" dataKey="corruptCumulative" name={language === "th" ? "ทุจริต (สะสม)" : "Corruption (Cum.)"} stroke="hsl(0 84% 60%)" fill="hsl(0 84% 60%)" fillOpacity={0.2} strokeWidth={2} />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ChartScrollWrapper>
             )}
           </CardContent>
         </Card>

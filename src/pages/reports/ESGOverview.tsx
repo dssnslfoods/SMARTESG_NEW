@@ -57,6 +57,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
+import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 
 // ─── All Key Metric IDs across E, S, G ───
 const ENV_METRICS = {
@@ -744,18 +745,18 @@ export default function ESGOverview() {
             {monthlyDimensionTrend.length === 0 ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data"} />
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
+              <ChartScrollWrapper dataLength={monthlyDimensionTrend.length} minBarWidth={44} height={250}>
                 <BarChart data={monthlyDimensionTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={glassTooltipStyle} />
+                  <Tooltip contentStyle={glassTooltipStyle} labelFormatter={(label) => `📅 ${label}`} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="environmental" name={language === "th" ? "สิ่งแวดล้อม" : "Environmental"} stackId="a" fill="hsl(142 71% 45%)" radius={[0, 0, 0, 0]} />
                   <Bar dataKey="social" name={language === "th" ? "สังคม" : "Social"} stackId="a" fill="hsl(217 91% 60%)" radius={[0, 0, 0, 0]} />
                   <Bar dataKey="governance" name={language === "th" ? "ธรรมาภิบาล" : "Governance"} stackId="a" fill="hsl(262 83% 58%)" radius={[4, 4, 0, 0]} />
                 </BarChart>
-              </ResponsiveContainer>
+              </ChartScrollWrapper>
             )}
           </CardContent>
         </Card>
