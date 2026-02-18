@@ -201,7 +201,7 @@ export default function Governance() {
 
   const [filterCompany, setFilterCompany] = useState<string>("");
   const [filterSite, setFilterSite] = useState<string>("");
-  const [filterYear, setFilterYear] = useState<string>("");
+  const [filterYear, setFilterYear] = useState<string>("__all__");
 
   const handleRefresh = useCallback(async () => { await fetchData(); }, []);
   const { pullDistance, isRefreshing, containerRef } = usePullToRefresh({ onRefresh: handleRefresh });
@@ -231,15 +231,6 @@ export default function Governance() {
       setMetrics(metricsData || []);
       setMetricValues(govValues);
 
-      // Auto-select latest year with data
-      if (!filterYear && periodsData) {
-        const yearsWithData = new Set(govValues.map(v => {
-          const p = (periodsData as ReportingPeriod[]).find(pp => pp.period_id === v.period_id);
-          return p?.year;
-        }).filter(Boolean));
-        const latestYear = Math.max(...Array.from(yearsWithData) as number[]);
-        if (latestYear && isFinite(latestYear)) setFilterYear(String(latestYear));
-      }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
