@@ -6,6 +6,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 interface FullscreenButtonProps {
   targetRef: React.RefObject<HTMLElement>;
   language?: string;
+  isFullscreen: boolean;
+  toggle: () => void;
 }
 
 export function useFullscreen(targetRef: React.RefObject<HTMLElement>) {
@@ -33,24 +35,13 @@ export function useFullscreen(targetRef: React.RefObject<HTMLElement>) {
   return { isFullscreen, toggle };
 }
 
-export function FullscreenButton({ targetRef, language = "en" }: FullscreenButtonProps) {
-  const { isFullscreen, toggle } = useFullscreen(targetRef);
+export function FullscreenButton({ targetRef, language = "en", isFullscreen, toggle }: FullscreenButtonProps) {
   const label = isFullscreen
     ? language === "th" ? "ออกจาก TV View" : "Exit TV View"
     : language === "th" ? "TV / Fullscreen View" : "TV / Fullscreen View";
 
   return (
     <>
-      {/* Fullscreen styles injected globally */}
-      <style>{`
-        :fullscreen [data-fullscreen-content],
-        :-webkit-full-screen [data-fullscreen-content] {
-          overflow-y: auto;
-          height: 100vh;
-          padding: 2rem;
-          background: white;
-        }
-      `}</style>
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -81,3 +72,4 @@ export function FullscreenButton({ targetRef, language = "en" }: FullscreenButto
     </>
   );
 }
+

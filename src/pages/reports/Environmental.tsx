@@ -44,7 +44,7 @@ import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { TrendAnalytics } from "@/components/reports/TrendAnalytics";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
 import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
-import { FullscreenButton } from "@/components/reports/FullscreenButton";
+import { FullscreenButton, useFullscreen } from "@/components/reports/FullscreenButton";
 
 // ─── Metric ID Constants ───
 const METRIC = {
@@ -186,6 +186,7 @@ function sumByMetrics(values: MetricValue[], ids: string[]): number {
 // ─── Main Component ───
 export default function Environmental() {
   const fullscreenRef = useRef<HTMLDivElement>(null);
+  const { isFullscreen, toggle: toggleFullscreen } = useFullscreen(fullscreenRef);
   const { language } = useLanguage();
 
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -578,111 +579,127 @@ export default function Environmental() {
   if (loading) return <ReportsLoadingSkeleton />;
 
   return (
-    <div ref={fullscreenRef} className="space-y-6 pb-8 bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 min-h-screen -m-6 p-6">
-      <div ref={containerRef} />
-      <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
-
-      <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 rounded-full" />
+    <div
+      ref={fullscreenRef}
+      className={isFullscreen
+        ? "h-screen overflow-hidden bg-background flex flex-col p-3 gap-2"
+        : "space-y-6 pb-8 bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 min-h-screen -m-6 p-6"
+      }
+    >
+      {!isFullscreen && <div ref={containerRef} />}
+      {!isFullscreen && <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />}
+      {!isFullscreen && <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 rounded-full" />}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className={`flex flex-row justify-between items-center gap-2 ${isFullscreen ? "shrink-0" : "flex-col md:flex-row items-start md:items-center gap-4"}`}>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-            <div className="p-2 bg-emerald-100 rounded-xl">
-              <Leaf className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+          <h1 className={`font-bold text-foreground flex items-center gap-2 ${isFullscreen ? "text-lg" : "text-xl sm:text-2xl"}`}>
+            <div className="p-1.5 bg-emerald-100 rounded-xl">
+              <Leaf className="h-4 w-4 text-emerald-600" />
             </div>
             Environmental Dashboard
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {language === "th"
-              ? "วิเคราะห์ตัวชี้วัดด้านสิ่งแวดล้อมครบทุกมิติ — พลังงาน, GHG, น้ำ, ของเสีย"
-              : "Comprehensive environmental analysis — Energy, GHG, Water, Waste"}
-          </p>
-          {hasData && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-                {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"} | {isAllTime ? (language === "th" ? "ทุกปี" : "All Time") : selectedYear}
+            {isFullscreen && hasData && (
+              <Badge variant="outline" className="ml-2 text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                {isAllTime ? (language === "th" ? "ทุกปี" : "All Time") : selectedYear}
               </Badge>
-              {formatLastUpdated(lastUpdated) && (
-                <Badge variant="outline" className="text-xs bg-muted/60 text-muted-foreground border-border/50 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {language === "th" ? "อัปเดตล่าสุด" : "Last updated"}: {formatLastUpdated(lastUpdated)}
-                </Badge>
+            )}
+          </h1>
+          {!isFullscreen && (
+            <>
+              <p className="text-sm text-muted-foreground mt-1">
+                {language === "th" ? "วิเคราะห์ตัวชี้วัดด้านสิ่งแวดล้อมครบทุกมิติ — พลังงาน, GHG, น้ำ, ของเสีย" : "Comprehensive environmental analysis — Energy, GHG, Water, Waste"}
+              </p>
+              {hasData && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                    {filteredValues.length.toLocaleString()} {language === "th" ? "รายการ" : "records"} | {isAllTime ? (language === "th" ? "ทุกปี" : "All Time") : selectedYear}
+                  </Badge>
+                  {formatLastUpdated(lastUpdated) && (
+                    <Badge variant="outline" className="text-xs bg-muted/60 text-muted-foreground border-border/50 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {language === "th" ? "อัปเดตล่าสุด" : "Last updated"}: {formatLastUpdated(lastUpdated)}
+                    </Badge>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <FullscreenButton targetRef={fullscreenRef} language={language} />
-          <ExportExcelButton
-            data={summaryTableData.map(row => {
-              const exportRow: Record<string, unknown> = {
-                [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.name,
-                [language === "th" ? "หน่วย" : "Unit"]: row.unit,
-              };
-              tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] || "-"; });
-              if (tableYears.length >= 2) {
-                exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.change !== null ? `${row.change >= 0 ? "+" : ""}${row.change.toFixed(1)}%` : "-";
-              }
-              return exportRow;
-            })}
-            filenamePrefix="environmental_report"
-            sourcePage="Environmental Dashboard"
-            appliedFilters={{
-              company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
-              site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
-              year: isAllTime ? "All Time" : String(selectedYear),
-            }}
-          />
+        <div className="flex items-center gap-2 shrink-0">
+          <FullscreenButton targetRef={fullscreenRef} language={language} isFullscreen={isFullscreen} toggle={toggleFullscreen} />
+          {!isFullscreen && (
+            <ExportExcelButton
+              data={summaryTableData.map(row => {
+                const exportRow: Record<string, unknown> = {
+                  [language === "th" ? "ตัวชี้วัด" : "Metric"]: row.name,
+                  [language === "th" ? "หน่วย" : "Unit"]: row.unit,
+                };
+                tableYears.forEach(y => { exportRow[language === "th" ? `ค่าปี ${y}` : `Value ${y}`] = row.yearData[y] || "-"; });
+                if (tableYears.length >= 2) {
+                  exportRow[language === "th" ? "เปลี่ยนแปลง (%)" : "Change (%)"] = row.change !== null ? `${row.change >= 0 ? "+" : ""}${row.change.toFixed(1)}%` : "-";
+                }
+                return exportRow;
+              })}
+              filenamePrefix="environmental_report"
+              sourcePage="Environmental Dashboard"
+              appliedFilters={{
+                company: filterCompany ? companies.find(c => c.company_id === filterCompany)?.company_name || filterCompany : "All",
+                site: filterSite ? sites.find(s => s.site_id === filterSite)?.site_name || filterSite : "All",
+                year: isAllTime ? "All Time" : String(selectedYear),
+              }}
+            />
+          )}
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-2xl">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">{language === "th" ? "บริษัท" : "Company"}</Label>
-              <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v === "__all__" ? "" : v); setFilterSite(""); }}>
-                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
-                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
-                </SelectTrigger>
-                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
-                  <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {companies.map(c => <SelectItem key={c.company_id} value={c.company_id}>{c.company_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+      {/* Filters - hidden in TV mode */}
+      {!isFullscreen && (
+        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 rounded-2xl">
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">{language === "th" ? "บริษัท" : "Company"}</Label>
+                <Select value={filterCompany} onValueChange={(v) => { setFilterCompany(v === "__all__" ? "" : v); setFilterSite(""); }}>
+                  <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
+                    <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
+                    <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                    {companies.map(c => <SelectItem key={c.company_id} value={c.company_id}>{c.company_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{language === "th" ? "สถานที่" : "Site"}</Label>
+                <Select value={filterSite} onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}>
+                  <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
+                    <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
+                    <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                    {filteredSites.map(s => <SelectItem key={s.site_id} value={s.site_id}>{s.site_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{language === "th" ? "ปี" : "Year"}</Label>
+                <Select value={filterYear} onValueChange={setFilterYear}>
+                  <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
+                    <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
+                    <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
+                    {uniqueYears.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{language === "th" ? "สถานที่" : "Site"}</Label>
-              <Select value={filterSite} onValueChange={(v) => setFilterSite(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
-                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
-                </SelectTrigger>
-                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
-                  <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {filteredSites.map(s => <SelectItem key={s.site_id} value={s.site_id}>{s.site_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{language === "th" ? "ปี" : "Year"}</Label>
-              <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="h-9 bg-white/60 backdrop-blur border-gray-200/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30">
-                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All"} />
-                </SelectTrigger>
-                <SelectContent className="bg-white/95 backdrop-blur-xl border-gray-200/50 rounded-xl">
-                  <SelectItem value="__all__">{language === "th" ? "ทั้งหมด" : "All"}</SelectItem>
-                  {uniqueYears.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* KPI Cards - 6 cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* KPI Cards - compact in TV mode */}
+      <div className={`grid gap-2 shrink-0 ${isFullscreen ? "grid-cols-6" : "grid-cols-2 lg:grid-cols-3 gap-4"}`}>
         <EnvKPICard
           title={language === "th" ? "GHG รวม (Scope 1+2)" : "Total GHG (Scope 1+2)"}
           value={hasData && totalGHG > 0 ? totalGHG.toLocaleString(undefined, { maximumFractionDigits: 2 }) : null}
@@ -746,63 +763,68 @@ export default function Environmental() {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className={isFullscreen ? "flex-1 overflow-hidden grid grid-cols-2 grid-rows-2 gap-2 min-h-0" : "grid grid-cols-1 lg:grid-cols-2 gap-6"}>
 
-        {/* 1. GHG Emissions Scope 1 & 2 Monthly */}
-        <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-xl"><Factory className="h-4 w-4 text-emerald-600" /></div>
-            <div>
-              <CardTitle className="text-base font-medium">
-                {language === "th" ? "การปล่อย GHG รายเดือน (Scope 1 & 2)" : "Monthly GHG Emissions (Scope 1 & 2)"}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">{language === "th" ? "หน่วย: tCO₂e" : "Unit: tCO₂e"}</p>
-            </div>
+        {/* 1. GHG Emissions Monthly */}
+        <Card className={`bg-card/80 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl ${isFullscreen ? "flex flex-col min-h-0 overflow-hidden" : "lg:col-span-2 rounded-3xl"}`}>
+          <CardHeader className={`flex flex-row items-center gap-2 ${isFullscreen ? "py-2 px-3 shrink-0" : "gap-3"}`}>
+            <div className="p-1.5 bg-emerald-100 rounded-lg"><Factory className="h-3.5 w-3.5 text-emerald-600" /></div>
+            <CardTitle className={isFullscreen ? "text-xs font-medium" : "text-base font-medium"}>
+              {language === "th" ? "GHG รายเดือน (Scope 1+2)" : "Monthly GHG (Scope 1+2)"}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-        {hasGhgData ? (
-              <ChartScrollWrapper dataLength={ghgChartData.length} minBarWidth={52} height={300}>
-                <ComposedChart data={ghgChartData.filter(d => d.total !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={glassTooltipStyle}
-                    formatter={(value: number, name: string) => [
-                      `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} tCO₂e`,
-                      name === "scope1" ? "Scope 1" : name === "scope2" ? "Scope 2" : "Total"
-                    ]}
-                    labelFormatter={(label) => `📅 ${label}`}
-                  />
-                  <Legend />
-                  <Bar dataKey="scope1" name="Scope 1" stackId="ghg" fill={SCOPE_COLORS.scope1} fillOpacity={0.8} radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="scope2" name="Scope 2" stackId="ghg" fill={SCOPE_COLORS.scope2} fillOpacity={0.8} radius={[4, 4, 0, 0]} />
-                  <Line type="monotone" dataKey="total" name="Total" stroke="hsl(var(--foreground))" strokeWidth={2} dot={{ r: 3 }} />
-                </ComposedChart>
-              </ChartScrollWrapper>
+          <CardContent className={isFullscreen ? "flex-1 min-h-0 p-2" : "p-6 pt-0"}>
+            {hasGhgData ? (
+              isFullscreen ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={ghgChartData.filter(d => d.total !== null)} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
+                    <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} tCO₂e`, name === "scope1" ? "Scope 1" : name === "scope2" ? "Scope 2" : "Total"]} labelFormatter={(label) => `📅 ${label}`} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                    <Bar dataKey="scope1" name="Scope 1" stackId="ghg" fill={SCOPE_COLORS.scope1} fillOpacity={0.8} />
+                    <Bar dataKey="scope2" name="Scope 2" stackId="ghg" fill={SCOPE_COLORS.scope2} fillOpacity={0.8} radius={[2, 2, 0, 0]} />
+                    <Line type="monotone" dataKey="total" name="Total" stroke="hsl(var(--foreground))" strokeWidth={1.5} dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              ) : (
+                <ChartScrollWrapper dataLength={ghgChartData.length} minBarWidth={52} height={300}>
+                  <ComposedChart data={ghgChartData.filter(d => d.total !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                    <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} tCO₂e`, name === "scope1" ? "Scope 1" : name === "scope2" ? "Scope 2" : "Total"]} labelFormatter={(label) => `📅 ${label}`} />
+                    <Legend />
+                    <Bar dataKey="scope1" name="Scope 1" stackId="ghg" fill={SCOPE_COLORS.scope1} fillOpacity={0.8} />
+                    <Bar dataKey="scope2" name="Scope 2" stackId="ghg" fill={SCOPE_COLORS.scope2} fillOpacity={0.8} radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="total" name="Total" stroke="hsl(var(--foreground))" strokeWidth={2} dot={{ r: 3 }} />
+                  </ComposedChart>
+                </ChartScrollWrapper>
+              )
             ) : (
-              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล GHG" : "No GHG data available"} />
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล GHG" : "No GHG data"} />
             )}
           </CardContent>
         </Card>
 
         {/* 2. GHG by Site */}
-        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-xl"><Factory className="h-4 w-4 text-emerald-600" /></div>
-            <CardTitle className="text-base font-medium">
+        <Card className={`bg-card/80 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl ${isFullscreen ? "flex flex-col min-h-0 overflow-hidden" : "rounded-3xl"}`}>
+          <CardHeader className={`flex flex-row items-center gap-2 ${isFullscreen ? "py-2 px-3 shrink-0" : "gap-3"}`}>
+            <div className="p-1.5 bg-emerald-100 rounded-lg"><Factory className="h-3.5 w-3.5 text-emerald-600" /></div>
+            <CardTitle className={isFullscreen ? "text-xs font-medium" : "text-base font-medium"}>
               {language === "th" ? "GHG แยกตามสถานที่" : "GHG by Site"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={isFullscreen ? "flex-1 min-h-0 p-2" : "p-6 pt-0"}>
             {ghgBySiteData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={ghgBySiteData} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 10 }}>
+              <ResponsiveContainer width="100%" height={isFullscreen ? "100%" : 300}>
+                <BarChart data={ghgBySiteData} layout="vertical" margin={{ top: 4, right: 16, left: 60, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} width={80} />
+                  <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: isFullscreen ? 9 : 12 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: isFullscreen ? 9 : 11 }} width={60} />
                   <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString()} tCO₂e`, ""]} />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: isFullscreen ? 10 : 12 }} />
                   <Bar dataKey="scope1" name="Scope 1" stackId="ghg" fill={SCOPE_COLORS.scope1} fillOpacity={0.8} />
                   <Bar dataKey="scope2" name="Scope 2" stackId="ghg" fill={SCOPE_COLORS.scope2} fillOpacity={0.8} radius={[0, 4, 4, 0]} />
                 </BarChart>
@@ -814,96 +836,189 @@ export default function Environmental() {
         </Card>
 
         {/* 3. Energy Mix Pie */}
-        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-xl"><Zap className="h-4 w-4 text-emerald-600" /></div>
-            <CardTitle className="text-base font-medium">
+        <Card className={`bg-card/80 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl ${isFullscreen ? "flex flex-col min-h-0 overflow-hidden" : "rounded-3xl"}`}>
+          <CardHeader className={`flex flex-row items-center gap-2 ${isFullscreen ? "py-2 px-3 shrink-0" : "gap-3"}`}>
+            <div className="p-1.5 bg-emerald-100 rounded-lg"><Zap className="h-3.5 w-3.5 text-emerald-600" /></div>
+            <CardTitle className={isFullscreen ? "text-xs font-medium" : "text-base font-medium"}>
               {language === "th" ? "สัดส่วนพลังงาน" : "Energy Mix"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={isFullscreen ? "flex-1 min-h-0 p-2" : "p-6 pt-0"}>
             {energyMixData.length > 0 ? (
-              <div className="flex flex-col items-center">
-                <ResponsiveContainer width="100%" height={260}>
-                  <PieChart>
-                    <Pie
-                      data={energyMixData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {energyMixData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => {
-                      const item = energyMixData.find(d => d.name === name);
-                      return [`${value.toLocaleString()} ${item?.unit || ""}`, name];
-                    }} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex flex-wrap justify-center gap-3 mt-2">
-                  {energyMixData.map((item, i) => (
-                    <div key={i} className="flex items-center gap-1.5 text-xs">
-                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
-                      <span className="text-muted-foreground">{item.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <ResponsiveContainer width="100%" height={isFullscreen ? "100%" : 260}>
+                <PieChart>
+                  <Pie data={energyMixData} cx="50%" cy="50%" innerRadius={isFullscreen ? 35 : 60} outerRadius={isFullscreen ? 70 : 100} paddingAngle={3} dataKey="value">
+                    {energyMixData.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
+                  </Pie>
+                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => { const item = energyMixData.find(d => d.name === name); return [`${value.toLocaleString()} ${item?.unit || ""}`, name]; }} />
+                  {!isFullscreen && <Legend />}
+                </PieChart>
+              </ResponsiveContainer>
             ) : (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลพลังงาน" : "No energy data"} />
             )}
           </CardContent>
         </Card>
 
-        {/* 4. Electricity Monthly (Grid vs Renewable) */}
-        <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-xl"><Zap className="h-4 w-4 text-emerald-600" /></div>
-            <div>
-              <CardTitle className="text-base font-medium">
-                {language === "th" ? "ปริมาณการใช้ไฟฟ้ารายเดือน (Grid vs Renewable)" : "Monthly Electricity (Grid vs Renewable)"}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">{language === "th" ? "หน่วย: kWh" : "Unit: kWh"}</p>
-            </div>
+        {/* 4. Water Balance Monthly */}
+        <Card className={`bg-card/80 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl ${isFullscreen ? "flex flex-col min-h-0 overflow-hidden" : "rounded-3xl"}`}>
+          <CardHeader className={`flex flex-row items-center gap-2 ${isFullscreen ? "py-2 px-3 shrink-0" : "gap-3"}`}>
+            <div className="p-1.5 bg-emerald-100 rounded-lg"><Droplets className="h-3.5 w-3.5 text-emerald-600" /></div>
+            <CardTitle className={isFullscreen ? "text-xs font-medium" : "text-base font-medium"}>
+              {language === "th" ? "สมดุลน้ำรายเดือน" : "Monthly Water Balance"}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            {hasElectricityData ? (
-              <ChartScrollWrapper dataLength={electricityChartData.length} minBarWidth={52} height={300}>
-                <AreaChart data={electricityChartData.filter(d => d.grid !== null || d.renewable !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                  <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString()} kWh`, name]} labelFormatter={(label) => `📅 ${label}`} />
-                  <Legend />
-                  <Area type="monotone" dataKey="grid" name={language === "th" ? "ไฟฟ้าโครงข่าย" : "Grid"} stackId="elec" stroke="hsl(45 93% 47%)" fill="hsl(45 93% 47%)" fillOpacity={0.5} />
-                  <Area type="monotone" dataKey="renewable" name={language === "th" ? "พลังงานหมุนเวียน" : "Renewable"} stackId="elec" stroke="hsl(142 71% 45%)" fill="hsl(142 71% 45%)" fillOpacity={0.5} />
-                </AreaChart>
-              </ChartScrollWrapper>
+          <CardContent className={isFullscreen ? "flex-1 min-h-0 p-2" : "p-6 pt-0"}>
+            {hasWaterBalanceData ? (
+              isFullscreen ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={waterBalanceData.filter(d => d.withdrawal !== null)} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
+                    <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString()} m³`, name]} labelFormatter={(label) => `📅 ${label}`} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                    <Bar dataKey="withdrawal" name={language === "th" ? "น้ำเข้า" : "Withdrawal"} fill="hsl(199 89% 48%)" fillOpacity={0.7} radius={[2, 2, 0, 0]} />
+                    <Line type="monotone" dataKey="recycling" name={language === "th" ? "นำกลับใช้" : "Recycling"} stroke="hsl(142 71% 45%)" strokeWidth={1.5} dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              ) : (
+                <ChartScrollWrapper dataLength={waterBalanceData.length} minBarWidth={52} height={300}>
+                  <ComposedChart data={waterBalanceData.filter(d => d.withdrawal !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                    <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString()} m³`, name]} labelFormatter={(label) => `📅 ${label}`} />
+                    <Legend />
+                    <Bar dataKey="withdrawal" name={language === "th" ? "น้ำเข้า" : "Withdrawal"} fill="hsl(199 89% 48%)" fillOpacity={0.7} radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="recycling" name={language === "th" ? "นำกลับใช้" : "Recycling"} stroke="hsl(142 71% 45%)" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="discharge" name={language === "th" ? "ปล่อยออก" : "Discharge"} stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                  </ComposedChart>
+                </ChartScrollWrapper>
+              )
             ) : (
-              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลไฟฟ้า" : "No electricity data"} />
+              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลน้ำ" : "No water data"} />
             )}
           </CardContent>
         </Card>
 
-        {/* 5. Water Balance Monthly */}
-        <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-xl"><Droplets className="h-4 w-4 text-emerald-600" /></div>
-            <div>
-              <CardTitle className="text-base font-medium">
-                {language === "th" ? "สมดุลน้ำรายเดือน" : "Monthly Water Balance"}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">m³</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {hasWaterBalanceData ? (
-              <ChartScrollWrapper dataLength={waterBalanceData.length} minBarWidth={52} height={300}>
+        {/* Extra charts - hidden in TV mode */}
+        {!isFullscreen && (
+          <>
+            {/* Electricity Monthly */}
+            <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+              <CardHeader className="flex flex-row items-center gap-3">
+                <div className="p-2 bg-emerald-100 rounded-xl"><Zap className="h-4 w-4 text-emerald-600" /></div>
+                <div>
+                  <CardTitle className="text-base font-medium">
+                    {language === "th" ? "ปริมาณการใช้ไฟฟ้ารายเดือน (Grid vs Renewable)" : "Monthly Electricity (Grid vs Renewable)"}
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">{language === "th" ? "หน่วย: kWh" : "Unit: kWh"}</p>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {hasElectricityData ? (
+                  <ChartScrollWrapper dataLength={electricityChartData.length} minBarWidth={52} height={300}>
+                    <AreaChart data={electricityChartData.filter(d => d.grid !== null || d.renewable !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                      <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${value.toLocaleString()} kWh`, name]} labelFormatter={(label) => `📅 ${label}`} />
+                      <Legend />
+                      <Area type="monotone" dataKey="grid" name={language === "th" ? "ไฟฟ้าโครงข่าย" : "Grid"} stackId="elec" stroke="hsl(45 93% 47%)" fill="hsl(45 93% 47%)" fillOpacity={0.5} />
+                      <Area type="monotone" dataKey="renewable" name={language === "th" ? "พลังงานหมุนเวียน" : "Renewable"} stackId="elec" stroke="hsl(142 71% 45%)" fill="hsl(142 71% 45%)" fillOpacity={0.5} />
+                    </AreaChart>
+                  </ChartScrollWrapper>
+                ) : (
+                  <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลไฟฟ้า" : "No electricity data"} />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Water by Site */}
+            <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+              <CardHeader className="flex flex-row items-center gap-3">
+                <div className="p-2 bg-emerald-100 rounded-xl"><Droplets className="h-4 w-4 text-emerald-600" /></div>
+                <CardTitle className="text-base font-medium">
+                  {language === "th" ? "น้ำแยกตามสถานที่" : "Water by Site"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {waterBySiteData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={waterBySiteData} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} width={80} />
+                      <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString()} m³`, ""]} />
+                      <Bar dataKey="withdrawal" name={language === "th" ? "ปริมาณน้ำ" : "Water"} fill="hsl(199 89% 48%)" fillOpacity={0.8} radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data"} />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Waste Pie */}
+            <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+              <CardHeader className="flex flex-row items-center gap-3">
+                <div className="p-2 bg-emerald-100 rounded-xl"><Trash2 className="h-4 w-4 text-emerald-600" /></div>
+                <CardTitle className="text-base font-medium">
+                  {language === "th" ? "สัดส่วนการจัดการขยะ" : "Waste Diversion"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {wastePieData.length > 0 ? (
+                  <div className="flex flex-col items-center">
+                    <ResponsiveContainer width="100%" height={260}>
+                      <PieChart>
+                        <Pie data={wastePieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="value" label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}>
+                          {wastePieData.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
+                        </Pie>
+                        <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${(value / 1000).toFixed(1)} t`, name]} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลขยะ" : "No waste data"} />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Waste Monthly */}
+            <Card className="bg-white/70 backdrop-blur-xl border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300 rounded-3xl">
+              <CardHeader className="flex flex-row items-center gap-3">
+                <div className="p-2 bg-emerald-100 rounded-xl"><Trash2 className="h-4 w-4 text-emerald-600" /></div>
+                <CardTitle className="text-base font-medium">
+                  {language === "th" ? "ขยะรายเดือน" : "Monthly Waste"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {hasWasteChartData ? (
+                  <ChartScrollWrapper dataLength={wasteChartData.length} minBarWidth={52} height={300}>
+                    <ComposedChart data={wasteChartData.filter(d => d.total !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                      <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number, name: string) => [`${(value / 1000).toFixed(1)} t`, name]} labelFormatter={(label) => `📅 ${label}`} />
+                      <Legend />
+                      <Bar dataKey="total" name={language === "th" ? "ขยะทั้งหมด" : "Total Waste"} fill="hsl(25 95% 53%)" fillOpacity={0.7} radius={[4, 4, 0, 0]} />
+                      <Line type="monotone" dataKey="recycled" name={language === "th" ? "Recycle/Reuse" : "Recycled"} stroke="hsl(142 71% 45%)" strokeWidth={2} dot={{ r: 3 }} />
+                    </ComposedChart>
+                  </ChartScrollWrapper>
+                ) : (
+                  <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+
+      {/* Summary Table - hidden in TV mode */}
+      {!isFullscreen && summaryTableData.length > 0 && (
                 <ComposedChart data={waterBalanceData.filter(d => d.withdrawal !== null)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />

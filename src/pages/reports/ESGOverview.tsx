@@ -59,7 +59,7 @@ import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh";
 import { ReportsLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ExportExcelButton } from "@/components/ExportExcelButton";
 import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
-import { FullscreenButton } from "@/components/reports/FullscreenButton";
+import { FullscreenButton, useFullscreen } from "@/components/reports/FullscreenButton";
 
 // ─── All Key Metric IDs across E, S, G ───
 const ENV_METRICS = {
@@ -223,6 +223,7 @@ const DimensionCard = ({
 // ─── Main Component ───
 export default function ESGOverview() {
   const fullscreenRef = useRef<HTMLDivElement>(null);
+  const { isFullscreen, toggle: toggleFullscreen } = useFullscreen(fullscreenRef);
   const { language } = useLanguage();
   const navigate = useNavigate();
 
@@ -527,7 +528,13 @@ export default function ESGOverview() {
   if (loading) return <ReportsLoadingSkeleton />;
 
   return (
-    <div ref={fullscreenRef} className="space-y-6 pb-8 bg-gradient-to-br from-background via-background to-primary/5 min-h-screen -m-6 p-6">
+    <div
+      ref={fullscreenRef}
+      className={isFullscreen
+        ? "h-screen overflow-hidden bg-background flex flex-col p-3 gap-2"
+        : "space-y-6 pb-8 bg-gradient-to-br from-background via-background to-primary/5 min-h-screen -m-6 p-6"
+      }
+    >
       <div ref={containerRef} />
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
@@ -568,7 +575,7 @@ export default function ESGOverview() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <FullscreenButton targetRef={fullscreenRef} language={language} />
+          <FullscreenButton targetRef={fullscreenRef} language={language} isFullscreen={isFullscreen} toggle={toggleFullscreen} />
           <ExportExcelButton
             data={summaryData.map(row => {
               const exportRow: Record<string, unknown> = {
