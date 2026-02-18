@@ -309,20 +309,22 @@ export default function Environmental() {
   // ─── Helper: get relevant periods for charts ───
   const chartPeriods = useMemo(() => {
     if (isAllTime) {
+      // Show ALL periods that have data across all years, sorted by year then month
       const periodsWithData = new Set(filteredValues.map(v => v.period_id));
       const allRelevant = periods.filter(p => periodsWithData.has(p.period_id));
       if (allRelevant.length === 0) {
         const latestYear = uniqueYears[0];
         return periods.filter(p => p.year === latestYear).sort((a, b) => a.month - b.month);
       }
-      // Use year with MOST months of data (not just latest) to avoid sparse years like 2026 (2 months only)
-      const yearCounts = new Map<number, number>();
-      allRelevant.forEach(p => yearCounts.set(p.year, (yearCounts.get(p.year) || 0) + 1));
-      const mostDataYear = [...yearCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
-      return periods.filter(p => p.year === mostDataYear).sort((a, b) => a.month - b.month);
+      return allRelevant.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
     }
     return periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
   }, [periods, selectedYear, isAllTime, uniqueYears, filteredValues]);
+
+  // ─── Helper: get values for a specific period_id ───
+  const getPeriodValues = useCallback((periodId: string) => {
+    return filteredValues.filter(v => v.period_id === periodId);
+  }, [filteredValues]);
 
   // When All Time, get filteredValues for a specific month (across all years)
   const getMonthValues = useCallback((month: number) => {
@@ -335,29 +337,36 @@ export default function Environmental() {
   }, [filteredValues, periods, selectedYear, isAllTime]);
 
   // ─── Monthly Sparkline ───
+  // ─── Monthly chart label helper ───
+  const periodLabel = useCallback((period: { month_name: string; year: number }) => {
+    return isAllTime
+      ? `${period.month_name.slice(0, 3)} '${String(period.year).slice(2)}`
+      : period.month_name.slice(0, 3);
+  }, [isAllTime]);
+
   const monthlySparkline = useCallback((metricIds: string[]) => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       return pv.filter(v => metricIds.includes(v.metric_id)).reduce((s, v) => s + v.value, 0);
     }).filter(v => v > 0);
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues]);
 
   // ─── GHG Monthly Chart Data ───
   const ghgChartData = useMemo(() => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       const scope1 = pv.filter(v => v.metric_id === METRIC.GHG_SCOPE1).reduce((s, v) => s + v.value, 0);
       const scope2 = pv.filter(v => v.metric_id === METRIC.GHG_SCOPE2).reduce((s, v) => s + v.value, 0);
       return {
-        name: period.month_name.slice(0, 3),
+        name: periodLabel(period),
         scope1: scope1 || null,
         scope2: scope2 || null,
         total: (scope1 + scope2) || null,
       };
     });
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues, periodLabel]);
   const hasGhgData = ghgChartData.some(d => d.total !== null);
 
   // ─── Energy Mix Pie ───
@@ -393,16 +402,16 @@ export default function Environmental() {
   const electricityChartData = useMemo(() => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       const grid = pv.filter(v => v.metric_id === METRIC.GRID_ELECTRICITY).reduce((s, v) => s + v.value, 0);
       const renew = pv.filter(v => v.metric_id === METRIC.RENEWABLE_ENERGY).reduce((s, v) => s + v.value, 0);
       return {
-        name: period.month_name.slice(0, 3),
+        name: periodLabel(period),
         grid: grid || null,
         renewable: renew || null,
       };
     });
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues, periodLabel]);
   const hasElectricityData = electricityChartData.some(d => d.grid !== null || d.renewable !== null);
 
   // ─── Water by Site ───
@@ -425,13 +434,13 @@ export default function Environmental() {
   const waterBalanceData = useMemo(() => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       const wd = pv.filter(v => v.metric_id === METRIC.WATER_WITHDRAWAL).reduce((s, v) => s + v.value, 0);
       const wdis = pv.filter(v => v.metric_id === METRIC.WATER_DISCHARGE).reduce((s, v) => s + v.value, 0);
       const wr = pv.filter(v => v.metric_id === METRIC.WATER_RECYCLING).reduce((s, v) => s + v.value, 0);
-      return { name: period.month_name.slice(0, 3), withdrawal: wd || null, discharge: wdis || null, recycling: wr || null };
+      return { name: periodLabel(period), withdrawal: wd || null, discharge: wdis || null, recycling: wr || null };
     });
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues, periodLabel]);
   const hasWaterBalanceData = waterBalanceData.some(d => d.withdrawal !== null);
 
   // ─── Waste Pie (Recycled vs Landfill) ───
@@ -448,12 +457,12 @@ export default function Environmental() {
   const wasteChartData = useMemo(() => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       const total = pv.filter(v => v.metric_id === METRIC.TOTAL_WASTE).reduce((s, v) => s + v.value, 0);
       const recycled = pv.filter(v => v.metric_id === METRIC.WASTE_RECYCLED).reduce((s, v) => s + v.value, 0);
-      return { name: period.month_name.slice(0, 3), total: total || null, recycled: recycled || null };
+      return { name: periodLabel(period), total: total || null, recycled: recycled || null };
     });
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues, periodLabel]);
   const hasWasteChartData = wasteChartData.some(d => d.total !== null);
 
   // ─── GHG by Site ───

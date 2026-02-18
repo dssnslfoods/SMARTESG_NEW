@@ -311,13 +311,22 @@ export default function Social() {
         const latestYear = uniqueYears[0];
         return periods.filter(p => p.year === latestYear).sort((a, b) => a.month - b.month);
       }
-      const yearCounts = new Map<number, number>();
-      allRelevant.forEach(p => yearCounts.set(p.year, (yearCounts.get(p.year) || 0) + 1));
-      const mostDataYear = [...yearCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
-      return periods.filter(p => p.year === mostDataYear).sort((a, b) => a.month - b.month);
+      return allRelevant.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
     }
     return periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
   }, [periods, selectedYear, isAllTime, uniqueYears, filteredValues]);
+
+  // Get values for a specific period_id
+  const getPeriodValues = useCallback((periodId: string) => {
+    return filteredValues.filter(v => v.period_id === periodId);
+  }, [filteredValues]);
+
+  // Period label: "Jan '25" in All Time mode
+  const periodLabel = useCallback((period: { month_name: string; year: number }) => {
+    return isAllTime
+      ? `${period.month_name.slice(0, 3)} '${String(period.year).slice(2)}`
+      : period.month_name.slice(0, 3);
+  }, [isAllTime]);
 
   const getMonthValues = useCallback((month: number) => {
     if (isAllTime) {
@@ -332,20 +341,20 @@ export default function Social() {
   const monthlySparkline = useCallback((metricIds: string[]) => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       return pv.filter(v => metricIds.includes(v.metric_id)).reduce((s, v) => s + v.value, 0);
     }).filter(v => v > 0);
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues]);
 
   // ─── 1. Training Hours Monthly Trend ───
   const trainingChartData = useMemo(() => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       const hours = pv.filter(v => v.metric_id === METRIC.TRAINING_HOURS).reduce((s, v) => s + v.value, 0);
-      return { name: period.month_name.slice(0, 3), hours: hours || null };
+      return { name: periodLabel(period), hours: hours || null };
     });
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues, periodLabel]);
   const hasTrainingData = trainingChartData.some(d => d.hours !== null);
 
   // ─── 2. Training Hours by Site ───
@@ -368,11 +377,11 @@ export default function Social() {
   const ltiChartData = useMemo(() => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       const lti = pv.filter(v => v.metric_id === METRIC.LTI).reduce((s, v) => s + v.value, 0);
-      return { name: period.month_name.slice(0, 3), lti: lti };
+      return { name: periodLabel(period), lti: lti };
     });
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues, periodLabel]);
   const hasLtiData = ltiChartData.some(d => d.lti > 0);
 
   // ─── 4. LTI by Site ───
@@ -394,11 +403,11 @@ export default function Social() {
   const wellbeingChartData = useMemo(() => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       const count = pv.filter(v => v.metric_id === METRIC.WELLBEING_ACCESS).reduce((s, v) => s + v.value, 0);
-      return { name: period.month_name.slice(0, 3), participants: count || null };
+      return { name: periodLabel(period), participants: count || null };
     });
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues, periodLabel]);
   const hasWellbeingData = wellbeingChartData.some(d => d.participants !== null);
 
   // ─── 6. Wellbeing by Site (Pie) ───
@@ -422,23 +431,23 @@ export default function Social() {
   const humanRightsChartData = useMemo(() => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       const violations = pv.filter(v => v.metric_id === METRIC.HUMAN_RIGHTS_VIOLATIONS).reduce((s, v) => s + v.value, 0);
-      return { name: period.month_name.slice(0, 3), violations };
+      return { name: periodLabel(period), violations };
     });
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues, periodLabel]);
   const hasHumanRightsData = humanRightsChartData.length > 0;
 
   // ─── Health & Safety Composite (LTI + Wellbeing) ───
   const safetyCompositeData = useMemo(() => {
     if (chartPeriods.length === 0) return [];
     return chartPeriods.map(period => {
-      const pv = getMonthValues(period.month);
+      const pv = getPeriodValues(period.period_id);
       const lti = pv.filter(v => v.metric_id === METRIC.LTI).reduce((s, v) => s + v.value, 0);
       const wellbeing = pv.filter(v => v.metric_id === METRIC.WELLBEING_ACCESS).reduce((s, v) => s + v.value, 0);
-      return { name: period.month_name.slice(0, 3), lti, wellbeing: wellbeing || null };
+      return { name: periodLabel(period), lti, wellbeing: wellbeing || null };
     });
-  }, [chartPeriods, getMonthValues]);
+  }, [chartPeriods, getPeriodValues, periodLabel]);
   const hasSafetyCompositeData = safetyCompositeData.some(d => d.lti > 0 || (d.wellbeing !== null && d.wellbeing > 0));
 
   // ─── Years with data (for multi-year table) ───

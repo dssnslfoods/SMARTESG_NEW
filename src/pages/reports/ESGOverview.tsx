@@ -393,23 +393,27 @@ export default function ESGOverview() {
     const socIds = new Set(Object.values(SOCIAL_METRICS));
     const govIds = new Set(Object.values(GOV_METRICS));
 
-    // Use year with MOST months of data to avoid sparse years (e.g. 2026 with only 2 months)
+    // Show ALL periods with data across all years when in All Time mode
     const periodsWithData = new Set(filteredValues.map(v => v.period_id));
     const allRelevant = periods.filter(p => periodsWithData.has(p.period_id));
-    let chartYear = selectedYear;
-    if (allRelevant.length > 0) {
-      const yearCounts = new Map<number, number>();
-      allRelevant.forEach(p => yearCounts.set(p.year, (yearCounts.get(p.year) || 0) + 1));
-      chartYear = [...yearCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+
+    let chartPeriods: typeof periods;
+    if (isAllTime) {
+      chartPeriods = allRelevant.length > 0
+        ? allRelevant.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month)
+        : periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
+    } else {
+      chartPeriods = periods.filter(p => p.year === selectedYear).sort((a, b) => a.month - b.month);
     }
 
-    return periods
-      .filter(p => p.year === chartYear)
-      .sort((a, b) => a.month - b.month)
+    return chartPeriods
       .map(period => {
         const pvs = filteredValues.filter(v => v.period_id === period.period_id);
+        const label = isAllTime
+          ? `${period.month_name.slice(0, 3)} '${String(period.year).slice(2)}`
+          : period.month_name.slice(0, 3);
         return {
-          name: period.month_name.slice(0, 3),
+          name: label,
           environmental: pvs.filter(v => envIds.has(v.metric_id)).length,
           social: pvs.filter(v => socIds.has(v.metric_id)).length,
           governance: pvs.filter(v => govIds.has(v.metric_id)).length,
