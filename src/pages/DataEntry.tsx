@@ -170,6 +170,8 @@ export default function DataEntry() {
   const [formCompany, setFormCompany] = useState<string>("");
   const [formDimension, setFormDimension] = useState<string>("");
   const [formTheme, setFormTheme] = useState<string>("");
+  const [formMonth, setFormMonth] = useState<string>("");
+  const [formYear, setFormYear] = useState<string>("");
 
   const [formData, setFormData] = useState<FormData>({
     value_id: '',
@@ -260,6 +262,8 @@ export default function DataEntry() {
     setFormCompany('');
     setFormDimension('');
     setFormTheme('');
+    setFormMonth('');
+    setFormYear('');
     
     // For staff role, auto-set site_id from profile
     const staffSiteId = role === 'staff' && profile?.site_id ? profile.site_id : '';
@@ -293,6 +297,9 @@ export default function DataEntry() {
     setFormCompany(site?.company_id || '');
     setFormDimension(theme?.dimension_id || '');
     setFormTheme(metric?.theme_id || '');
+    const editPeriod = periods.find(p => p.period_id === value.period_id);
+    setFormMonth(editPeriod ? String(editPeriod.month) : '');
+    setFormYear(editPeriod ? String(editPeriod.year) : '');
     setFormData({
       value_id: value.value_id,
       site_id: value.site_id,
@@ -1359,23 +1366,60 @@ export default function DataEntry() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'รอบระยะเวลา' : 'Period'} *</Label>
+                <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'เดือน' : 'Month'} *</Label>
                 <Select
-                  value={formData.period_id}
-                  onValueChange={(v) => setFormData({ ...formData, period_id: v })}
+                  value={formMonth}
+                  onValueChange={(v) => {
+                    setFormMonth(v);
+                    if (formYear) {
+                      const matched = periods.find(p => p.month === Number(v) && p.year === Number(formYear));
+                      setFormData(prev => ({ ...prev, period_id: matched?.period_id || '' }));
+                    }
+                  }}
                 >
                   <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
-                    <SelectValue placeholder={language === 'th' ? 'เลือกรอบระยะเวลา' : 'Select period'} />
+                    <SelectValue placeholder={language === 'th' ? 'เลือกเดือน' : 'Select month'} />
                   </SelectTrigger>
                   <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
-                    {periods.map((period) => (
-                      <SelectItem key={period.period_id} value={period.period_id}>
-                        {period.month_name} {period.year}
-                      </SelectItem>
-                    ))}
+                    {Array.from(new Map(periods.map(p => [p.month, p])).values())
+                      .sort((a, b) => a.month - b.month)
+                      .map((p) => (
+                        <SelectItem key={p.month} value={String(p.month)}>
+                          {p.month_name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'ปี' : 'Year'} *</Label>
+                <Select
+                  value={formYear}
+                  onValueChange={(v) => {
+                    setFormYear(v);
+                    if (formMonth) {
+                      const matched = periods.find(p => p.month === Number(formMonth) && p.year === Number(v));
+                      setFormData(prev => ({ ...prev, period_id: matched?.period_id || '' }));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                    <SelectValue placeholder={language === 'th' ? 'เลือกปี' : 'Select year'} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
+                    {Array.from(new Set(periods.map(p => p.year)))
+                      .sort((a, b) => b - a)
+                      .map((year) => (
+                        <SelectItem key={year} value={String(year)}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'มิติ ESG' : 'Dimension'}</Label>
                 <Select
