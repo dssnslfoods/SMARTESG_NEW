@@ -166,6 +166,10 @@ export default function DataEntry() {
   const [filterTheme, setFilterTheme] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const PAGE_SIZE = 15;
+
   // Form filter states
   const [formCompany, setFormCompany] = useState<string>("");
   const [formDimension, setFormDimension] = useState<string>("");
