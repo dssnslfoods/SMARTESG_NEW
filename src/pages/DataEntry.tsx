@@ -1223,7 +1223,7 @@ export default function DataEntry() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredValues.map((value) => (
+                  {pagedValues.map((value) => (
                     <TableRow 
                       key={value.value_id} 
                       data-state={selectedIds.has(value.value_id) ? 'selected' : undefined}
