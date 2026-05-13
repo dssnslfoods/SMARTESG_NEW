@@ -820,11 +820,18 @@ export default function Environmental() {
           </CardHeader>
           <CardContent className={isFullscreen ? "flex-1 min-h-0 p-2" : "p-6 pt-0"}>
             {ghgBySiteData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={isFullscreen ? "100%" : 300}>
-                <BarChart data={ghgBySiteData} layout="vertical" margin={{ top: 4, right: 16, left: 60, bottom: 4 }}>
+              <ResponsiveContainer width="100%" height={isFullscreen ? "100%" : Math.max(300, ghgBySiteData.length * 36 + 60)}>
+                <BarChart data={ghgBySiteData} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: isFullscreen ? 9 : 12 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: isFullscreen ? 9 : 11 }} width={60} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: isFullscreen ? 10 : 11 }}
+                    width={130}
+                    interval={0}
+                    tickFormatter={(v: string) => (v && v.length > 18 ? v.slice(0, 17) + "…" : v)}
+                  />
                   <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString()} tCO₂e`, ""]} />
                   <Legend wrapperStyle={{ fontSize: isFullscreen ? 10 : 12 }} />
                   <Bar dataKey="scope1" name="Scope 1" stackId="ghg" fill={SCOPE_COLORS.scope1} fillOpacity={0.8} />
