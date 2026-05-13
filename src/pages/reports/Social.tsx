@@ -782,11 +782,18 @@ export default function Social() {
           </CardHeader>
           <CardContent>
             {trainingBySiteData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={trainingBySiteData} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 10 }}>
+              <ResponsiveContainer width="100%" height={Math.max(300, trainingBySiteData.length * 36 + 60)}>
+                <BarChart data={trainingBySiteData} layout="vertical" margin={{ top: 10, right: 30, left: 8, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} width={80} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                    width={130}
+                    interval={0}
+                    tickFormatter={(v: string) => (v && v.length > 18 ? v.slice(0, 17) + "…" : v)}
+                  />
                   <Tooltip contentStyle={glassTooltipStyle} formatter={(value: number) => [`${value.toLocaleString()} ${language === "th" ? "ชั่วโมง" : "hrs"}`, ""]} />
                   <Bar dataKey="hours" name={language === "th" ? "ชั่วโมงอบรม" : "Training Hours"} fill={THEME_COLORS.training} fillOpacity={0.8} radius={[0, 4, 4, 0]} />
                 </BarChart>
