@@ -166,6 +166,10 @@ export default function DataEntry() {
   const [filterTheme, setFilterTheme] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const PAGE_SIZE = 15;
+
   // Form filter states
   const [formCompany, setFormCompany] = useState<string>("");
   const [formDimension, setFormDimension] = useState<string>("");
@@ -707,6 +711,16 @@ export default function DataEntry() {
     return true;
   });
 
+  // Pagination derived values
+  const totalPages = Math.max(1, Math.ceil(filteredValues.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedValues = filteredValues.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterCompany, filterSite, filterPeriod, filterDimension, filterTheme, filterStatus]);
+
   const unique = (items: string[]) => Array.from(new Set(items)).filter(Boolean);
 
   const getFilterDropReason = () => {
@@ -1209,7 +1223,7 @@ export default function DataEntry() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredValues.map((value) => (
+                  {pagedValues.map((value) => (
                     <TableRow 
                       key={value.value_id} 
                       data-state={selectedIds.has(value.value_id) ? 'selected' : undefined}
@@ -1265,6 +1279,56 @@ export default function DataEntry() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+          {!loading && filteredValues.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-100 bg-gray-50/50">
+              <div className="text-sm text-gray-600">
+                {language === 'th'
+                  ? `แสดง ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(safePage * PAGE_SIZE, filteredValues.length)} จาก ${filteredValues.length} รายการ`
+                  : `Showing ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(safePage * PAGE_SIZE, filteredValues.length)} of ${filteredValues.length}`}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={safePage === 1}
+                >
+                  «
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                >
+                  {language === 'th' ? 'ก่อนหน้า' : 'Prev'}
+                </Button>
+                <span className="text-sm text-gray-700 px-2">
+                  {language === 'th' ? `หน้า ${safePage} / ${totalPages}` : `Page ${safePage} / ${totalPages}`}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                >
+                  {language === 'th' ? 'ถัดไป' : 'Next'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={safePage === totalPages}
+                >
+                  »
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
