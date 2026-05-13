@@ -711,6 +711,16 @@ export default function DataEntry() {
     return true;
   });
 
+  // Pagination derived values
+  const totalPages = Math.max(1, Math.ceil(filteredValues.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedValues = filteredValues.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterCompany, filterSite, filterPeriod, filterDimension, filterTheme, filterStatus]);
+
   const unique = (items: string[]) => Array.from(new Set(items)).filter(Boolean);
 
   const getFilterDropReason = () => {
