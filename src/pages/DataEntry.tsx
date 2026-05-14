@@ -766,8 +766,8 @@ export default function DataEntry() {
 
   // Filter metric values
   const filteredValues = metricValues.filter(v => {
-    // Last 4 months window (drafts always visible)
-    if (recentPeriodIds && v.status !== 'draft' && !recentPeriodIds.has(v.period_id)) {
+    // Admin-configured period window (drafts always visible)
+    if (allowedPeriodIds && v.status !== 'draft' && !allowedPeriodIds.has(v.period_id)) {
       return false;
     }
     // Filter by company: check if site belongs to the selected company
