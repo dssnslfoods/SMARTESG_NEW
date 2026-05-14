@@ -764,6 +764,17 @@ export default function DataEntry() {
     return set;
   }, [periods, metricValues, periodById, periodFilterMode, recentMonths, fromYear, fromMonth]);
 
+  const activePeriods = useMemo(() => {
+    if (periodFilterMode === 'all') return null;
+    if (!allowedPeriodIds) return [];
+    return periods
+      .filter(p => allowedPeriodIds.has(p.period_id))
+      .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.month - a.month;
+      });
+  }, [periods, allowedPeriodIds, periodFilterMode]);
+
   // Filter metric values
   const filteredValues = metricValues.filter(v => {
     // Admin-configured period window (drafts always visible)
