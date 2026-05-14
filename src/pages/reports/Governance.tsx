@@ -143,7 +143,7 @@ const GovKPICard = ({
               <p className="text-xs text-muted-foreground">{title}</p>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-xl sm:text-2xl font-bold text-foreground">{value !== null ? value : "-"}</span>
+              <span className="text-xl sm:text-2xl font-bold text-foreground">{value !== null ? (typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value) : "-"}</span>
               {value !== null && <span className="text-xs text-muted-foreground">{unit}</span>}
             </div>
             {trend && trendValue && (
