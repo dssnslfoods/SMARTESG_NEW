@@ -902,8 +902,8 @@ export default function DataEntry() {
               <AlertTriangle className="h-5 w-5" />
               <span className="text-sm">
                 {language === 'th' 
-                  ? `แสดง ${metricValues.length} จาก ${totalDbCount} รายการ (RLS อาจซ่อนบางรายการ)` 
-                  : `Showing ${metricValues.length} of ${totalDbCount} records (RLS may hide some records)`}
+                  ? `แสดง ${metricValues.length.toLocaleString()} จาก ${totalDbCount.toLocaleString()} รายการ (RLS อาจซ่อนบางรายการ)` 
+                  : `Showing ${metricValues.length.toLocaleString()} of ${totalDbCount.toLocaleString()} records (RLS may hide some records)`}
               </span>
             </div>
           </CardContent>
@@ -923,7 +923,7 @@ export default function DataEntry() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-800">{totalDbCount}</p>
+            <p className="text-3xl font-bold text-gray-800">{totalDbCount.toLocaleString()}</p>
             <p className="text-xs text-purple-600 mt-1">{language === 'th' ? 'รายการทั้งหมด' : 'total entries'}</p>
           </CardContent>
         </Card>
@@ -939,7 +939,7 @@ export default function DataEntry() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-800">{metricValues.length}</p>
+            <p className="text-3xl font-bold text-gray-800">{metricValues.length.toLocaleString()}</p>
             <p className="text-xs text-gray-500 mt-1">{language === 'th' ? 'รายการ' : 'entries'}</p>
           </CardContent>
         </Card>
@@ -955,7 +955,7 @@ export default function DataEntry() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-800">{metricValues.filter(v => v.status === 'draft').length}</p>
+            <p className="text-3xl font-bold text-gray-800">{metricValues.filter(v => v.status === 'draft').length.toLocaleString()}</p>
             <p className="text-xs text-amber-600 mt-1">{language === 'th' ? 'รอดำเนินการ' : 'pending'}</p>
           </CardContent>
         </Card>
@@ -971,7 +971,7 @@ export default function DataEntry() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-800">{metricValues.filter(v => v.status === 'submitted').length}</p>
+            <p className="text-3xl font-bold text-gray-800">{metricValues.filter(v => v.status === 'submitted').length.toLocaleString()}</p>
             <p className="text-xs text-blue-600 mt-1">{language === 'th' ? 'เสร็จสิ้น' : 'completed'}</p>
           </CardContent>
         </Card>
@@ -1096,8 +1096,8 @@ export default function DataEntry() {
           <div className="mt-4 flex flex-col gap-2">
             <div className="text-xs text-gray-500">
               {language === 'th'
-                ? `ทั้งหมด ${metricValues.length} รายการ • หลังกรอง ${filteredValues.length} รายการ`
-                : `Total ${metricValues.length} • After filters ${filteredValues.length}`}
+                ? `ทั้งหมด ${metricValues.length.toLocaleString()} รายการ • หลังกรอง ${filteredValues.length.toLocaleString()} รายการ`
+                : `Total ${metricValues.length.toLocaleString()} • After filters ${filteredValues.length.toLocaleString()}`}
             </div>
 
             {filterDropReason && (
@@ -1168,7 +1168,7 @@ export default function DataEntry() {
             <CardTitle className="flex items-center gap-3 text-gray-800">
               {language === 'th' ? 'รายการข้อมูล' : 'Data Records'}
               <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 rounded-full px-3">
-                {filteredValues.length} {language === 'th' ? 'รายการ' : 'records'}
+                {filteredValues.length.toLocaleString()} {language === 'th' ? 'รายการ' : 'records'}
               </Badge>
               {selectedIds.size > 0 && (
                 <Badge className="bg-blue-100 text-blue-700 border-blue-200 rounded-full px-3">
@@ -1285,8 +1285,8 @@ export default function DataEntry() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-100 bg-gray-50/50">
               <div className="text-sm text-gray-600">
                 {language === 'th'
-                  ? `แสดง ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(safePage * PAGE_SIZE, filteredValues.length)} จาก ${filteredValues.length} รายการ`
-                  : `Showing ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(safePage * PAGE_SIZE, filteredValues.length)} of ${filteredValues.length}`}
+                  ? `แสดง ${((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}-${Math.min(safePage * PAGE_SIZE, filteredValues.length).toLocaleString()} จาก ${filteredValues.length.toLocaleString()} รายการ`
+                  : `Showing ${((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}-${Math.min(safePage * PAGE_SIZE, filteredValues.length).toLocaleString()} of ${filteredValues.length.toLocaleString()}`}
               </div>
               <div className="flex items-center gap-2">
                 <Button
