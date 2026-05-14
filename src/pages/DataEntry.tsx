@@ -764,6 +764,17 @@ export default function DataEntry() {
     return set;
   }, [periods, metricValues, periodById, periodFilterMode, recentMonths, fromYear, fromMonth]);
 
+  const activePeriods = useMemo(() => {
+    if (periodFilterMode === 'all') return null;
+    if (!allowedPeriodIds) return [];
+    return periods
+      .filter(p => allowedPeriodIds.has(p.period_id))
+      .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.month - a.month;
+      });
+  }, [periods, allowedPeriodIds, periodFilterMode]);
+
   // Filter metric values
   const filteredValues = metricValues.filter(v => {
     // Admin-configured period window (drafts always visible)
@@ -1055,6 +1066,44 @@ export default function DataEntry() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Active Periods Summary */}
+      <Card className="glass-card-solid overflow-hidden">
+        <CardHeader className="border-b border-gray-100 pb-3">
+          <CardTitle className="text-sm flex items-center gap-2 text-gray-700">
+            <Calendar className="h-4 w-4 text-emerald-600" />
+            {language === 'th' ? 'ช่วงเวลาที่แสดงผล (ตามการตั้งค่าระบบ)' : 'Active Periods (System Setting)'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap gap-2">
+            {periodFilterMode === 'all' ? (
+              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 rounded-lg px-3 py-1">
+                {language === 'th' ? 'แสดงทั้งหมด' : 'Show all periods'}
+              </Badge>
+            ) : (
+              activePeriods && activePeriods.length > 0 ? (
+                activePeriods.map(p => (
+                  <Badge key={p.period_id} variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 rounded-lg px-3 py-1">
+                    {p.month_name} {p.year}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-xs text-gray-500">
+                  {language === 'th' ? 'ไม่มีข้อมูลในช่วงเวลาที่กรอง' : 'No data in filtered period range'}
+                </span>
+              )
+            )}
+          </div>
+          {periodFilterMode !== 'all' && (
+            <p className="text-xs text-gray-500 mt-2">
+              {periodFilterMode === 'recent'
+                ? (language === 'th' ? `ย้อนหลัง ${recentMonths} เดือน จากเดือนล่าสุดในข้อมูล` : `Last ${recentMonths} months from latest data`)
+                : (language === 'th' ? `ตั้งแต่เดือน ${fromMonth} ปี ${fromYear}` : `From month ${fromMonth}, ${fromYear}`)}
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Filters Card - Glass Style */}
       <Card className="glass-card-solid overflow-hidden">
