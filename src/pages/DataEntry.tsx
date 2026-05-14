@@ -689,8 +689,40 @@ export default function DataEntry() {
     ? metrics.filter(m => m.theme_id === formTheme)
     : metrics;
 
+  // Compute "last 4 months" window based on the latest period present in data.
+  // Drafts are always shown regardless of period.
+  const periodById = useMemo(() => {
+    const map = new Map<string, ReportingPeriod>();
+    periods.forEach(p => map.set(p.period_id, p));
+    return map;
+  }, [periods]);
+
+  const recentPeriodIds = useMemo(() => {
+    if (periods.length === 0) return null as Set<string> | null;
+    // Find the latest (year, month) present in the metric values
+    let latestKey = -1;
+    metricValues.forEach(v => {
+      const p = periodById.get(v.period_id);
+      if (!p) return;
+      const key = p.year * 12 + (p.month - 1);
+      if (key > latestKey) latestKey = key;
+    });
+    if (latestKey < 0) return null;
+    const cutoff = latestKey - 3; // inclusive 4-month window
+    const set = new Set<string>();
+    periods.forEach(p => {
+      const key = p.year * 12 + (p.month - 1);
+      if (key <= latestKey && key >= cutoff) set.add(p.period_id);
+    });
+    return set;
+  }, [periods, metricValues, periodById]);
+
   // Filter metric values
   const filteredValues = metricValues.filter(v => {
+    // Last 4 months window (drafts always visible)
+    if (recentPeriodIds && v.status !== 'draft' && !recentPeriodIds.has(v.period_id)) {
+      return false;
+    }
     // Filter by company: check if site belongs to the selected company
     if (filterCompany) {
       const site = sites.find(s => s.site_id === v.site_id);
