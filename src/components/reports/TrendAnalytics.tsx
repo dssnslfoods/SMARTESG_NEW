@@ -236,7 +236,7 @@ export function TrendAnalytics({
         {/* YTD Badge */}
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10">
           <span className="text-[10px] text-muted-foreground font-medium">YTD</span>
-          <span className="text-[10px] font-semibold text-primary">{ytd.total}</span>
+          <span className="text-[10px] font-semibold text-primary">{ytd.total.toLocaleString()}</span>
         </div>
 
         {/* Trend Indicator */}

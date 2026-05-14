@@ -344,7 +344,7 @@ export default function Dashboard() {
                 <TableRow key={item.value_id}>
                   <TableCell className="font-medium">{item.metric?.metric_name || '-'}</TableCell>
                   <TableCell>{item.site?.site_name || '-'}</TableCell>
-                  <TableCell>{item.value}</TableCell>
+                  <TableCell>{typeof item.value === 'number' ? item.value.toLocaleString() : item.value}</TableCell>
                   <TableCell>
                     <Badge variant={item.status === 'approved' ? 'default' : item.status === 'submitted' ? 'secondary' : 'outline'}>
                       {item.status}
@@ -457,7 +457,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl sm:text-3xl font-bold text-foreground">{card.value}</div>
+                  <div className="text-2xl sm:text-3xl font-bold text-foreground">{typeof card.value === 'number' ? card.value.toLocaleString() : card.value}</div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </CardContent>
@@ -482,7 +482,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
               <div className="flex items-center justify-between">
-                <div className="text-2xl sm:text-3xl font-bold text-foreground">{stats.myDrafts}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-foreground">{(stats.myDrafts ?? 0).toLocaleString()}</div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </CardContent>
@@ -501,7 +501,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
               <div className="flex items-center justify-between">
-                <div className="text-2xl sm:text-3xl font-bold text-foreground">{stats.mySubmitted}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-foreground">{(stats.mySubmitted ?? 0).toLocaleString()}</div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </CardContent>

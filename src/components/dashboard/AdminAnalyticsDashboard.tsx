@@ -508,7 +508,7 @@ export default function AdminAnalyticsDashboard() {
                 <Activity className="h-4 w-4 text-blue-600" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.totalEntries}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{(analytics.totalEntries ?? 0).toLocaleString()}</div>
           </CardContent>
         </Card>
 
@@ -523,7 +523,7 @@ export default function AdminAnalyticsDashboard() {
                 <Send className="h-4 w-4 text-green-600" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.totalSubmitted}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{(analytics.totalSubmitted ?? 0).toLocaleString()}</div>
           </CardContent>
         </Card>
 
@@ -538,7 +538,7 @@ export default function AdminAnalyticsDashboard() {
                 <FileEdit className="h-4 w-4 text-amber-600" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.totalDrafted}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{(analytics.totalDrafted ?? 0).toLocaleString()}</div>
           </CardContent>
         </Card>
 
@@ -553,7 +553,7 @@ export default function AdminAnalyticsDashboard() {
                 <Users className="h-4 w-4 text-emerald-600" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.userStats.length}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{(analytics.userStats.length ?? 0).toLocaleString()}</div>
           </CardContent>
         </Card>
 
@@ -568,7 +568,7 @@ export default function AdminAnalyticsDashboard() {
                 <TrendingUp className="h-4 w-4 text-indigo-600" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{analytics.overallAvg}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{typeof analytics.overallAvg === 'number' ? analytics.overallAvg.toLocaleString(undefined, { maximumFractionDigits: 2 }) : analytics.overallAvg}</div>
           </CardContent>
         </Card>
 
