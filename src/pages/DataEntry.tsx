@@ -170,16 +170,36 @@ export default function DataEntry() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [PAGE_SIZE, setPageSize] = useState<number>(15);
 
-  // Load page size from app_setting (admin-configurable)
+  // Period filter settings (admin-configurable via System Settings)
+  const [periodFilterMode, setPeriodFilterMode] = useState<'recent' | 'from' | 'all'>('recent');
+  const [recentMonths, setRecentMonths] = useState<number>(4);
+  const [fromYear, setFromYear] = useState<number>(new Date().getFullYear());
+  const [fromMonth, setFromMonth] = useState<number>(1);
+
+  // Load app settings (page size + period filter)
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from('app_setting')
-        .select('value')
-        .eq('key', 'data_entry_page_size')
-        .maybeSingle();
-      const n = parseInt(data?.value ?? '', 10);
-      if (Number.isFinite(n) && n > 0) setPageSize(n);
+        .select('key,value')
+        .in('key', [
+          'data_entry_page_size',
+          'data_entry_filter_mode',
+          'data_entry_recent_months',
+          'data_entry_from_year',
+          'data_entry_from_month',
+        ]);
+      const map = new Map((data ?? []).map((r: any) => [r.key, r.value as string]));
+      const ps = parseInt(map.get('data_entry_page_size') ?? '', 10);
+      if (Number.isFinite(ps) && ps > 0) setPageSize(ps);
+      const mode = map.get('data_entry_filter_mode');
+      if (mode === 'recent' || mode === 'from' || mode === 'all') setPeriodFilterMode(mode);
+      const rm = parseInt(map.get('data_entry_recent_months') ?? '', 10);
+      if (Number.isFinite(rm) && rm > 0) setRecentMonths(rm);
+      const fy = parseInt(map.get('data_entry_from_year') ?? '', 10);
+      if (Number.isFinite(fy)) setFromYear(fy);
+      const fm = parseInt(map.get('data_entry_from_month') ?? '', 10);
+      if (Number.isFinite(fm) && fm >= 1 && fm <= 12) setFromMonth(fm);
     })();
   }, []);
 
@@ -703,7 +723,7 @@ export default function DataEntry() {
     ? metrics.filter(m => m.theme_id === formTheme)
     : metrics;
 
-  // Compute "last 4 months" window based on the latest period present in data.
+  // Period filter window driven by admin System Settings.
   // Drafts are always shown regardless of period.
   const periodById = useMemo(() => {
     const map = new Map<string, ReportingPeriod>();
@@ -711,30 +731,43 @@ export default function DataEntry() {
     return map;
   }, [periods]);
 
-  const recentPeriodIds = useMemo(() => {
-    if (periods.length === 0) return null as Set<string> | null;
-    // Find the latest (year, month) present in the metric values
-    let latestKey = -1;
-    metricValues.forEach(v => {
-      const p = periodById.get(v.period_id);
-      if (!p) return;
-      const key = p.year * 12 + (p.month - 1);
-      if (key > latestKey) latestKey = key;
-    });
-    if (latestKey < 0) return null;
-    const cutoff = latestKey - 3; // inclusive 4-month window
+  const allowedPeriodIds = useMemo(() => {
+    if (periodFilterMode === 'all') return null as Set<string> | null;
+    if (periods.length === 0) return null;
+
+    if (periodFilterMode === 'recent') {
+      // Latest (year, month) actually present in metric values
+      let latestKey = -1;
+      metricValues.forEach(v => {
+        const p = periodById.get(v.period_id);
+        if (!p) return;
+        const key = p.year * 12 + (p.month - 1);
+        if (key > latestKey) latestKey = key;
+      });
+      if (latestKey < 0) return null;
+      const cutoff = latestKey - (Math.max(1, recentMonths) - 1);
+      const set = new Set<string>();
+      periods.forEach(p => {
+        const key = p.year * 12 + (p.month - 1);
+        if (key <= latestKey && key >= cutoff) set.add(p.period_id);
+      });
+      return set;
+    }
+
+    // 'from' mode — show everything from (fromYear, fromMonth) onwards
+    const fromKey = fromYear * 12 + (fromMonth - 1);
     const set = new Set<string>();
     periods.forEach(p => {
       const key = p.year * 12 + (p.month - 1);
-      if (key <= latestKey && key >= cutoff) set.add(p.period_id);
+      if (key >= fromKey) set.add(p.period_id);
     });
     return set;
-  }, [periods, metricValues, periodById]);
+  }, [periods, metricValues, periodById, periodFilterMode, recentMonths, fromYear, fromMonth]);
 
   // Filter metric values
   const filteredValues = metricValues.filter(v => {
-    // Last 4 months window (drafts always visible)
-    if (recentPeriodIds && v.status !== 'draft' && !recentPeriodIds.has(v.period_id)) {
+    // Admin-configured period window (drafts always visible)
+    if (allowedPeriodIds && v.status !== 'draft' && !allowedPeriodIds.has(v.period_id)) {
       return false;
     }
     // Filter by company: check if site belongs to the selected company
