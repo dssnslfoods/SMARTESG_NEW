@@ -168,7 +168,21 @@ export default function DataEntry() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const PAGE_SIZE = 15;
+  const [PAGE_SIZE, setPageSize] = useState<number>(15);
+
+  // Load page size from app_setting (admin-configurable)
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('app_setting')
+        .select('value')
+        .eq('key', 'data_entry_page_size')
+        .maybeSingle();
+      const n = parseInt(data?.value ?? '', 10);
+      if (Number.isFinite(n) && n > 0) setPageSize(n);
+    })();
+  }, []);
+
 
   // Form filter states
   const [formCompany, setFormCompany] = useState<string>("");
