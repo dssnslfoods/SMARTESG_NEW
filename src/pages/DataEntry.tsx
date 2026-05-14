@@ -723,7 +723,7 @@ export default function DataEntry() {
     ? metrics.filter(m => m.theme_id === formTheme)
     : metrics;
 
-  // Compute "last 4 months" window based on the latest period present in data.
+  // Period filter window driven by admin System Settings.
   // Drafts are always shown regardless of period.
   const periodById = useMemo(() => {
     const map = new Map<string, ReportingPeriod>();
@@ -731,25 +731,38 @@ export default function DataEntry() {
     return map;
   }, [periods]);
 
-  const recentPeriodIds = useMemo(() => {
-    if (periods.length === 0) return null as Set<string> | null;
-    // Find the latest (year, month) present in the metric values
-    let latestKey = -1;
-    metricValues.forEach(v => {
-      const p = periodById.get(v.period_id);
-      if (!p) return;
-      const key = p.year * 12 + (p.month - 1);
-      if (key > latestKey) latestKey = key;
-    });
-    if (latestKey < 0) return null;
-    const cutoff = latestKey - 3; // inclusive 4-month window
+  const allowedPeriodIds = useMemo(() => {
+    if (periodFilterMode === 'all') return null as Set<string> | null;
+    if (periods.length === 0) return null;
+
+    if (periodFilterMode === 'recent') {
+      // Latest (year, month) actually present in metric values
+      let latestKey = -1;
+      metricValues.forEach(v => {
+        const p = periodById.get(v.period_id);
+        if (!p) return;
+        const key = p.year * 12 + (p.month - 1);
+        if (key > latestKey) latestKey = key;
+      });
+      if (latestKey < 0) return null;
+      const cutoff = latestKey - (Math.max(1, recentMonths) - 1);
+      const set = new Set<string>();
+      periods.forEach(p => {
+        const key = p.year * 12 + (p.month - 1);
+        if (key <= latestKey && key >= cutoff) set.add(p.period_id);
+      });
+      return set;
+    }
+
+    // 'from' mode — show everything from (fromYear, fromMonth) onwards
+    const fromKey = fromYear * 12 + (fromMonth - 1);
     const set = new Set<string>();
     periods.forEach(p => {
       const key = p.year * 12 + (p.month - 1);
-      if (key <= latestKey && key >= cutoff) set.add(p.period_id);
+      if (key >= fromKey) set.add(p.period_id);
     });
     return set;
-  }, [periods, metricValues, periodById]);
+  }, [periods, metricValues, periodById, periodFilterMode, recentMonths, fromYear, fromMonth]);
 
   // Filter metric values
   const filteredValues = metricValues.filter(v => {
