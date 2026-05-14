@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_setting: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       app_user_profile: {
         Row: {
           company_id: string | null

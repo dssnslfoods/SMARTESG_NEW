@@ -25,6 +25,7 @@ import PeriodManagement from "./pages/master/PeriodManagement";
 import DimensionManagement from "./pages/master/DimensionManagement";
 import ThemeManagement from "./pages/master/ThemeManagement";
 import MetricManagement from "./pages/master/MetricManagement";
+import SystemSettings from "./pages/master/SystemSettings";
 import DataEntry from "./pages/DataEntry";
 import BackupData from "./pages/BackupData";
 import HelpCenter from "./pages/HelpCenter";
@@ -115,6 +116,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
                     <MetricManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/master/settings"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <SystemSettings />
                   </ProtectedRoute>
                 }
               />
