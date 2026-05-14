@@ -170,16 +170,36 @@ export default function DataEntry() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [PAGE_SIZE, setPageSize] = useState<number>(15);
 
-  // Load page size from app_setting (admin-configurable)
+  // Period filter settings (admin-configurable via System Settings)
+  const [periodFilterMode, setPeriodFilterMode] = useState<'recent' | 'from' | 'all'>('recent');
+  const [recentMonths, setRecentMonths] = useState<number>(4);
+  const [fromYear, setFromYear] = useState<number>(new Date().getFullYear());
+  const [fromMonth, setFromMonth] = useState<number>(1);
+
+  // Load app settings (page size + period filter)
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from('app_setting')
-        .select('value')
-        .eq('key', 'data_entry_page_size')
-        .maybeSingle();
-      const n = parseInt(data?.value ?? '', 10);
-      if (Number.isFinite(n) && n > 0) setPageSize(n);
+        .select('key,value')
+        .in('key', [
+          'data_entry_page_size',
+          'data_entry_filter_mode',
+          'data_entry_recent_months',
+          'data_entry_from_year',
+          'data_entry_from_month',
+        ]);
+      const map = new Map((data ?? []).map((r: any) => [r.key, r.value as string]));
+      const ps = parseInt(map.get('data_entry_page_size') ?? '', 10);
+      if (Number.isFinite(ps) && ps > 0) setPageSize(ps);
+      const mode = map.get('data_entry_filter_mode');
+      if (mode === 'recent' || mode === 'from' || mode === 'all') setPeriodFilterMode(mode);
+      const rm = parseInt(map.get('data_entry_recent_months') ?? '', 10);
+      if (Number.isFinite(rm) && rm > 0) setRecentMonths(rm);
+      const fy = parseInt(map.get('data_entry_from_year') ?? '', 10);
+      if (Number.isFinite(fy)) setFromYear(fy);
+      const fm = parseInt(map.get('data_entry_from_month') ?? '', 10);
+      if (Number.isFinite(fm) && fm >= 1 && fm <= 12) setFromMonth(fm);
     })();
   }, []);
 
