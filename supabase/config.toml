@@ -1,4 +1,4 @@
-project_id = "zeafrtcerafgyisnaizw"
+project_id = "zwzdhbttmtbkjyegsmzz"
 
 [functions.create-user]
 verify_jwt = false
@@ -14,3 +14,33 @@ verify_jwt = false
 
 [functions.delete-user]
 verify_jwt = false
+
+# ============================================================
+# Auth — Site URL + Redirect allow list
+# ============================================================
+[auth]
+site_url = "https://smartesg-af75b.web.app/reset-password"
+additional_redirect_urls = [
+  "https://smartesg-af75b.web.app/reset-password",
+  "https://smartesg-af75b.web.app/auth",
+  "https://smartesg-af75b.web.app/**",
+]
+
+# ============================================================
+# Auth — Custom SMTP via Resend
+# ============================================================
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(SMTP_PASS)"
+admin_email = "no-reply@def2design.com"
+sender_name = "ESG Smart Performance"
+
+# ============================================================
+# Email templates
+# ============================================================
+[auth.email.template.recovery]
+subject = "รีเซ็ตรหัสผ่าน — ESG Smart Performance"
+content_path = "./supabase/templates/recovery.html"

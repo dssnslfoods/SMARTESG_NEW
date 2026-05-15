@@ -641,12 +641,30 @@ export default function DataEntry() {
 
     let error;
     if (editingValue) {
+      // If user changed site/period/metric to a combo that already exists in another row,
+      // PostgREST PATCH would violate the unique constraint. Detect & handle gracefully.
+      const conflict =
+        existingRecord &&
+        existingRecord.value_id !== editingValue.value_id;
+
+      if (conflict) {
+        toast({
+          title: language === 'th' ? 'ข้อมูลซ้ำ' : 'Duplicate record',
+          description:
+            language === 'th'
+              ? 'มีข้อมูลของ Metric / Site / Period นี้อยู่แล้วในแถวอื่น กรุณาแก้ไขแถวนั้นแทน หรือเลือก Metric/Site/Period ใหม่'
+              : 'A record with this Metric/Site/Period combination already exists in another row. Please edit that row instead, or choose a different Metric/Site/Period.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const { error: updateError } = await supabase
         .from('metric_value')
         .update(dataToSave)
         .eq('value_id', editingValue.value_id);
       error = updateError;
-      
+
       if (!updateError) {
         await logActivity({
           action: 'UPDATE',
@@ -662,7 +680,7 @@ export default function DataEntry() {
       const { data: upsertedData, error: upsertError } = await supabase
         .from('metric_value')
         .upsert(dataToSave, { 
-          onConflict: 'metric_id,site_id,period_id',
+          onConflict: 'site_id,period_id,metric_id',
           ignoreDuplicates: false 
         })
         .select()
@@ -1521,8 +1539,9 @@ export default function DataEntry() {
                       setFormCompany(v);
                       setFormData({ ...formData, site_id: '' });
                     }}
+                    disabled={!!editingValue}
                   >
-                    <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                    <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-60">
                       <SelectValue placeholder={language === 'th' ? 'เลือกบริษัท' : 'Select company'} />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
@@ -1539,7 +1558,7 @@ export default function DataEntry() {
                   <Select
                     value={formData.site_id}
                     onValueChange={(v) => setFormData({ ...formData, site_id: v })}
-                    disabled={!formCompany}
+                    disabled={!formCompany || !!editingValue}
                   >
                     <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-50">
                       <SelectValue placeholder={language === 'th' ? 'เลือกสถานที่' : 'Select site'} />
@@ -1568,8 +1587,9 @@ export default function DataEntry() {
                       setFormData(prev => ({ ...prev, period_id: matched?.period_id || '' }));
                     }
                   }}
+                  disabled={!!editingValue}
                 >
-                  <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                  <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-60">
                     <SelectValue placeholder={language === 'th' ? 'เลือกเดือน' : 'Select month'} />
                   </SelectTrigger>
                   <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
@@ -1594,8 +1614,9 @@ export default function DataEntry() {
                       setFormData(prev => ({ ...prev, period_id: matched?.period_id || '' }));
                     }
                   }}
+                  disabled={!!editingValue}
                 >
-                  <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                  <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-60">
                     <SelectValue placeholder={language === 'th' ? 'เลือกปี' : 'Select year'} />
                   </SelectTrigger>
                   <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
@@ -1617,8 +1638,9 @@ export default function DataEntry() {
                 <Select
                   value={formDimension}
                   onValueChange={(v) => { setFormDimension(v); setFormTheme(''); setFormData({ ...formData, metric_id: '' }); }}
+                  disabled={!!editingValue}
                 >
-                  <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                  <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-60">
                     <SelectValue placeholder={language === 'th' ? 'เลือกมิติ' : 'Select dimension'} />
                   </SelectTrigger>
                   <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
@@ -1637,7 +1659,7 @@ export default function DataEntry() {
               <Select
                 value={formTheme}
                 onValueChange={(v) => { setFormTheme(v); setFormData({ ...formData, metric_id: '' }); }}
-                disabled={!formDimension}
+                disabled={!formDimension || !!editingValue}
               >
                 <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-50">
                   <SelectValue placeholder={language === 'th' ? 'เลือกหัวข้อ' : 'Select theme'} />
@@ -1657,7 +1679,7 @@ export default function DataEntry() {
               <Select
                 value={formData.metric_id}
                 onValueChange={(v) => setFormData({ ...formData, metric_id: v })}
-                disabled={!formTheme}
+                disabled={!formTheme || !!editingValue}
               >
                 <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-50">
                   <SelectValue placeholder={language === 'th' ? 'เลือกตัวชี้วัด' : 'Select metric'} />
@@ -1682,6 +1704,21 @@ export default function DataEntry() {
                     {language === 'th'
                       ? 'ระบบดึงค่าที่บันทึกไว้แล้วมาแสดงในฟอร์ม (กดบันทึกเพื่ออัปเดต)'
                       : 'Loaded saved values into the form (Save to update).'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {editingValue && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="bg-amber-100 text-amber-800 border-amber-200 rounded-full">
+                    {language === 'th' ? 'โหมดแก้ไข' : 'Edit mode'}
+                  </Badge>
+                  <span className="text-sm text-amber-800">
+                    {language === 'th'
+                      ? 'แก้ไขได้เฉพาะค่า / สถานะ / แหล่งข้อมูล / หมายเหตุ — ถ้าต้องการเปลี่ยน Metric/Site/Period ให้ลบแถวนี้แล้วเพิ่มใหม่'
+                      : 'Only value/status/data source/remark can be changed. To change Metric/Site/Period, delete this row and create a new one.'}
                   </span>
                 </div>
               </div>

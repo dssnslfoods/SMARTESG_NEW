@@ -12,6 +12,18 @@ dist
 dist-ssr
 *.local
 
+# Env files
+.env
+.env.*
+!.env.example
+
+# Local secrets / one-off scripts
+scripts/
+
+# Firebase / Supabase CLI caches
+.firebase/
+supabase/.temp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

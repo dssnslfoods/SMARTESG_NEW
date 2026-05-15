@@ -16,9 +16,11 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  Zap,
-  Shield,
-  TrendingUp,
+  Thermometer,
+  TreePine,
+  Wind,
+  Sparkles,
+  Earth,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,7 +29,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CheckCircle2, KeyRound } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+
+const emailSchema = z.string().email();
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -57,6 +71,47 @@ export default function Auth() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+
+  // Forgot password dialog state
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError("");
+
+    const parsed = emailSchema.safeParse(forgotEmail.trim());
+    if (!parsed.success) {
+      setForgotError(language === "th" ? "กรุณากรอกอีเมลให้ถูกต้อง" : "Please enter a valid email");
+      return;
+    }
+
+    setForgotLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setForgotLoading(false);
+
+    if (error) {
+      setForgotError(
+        language === "th"
+          ? `ส่งอีเมลไม่สำเร็จ: ${error.message}`
+          : `Failed to send email: ${error.message}`,
+      );
+      return;
+    }
+    setForgotSent(true);
+  };
+
+  const openForgotDialog = () => {
+    setForgotEmail(loginForm.email || "");
+    setForgotSent(false);
+    setForgotError("");
+    setForgotOpen(true);
+  };
   const [signupForm, setSignupForm] = useState({
     email: "",
     password: "",
@@ -70,7 +125,7 @@ export default function Auth() {
       <div
         className="flex h-screen items-center justify-center"
         style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1509391366360-2e959784a276?w=1920&q=80')`,
+          backgroundImage: `url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -154,9 +209,9 @@ export default function Auth() {
   };
 
   const stats = [
-    { icon: Zap, value: "99.9%", label: language === "th" ? "Uptime" : "Uptime" },
-    { icon: Shield, value: "ISO", label: language === "th" ? "มาตรฐาน" : "Certified" },
-    { icon: TrendingUp, value: "ESG", label: language === "th" ? "รายงาน" : "Reports" },
+    { icon: Thermometer, value: "1.5°C", label: language === "th" ? "เป้าหมาย" : "Target" },
+    { icon: TreePine, value: "Net 0", label: language === "th" ? "คาร์บอน" : "Carbon" },
+    { icon: Wind, value: "ESG", label: language === "th" ? "ความยั่งยืน" : "Sustain." },
   ];
 
   return (
@@ -165,33 +220,48 @@ export default function Auth() {
       <div
         className="absolute inset-0"
         style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1509391366360-2e959784a276?w=1920&q=80')`,
+          backgroundImage: `url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       />
-      {/* Multi-layer glass tint */}
-      <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-emerald-950/50 to-black/60" />
-      <div className="absolute inset-0 backdrop-blur-[2px]" />
+      {/* Multi-layer glass tint — Earth from space / Global Warming theme */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950/80 via-emerald-950/60 to-blue-950/70" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-amber-900/10 to-transparent" />
+      <div className="absolute inset-0 backdrop-blur-[3px]" />
 
-      {/* ===== FLOATING ORB DECORATIONS ===== */}
+      {/* ===== FLOATING ORB DECORATIONS (warming + cooling) ===== */}
       <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-emerald-500/20 blur-3xl animate-pulse" style={{ animationDuration: "4s" }} />
-      <div className="absolute -bottom-32 -right-32 w-80 h-80 rounded-full bg-teal-400/15 blur-3xl animate-pulse" style={{ animationDuration: "6s" }} />
-      <div className="absolute top-1/2 left-1/4 w-48 h-48 rounded-full bg-emerald-300/10 blur-2xl animate-pulse" style={{ animationDuration: "5s" }} />
+      <div className="absolute -bottom-32 -right-32 w-80 h-80 rounded-full bg-sky-400/15 blur-3xl animate-pulse" style={{ animationDuration: "6s" }} />
+      <div className="absolute top-1/2 left-1/4 w-48 h-48 rounded-full bg-amber-400/10 blur-2xl animate-pulse" style={{ animationDuration: "5s" }} />
+      <div className="absolute top-1/3 right-1/4 w-64 h-64 rounded-full bg-teal-300/10 blur-3xl animate-pulse" style={{ animationDuration: "7s" }} />
 
       {/* ===== TOP BAR ===== */}
       <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-4 sm:px-8 sm:py-6">
         {/* Logo */}
         <div className="flex items-center gap-3 gl-fade-in">
           <div
-            className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl border border-white/25 shadow-lg"
+            className="relative flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl border border-white/25 shadow-lg"
             style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(20px)" }}
           >
-            <Leaf className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-300" />
+            <Earth className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-300" />
+            {/* Pulsing dot indicating "new" */}
+            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500 border border-white/40" />
+            </span>
           </div>
           <div className="hidden sm:block">
-            <p className="text-sm font-bold text-white leading-none">ESG Smart Performance</p>
-            <p className="text-xs text-white/50 mt-0.5">v2.5 — Sustainability Platform</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-white leading-none">ESG Smart Performance</p>
+              <span
+                className="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded-md border border-amber-300/40 text-amber-200"
+                style={{ background: "linear-gradient(135deg, rgba(245,158,11,0.25), rgba(251,191,36,0.15))" }}
+              >
+                NEW HOST
+              </span>
+            </div>
+            <p className="text-xs text-white/50 mt-0.5">v2.6 — Climate Action Platform</p>
           </div>
         </div>
 
@@ -227,15 +297,32 @@ export default function Auth() {
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-24 sm:py-28">
 
         {/* Brand heading — desktop only */}
-        <div className="hidden lg:block text-center mb-10 gl-fade-in" style={{ animationDelay: "0.1s" }}>
+        <div className="hidden lg:block text-center mb-8 gl-fade-in" style={{ animationDelay: "0.1s" }}>
+          <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full border border-amber-300/30 bg-amber-500/10 backdrop-blur-md">
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+            <span className="text-xs font-semibold text-amber-200 tracking-wider">
+              {language === "th" ? "ระบบย้ายมาที่ Host ใหม่แล้ว" : "Migrated to New Host"}
+            </span>
+          </div>
           <h1 className="text-5xl xl:text-6xl font-black tracking-tight text-white leading-none">
-            {language === "th" ? "ขับเคลื่อนสู่" : "Drive Towards"}
+            {language === "th" ? "ร่วมต่อสู้" : "Combat"}
           </h1>
-          <h1 className="text-5xl xl:text-6xl font-black tracking-tight leading-none mt-1"
-            style={{ background: "linear-gradient(135deg, #6ee7b7, #14b8a6, #34d399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-            {language === "th" ? "ความยั่งยืน" : "Sustainability"}
+          <h1
+            className="text-5xl xl:text-6xl font-black tracking-tight leading-none mt-1"
+            style={{
+              background: "linear-gradient(135deg, #fbbf24, #f59e0b, #6ee7b7, #14b8a6)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundSize: "200% 200%",
+              animation: "shimmer 6s ease-in-out infinite",
+            }}
+          >
+            {language === "th" ? "ภาวะโลกร้อน" : "Global Warming"}
           </h1>
-          <p className="text-white/50 mt-4 text-base">{language === "th" ? "บริษัท เอ็นเอสแอล ฟู้ดส์ จำกัด (มหาชน)" : "NSL FOODS Public Company Limited"}</p>
+          <p className="text-white/60 mt-4 text-base">{language === "th" ? "บริษัท เอ็นเอสแอล ฟู้ดส์ จำกัด (มหาชน)" : "NSL FOODS Public Company Limited"}</p>
+          <p className="text-white/40 mt-1 text-xs tracking-widest uppercase">
+            {language === "th" ? "ขับเคลื่อนความยั่งยืนเพื่ออนาคต" : "Sustainability for the Future"}
+          </p>
         </div>
 
         {/* ===== GLASS CARD ===== */}
@@ -256,17 +343,32 @@ export default function Auth() {
             <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 
             <div className="p-6 sm:p-8">
+              {/* ===== Mobile: Migration banner inside card ===== */}
+              <div className="lg:hidden mb-5 rounded-2xl border border-amber-300/30 bg-amber-500/10 backdrop-blur-md px-3 py-2 gl-fade-in" style={{ animationDelay: "0.25s" }}>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-300 shrink-0" />
+                  <span className="text-xs font-semibold text-amber-100">
+                    {language === "th" ? "ระบบย้ายมา Host ใหม่แล้ว — v2.6" : "New Host — v2.6"}
+                  </span>
+                </div>
+              </div>
+
               {/* Icon + Title */}
               <div className="flex flex-col items-center mb-7 gl-fade-in" style={{ animationDelay: "0.3s" }}>
                 <div
-                  className="h-16 w-16 flex items-center justify-center rounded-3xl mb-4 border border-white/20"
+                  className="relative h-16 w-16 flex items-center justify-center rounded-3xl mb-4 border border-white/20"
                   style={{
                     background: "linear-gradient(135deg, rgba(52,211,153,0.4), rgba(20,184,166,0.3))",
                     backdropFilter: "blur(20px)",
                     boxShadow: "0 8px 32px rgba(52,211,153,0.3), inset 0 1px 0 rgba(255,255,255,0.2)",
                   }}
                 >
-                  <Leaf className="h-8 w-8 text-emerald-300" />
+                  <Earth className="h-8 w-8 text-emerald-300" />
+                  {/* Orbit ring */}
+                  <span
+                    className="pointer-events-none absolute inset-0 rounded-3xl border border-emerald-300/30"
+                    style={{ animation: "spin 12s linear infinite" }}
+                  />
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
                   {activeTab === "login"
@@ -364,7 +466,7 @@ export default function Auth() {
                     <button
                       type="button"
                       className="text-xs text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
-                      onClick={() => toast({ title: language === "th" ? "ลืมรหัสผ่าน" : "Forgot Password", description: language === "th" ? "กรุณาติดต่อผู้ดูแลระบบ" : "Please contact your administrator" })}
+                      onClick={openForgotDialog}
                     >
                       {language === "th" ? "ลืมรหัสผ่าน?" : "Forgot password?"}
                     </button>
@@ -518,6 +620,97 @@ export default function Auth() {
         </p>
       </div>
 
+      {/* ===== FORGOT PASSWORD DIALOG ===== */}
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="sm:max-w-[440px] rounded-2xl border-slate-200">
+          <DialogHeader>
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-100">
+              {forgotSent ? (
+                <CheckCircle2 className="h-7 w-7 text-emerald-600" />
+              ) : (
+                <KeyRound className="h-7 w-7 text-emerald-600" />
+              )}
+            </div>
+            <DialogTitle className="text-center text-xl">
+              {forgotSent
+                ? (language === "th" ? "ส่งลิงก์รีเซ็ตแล้ว" : "Reset link sent")
+                : (language === "th" ? "ลืมรหัสผ่าน?" : "Forgot password?")}
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {forgotSent
+                ? (language === "th"
+                    ? "กรุณาตรวจสอบอีเมลของคุณ (รวมถึงโฟลเดอร์ Spam) แล้วกดลิงก์เพื่อตั้งรหัสผ่านใหม่"
+                    : "Please check your email (including Spam folder) and click the link to set a new password.")
+                : (language === "th"
+                    ? "กรอกอีเมลที่ใช้สมัคร ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านไปให้"
+                    : "Enter your registered email and we'll send you a reset link.")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {!forgotSent ? (
+            <form onSubmit={handleForgotPassword} className="space-y-4 mt-2" noValidate>
+              <div className="space-y-1.5">
+                <Label htmlFor="forgot-email" className="text-sm font-medium text-slate-700">
+                  {language === "th" ? "อีเมล" : "Email"}
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    disabled={forgotLoading}
+                    autoComplete="email"
+                    autoFocus
+                    className="pl-10 h-11"
+                  />
+                </div>
+                {forgotError && (
+                  <p className="text-xs text-red-600 mt-1">{forgotError}</p>
+                )}
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setForgotOpen(false)}
+                  disabled={forgotLoading}
+                >
+                  {language === "th" ? "ยกเลิก" : "Cancel"}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {forgotLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      {language === "th" ? "กำลังส่ง..." : "Sending..."}
+                    </>
+                  ) : (
+                    <>{language === "th" ? "ส่งลิงก์รีเซ็ต" : "Send reset link"}</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <DialogFooter className="mt-2">
+              <Button
+                type="button"
+                onClick={() => setForgotOpen(false)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {language === "th" ? "เข้าใจแล้ว" : "Got it"}
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* ===== KEYFRAME ANIMATIONS ===== */}
       <style>{`
         @keyframes glFadeIn {
@@ -527,6 +720,10 @@ export default function Auth() {
         @keyframes glSlideUp {
           from { opacity: 0; transform: translateY(32px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0)  scale(1); }
+        }
+        @keyframes shimmer {
+          0%, 100% { background-position: 0% 50%; }
+          50%      { background-position: 100% 50%; }
         }
         .gl-fade-in  { animation: glFadeIn  0.7s cubic-bezier(0.16,1,0.3,1) both; }
         .gl-slide-up { animation: glSlideUp 0.8s cubic-bezier(0.16,1,0.3,1) both; }
