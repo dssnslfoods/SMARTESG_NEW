@@ -962,30 +962,33 @@ export default function UserManagement() {
                               <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           )}
-                          {/* Password change button */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 sm:h-9 sm:w-9 p-0"
-                            onClick={async () => {
-                              setLoadingEmail(true);
-                              try {
-                                const { data, error } = await supabase.functions.invoke('get-user-email', {
-                                  body: { userId: user.user_id },
-                                });
-                                if (!error && data?.email) {
-                                  setPasswordUser({ ...user, email: data.email });
-                                  setIsPasswordDialogOpen(true);
+                          {/* Password change button — admin/supervisor can reset others (not admin row); anyone can reset their own */}
+                          {((isManager && user.role !== 'admin') || user.user_id === currentUser?.id) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 sm:h-9 sm:w-9 p-0"
+                              title={language === 'th' ? 'รีเซ็ตรหัสผ่าน' : 'Reset password'}
+                              onClick={async () => {
+                                setLoadingEmail(true);
+                                try {
+                                  const { data, error } = await supabase.functions.invoke('get-user-email', {
+                                    body: { userId: user.user_id },
+                                  });
+                                  if (!error && data?.email) {
+                                    setPasswordUser({ ...user, email: data.email });
+                                    setIsPasswordDialogOpen(true);
+                                  }
+                                } catch (err) {
+                                  console.error('Error fetching email:', err);
+                                } finally {
+                                  setLoadingEmail(false);
                                 }
-                              } catch (err) {
-                                console.error('Error fetching email:', err);
-                              } finally {
-                                setLoadingEmail(false);
-                              }
-                            }}
-                          >
-                            <KeyRound className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                          </Button>
+                              }}
+                            >
+                              <KeyRound className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            </Button>
+                          )}
                           {/* Delete button - only for managers, not for admins */}
                           {isManager && user.role !== 'admin' && (
                             <Button
