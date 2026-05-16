@@ -42,8 +42,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Pencil, Search, UserPlus, Trash2, KeyRound } from 'lucide-react';
+import { Loader2, Pencil, Search, UserPlus, Trash2, KeyRound, ShieldCheck, X as XIcon } from 'lucide-react';
 import { UserManagementLoadingSkeleton } from '@/components/ui/loading-skeleton';
 
 type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest';
@@ -116,6 +117,17 @@ export default function UserManagement() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+
+  // Multi-select + bulk reset password
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [isBulkPasswordOpen, setIsBulkPasswordOpen] = useState(false);
+  const [bulkPasswordMode, setBulkPasswordMode] = useState<'shared' | 'random'>('shared');
+  const [bulkPassword, setBulkPassword] = useState('');
+  const [bulkConfirm, setBulkConfirm] = useState('');
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkResults, setBulkResults] = useState<
+    { email: string; full_name: string; password: string; ok: boolean; error?: string }[]
+  >([]);
 
   // Check if current user is admin or supervisor (can manage others)
   const isManager = currentUserRole === 'admin' || currentUserRole === 'supervisor';
@@ -478,6 +490,134 @@ export default function UserManagement() {
     }
   };
 
+  // ---- Multi-select helpers ----
+  const toggleSelectOne = (id: string) => {
+    setSelectedUserIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (ids: string[], checked: boolean) => {
+    setSelectedUserIds(prev => {
+      const next = new Set(prev);
+      if (checked) ids.forEach(id => next.add(id));
+      else ids.forEach(id => next.delete(id));
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedUserIds(new Set());
+
+  const generateTempPassword = (length = 12) => {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnpqrstuvwxyz';
+    const nums = '23456789';
+    const all = upper + lower + nums;
+    // Guarantee at least 1 of each class
+    const pick = (src: string) => src[Math.floor(Math.random() * src.length)];
+    let pwd = pick(upper) + pick(lower) + pick(nums);
+    for (let i = pwd.length; i < length; i++) pwd += pick(all);
+    // Shuffle
+    return pwd.split('').sort(() => Math.random() - 0.5).join('');
+  };
+
+  const openBulkPasswordDialog = () => {
+    setBulkPasswordMode('shared');
+    setBulkPassword('');
+    setBulkConfirm('');
+    setBulkResults([]);
+    setIsBulkPasswordOpen(true);
+  };
+
+  const handleBulkResetPassword = async () => {
+    const targets = users.filter(u => selectedUserIds.has(u.user_id));
+    if (targets.length === 0) return;
+
+    if (bulkPasswordMode === 'shared') {
+      if (!bulkPassword || bulkPassword.length < 6) {
+        toast({
+          variant: 'destructive',
+          title: t('error'),
+          description: language === 'th' ? 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' : 'Password must be at least 6 characters',
+        });
+        return;
+      }
+      if (bulkPassword !== bulkConfirm) {
+        toast({
+          variant: 'destructive',
+          title: t('error'),
+          description: language === 'th' ? 'รหัสผ่านไม่ตรงกัน' : 'Passwords do not match',
+        });
+        return;
+      }
+    }
+
+    setBulkProcessing(true);
+    const results: typeof bulkResults = [];
+
+    for (const u of targets) {
+      const pwd = bulkPasswordMode === 'shared' ? bulkPassword : generateTempPassword();
+      try {
+        const { data, error } = await supabase.functions.invoke('update-password', {
+          body: { email: u.email, newPassword: pwd },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        results.push({ email: u.email || '', full_name: u.full_name || '', password: pwd, ok: true });
+      } catch (err: any) {
+        results.push({
+          email: u.email || '',
+          full_name: u.full_name || '',
+          password: pwd,
+          ok: false,
+          error: err?.message || 'unknown',
+        });
+      }
+    }
+
+    setBulkResults(results);
+    setBulkProcessing(false);
+
+    const okCount = results.filter(r => r.ok).length;
+    toast({
+      title: t('success'),
+      description: language === 'th'
+        ? `รีเซ็ตรหัสผ่านสำเร็จ ${okCount}/${targets.length} คน`
+        : `Password reset done ${okCount}/${targets.length} users`,
+    });
+  };
+
+  const copyResultsToClipboard = async () => {
+    const lines = bulkResults.map(r =>
+      `${r.full_name}\t${r.email}\t${r.password}\t${r.ok ? 'OK' : 'FAIL: ' + (r.error ?? '')}`,
+    );
+    const header = ['Full Name', 'Email', 'Temp Password', 'Status'].join('\t');
+    await navigator.clipboard.writeText([header, ...lines].join('\n'));
+    toast({
+      title: t('success'),
+      description: language === 'th' ? 'คัดลอกไปยังคลิปบอร์ดแล้ว' : 'Copied to clipboard',
+    });
+  };
+
+  const downloadResultsCsv = () => {
+    const escape = (s: string) => `"${(s ?? '').replace(/"/g, '""')}"`;
+    const header = ['Full Name', 'Email', 'Temp Password', 'Status'].map(escape).join(',');
+    const rows = bulkResults.map(r =>
+      [r.full_name, r.email, r.password, r.ok ? 'OK' : `FAIL: ${r.error ?? ''}`].map(escape).join(','),
+    );
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `password_reset_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Filter users based on role
   // Admin sees all, supervisor sees non-admin, executive/staff see only self
   const visibleUsers = isSelfOnly
@@ -642,12 +782,63 @@ export default function UserManagement() {
               />
             </div>
           </div>
+
+          {/* Bulk action bar — visible when user(s) selected */}
+          {isManager && selectedUserIds.size > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2">
+              <Badge variant="secondary" className="bg-emerald-600 text-white hover:bg-emerald-700">
+                {language === 'th'
+                  ? `เลือก ${selectedUserIds.size} คน`
+                  : `${selectedUserIds.size} selected`}
+              </Badge>
+              <span className="text-xs text-emerald-900/70 hidden sm:inline">
+                {language === 'th' ? '— เลือกการดำเนินการ:' : '— Choose action:'}
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={clearSelection}
+                  className="gap-1 border-emerald-200"
+                >
+                  <XIcon className="h-3.5 w-3.5" />
+                  {language === 'th' ? 'ยกเลิก' : 'Clear'}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={openBulkPasswordDialog}
+                  className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {language === 'th' ? 'รีเซ็ตรหัสผ่าน' : 'Reset Password'}
+                </Button>
+              </div>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="px-3 sm:px-6">
           <div className="overflow-x-auto -mx-3 sm:mx-0">
             <Table>
               <TableHeader>
                 <TableRow>
+                  {isManager && (() => {
+                    const selectableIds = filteredUsers
+                      .filter(u => u.role !== 'admin' && u.email)
+                      .map(u => u.user_id);
+                    const allSelected =
+                      selectableIds.length > 0 && selectableIds.every(id => selectedUserIds.has(id));
+                    const someSelected =
+                      selectableIds.some(id => selectedUserIds.has(id)) && !allSelected;
+                    return (
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                          onCheckedChange={(c) => toggleSelectAll(selectableIds, !!c)}
+                          aria-label={language === 'th' ? 'เลือกทั้งหมด' : 'Select all'}
+                        />
+                      </TableHead>
+                    );
+                  })()}
                   <TableHead className="text-xs sm:text-sm">{t('fullName')}</TableHead>
                   <TableHead className="text-xs sm:text-sm">{language === 'th' ? 'บทบาท' : 'Role'}</TableHead>
                   <TableHead className="hidden md:table-cell text-xs sm:text-sm">{t('company')}</TableHead>
@@ -659,13 +850,29 @@ export default function UserManagement() {
               <TableBody>
                 {filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground text-sm">
+                    <TableCell colSpan={isManager ? 7 : 6} className="text-center text-muted-foreground text-sm">
                       {t('noData')}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredUsers.map((user) => (
-                    <TableRow key={user.user_id}>
+                    <TableRow
+                      key={user.user_id}
+                      className={selectedUserIds.has(user.user_id) ? 'bg-emerald-50/60' : ''}
+                    >
+                      {isManager && (
+                        <TableCell className="w-10 py-2 sm:py-4">
+                          {user.role === 'admin' || !user.email ? (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          ) : (
+                            <Checkbox
+                              checked={selectedUserIds.has(user.user_id)}
+                              onCheckedChange={() => toggleSelectOne(user.user_id)}
+                              aria-label={`Select ${user.full_name}`}
+                            />
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="font-medium text-xs sm:text-sm py-2 sm:py-4">
                         <div className="flex flex-col gap-0.5">
                           <span>{user.full_name || '-'}</span>
@@ -1008,6 +1215,214 @@ export default function UserManagement() {
                 {changingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {language === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change Password'}
               </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== BULK RESET PASSWORD DIALOG ===== */}
+      <Dialog
+        open={isBulkPasswordOpen}
+        onOpenChange={(open) => {
+          if (!open && !bulkProcessing) {
+            setIsBulkPasswordOpen(false);
+            // Clear results after closing so next open starts fresh
+            setTimeout(() => setBulkResults([]), 250);
+          }
+        }}
+      >
+        <DialogContent className="glass-card-solid sm:max-w-[640px] max-h-[90vh] overflow-y-auto rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-emerald-600" />
+              {language === 'th' ? 'รีเซ็ตรหัสผ่านหลายผู้ใช้' : 'Bulk Reset Password'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {bulkResults.length === 0 ? (
+            <div className="space-y-4 py-2">
+              {/* Selected users summary */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                <p className="text-xs font-semibold text-slate-700 mb-2">
+                  {language === 'th' ? `ผู้ใช้ที่เลือก (${selectedUserIds.size})` : `Selected users (${selectedUserIds.size})`}
+                </p>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                  {users
+                    .filter(u => selectedUserIds.has(u.user_id))
+                    .map(u => (
+                      <Badge key={u.user_id} variant="secondary" className="text-xs font-normal">
+                        {u.full_name || u.email || u.user_id}
+                      </Badge>
+                    ))}
+                </div>
+              </div>
+
+              {/* Mode selector */}
+              <div className="space-y-2">
+                <Label>{language === 'th' ? 'วิธีการตั้งรหัส' : 'Password method'}</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBulkPasswordMode('shared')}
+                    className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                      bulkPasswordMode === 'shared'
+                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="font-semibold text-sm">
+                      {language === 'th' ? 'รหัสเดียวกันทุกคน' : 'Same password for all'}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {language === 'th'
+                        ? 'กำหนดรหัสผ่านชุดเดียวให้ทุกผู้ใช้ที่เลือก'
+                        : 'Set one shared password for every selected user'}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkPasswordMode('random')}
+                    className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                      bulkPasswordMode === 'random'
+                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="font-semibold text-sm">
+                      {language === 'th' ? 'สุ่มรหัสแยกแต่ละคน' : 'Unique random per user'}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {language === 'th'
+                        ? 'สุ่มรหัสผ่าน 12 ตัวอักษรให้แต่ละคน (ปลอดภัยกว่า)'
+                        : 'Generate a unique 12-char password per user (more secure)'}
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Password inputs (shared mode only) */}
+              {bulkPasswordMode === 'shared' && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>{language === 'th' ? 'รหัสผ่านใหม่' : 'New password'} *</Label>
+                    <Input
+                      type="password"
+                      value={bulkPassword}
+                      onChange={(e) => setBulkPassword(e.target.value)}
+                      placeholder="••••••••"
+                      disabled={bulkProcessing}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{language === 'th' ? 'ยืนยันรหัสผ่าน' : 'Confirm password'} *</Label>
+                    <Input
+                      type="password"
+                      value={bulkConfirm}
+                      onChange={(e) => setBulkConfirm(e.target.value)}
+                      placeholder="••••••••"
+                      disabled={bulkProcessing}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-xs text-amber-800">
+                  ⚠️{' '}
+                  {language === 'th'
+                    ? 'รหัสผ่านจะถูกเปลี่ยนทันที — กรุณาแจ้งผู้ใช้และให้เปลี่ยนรหัสใหม่ในการ login ครั้งถัดไป'
+                    : 'Passwords will be changed immediately. Notify users and ask them to change their password on next login.'}
+                </p>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button variant="outline" onClick={() => setIsBulkPasswordOpen(false)} disabled={bulkProcessing}>
+                  {language === 'th' ? 'ยกเลิก' : 'Cancel'}
+                </Button>
+                <Button
+                  onClick={handleBulkResetPassword}
+                  disabled={bulkProcessing}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {bulkProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {language === 'th'
+                    ? `รีเซ็ตรหัสผ่าน (${selectedUserIds.size})`
+                    : `Reset Passwords (${selectedUserIds.size})`}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Results view */
+            <div className="space-y-4 py-2">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                <p className="text-sm font-semibold text-emerald-900">
+                  ✓{' '}
+                  {language === 'th'
+                    ? `สำเร็จ ${bulkResults.filter(r => r.ok).length}/${bulkResults.length} คน`
+                    : `Done ${bulkResults.filter(r => r.ok).length}/${bulkResults.length}`}
+                </p>
+                <p className="text-xs text-emerald-800/80 mt-1">
+                  {language === 'th'
+                    ? 'คัดลอกหรือดาวน์โหลด CSV เพื่อเก็บไว้ส่งให้ผู้ใช้ — รหัสจะไม่แสดงอีกหลังปิด dialog นี้'
+                    : 'Copy or download the CSV to share with users — passwords will not be shown again after closing.'}
+                </p>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto rounded-xl border border-slate-200">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">{t('fullName')}</TableHead>
+                      <TableHead className="text-xs">{t('email')}</TableHead>
+                      <TableHead className="text-xs">
+                        {language === 'th' ? 'รหัสผ่านชั่วคราว' : 'Temp Password'}
+                      </TableHead>
+                      <TableHead className="text-xs text-center">
+                        {language === 'th' ? 'สถานะ' : 'Status'}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bulkResults.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs">{r.full_name || '-'}</TableCell>
+                        <TableCell className="text-xs">{r.email}</TableCell>
+                        <TableCell className="text-xs font-mono">{r.password}</TableCell>
+                        <TableCell className="text-xs text-center">
+                          {r.ok ? (
+                            <Badge className="bg-emerald-100 text-emerald-700">OK</Badge>
+                          ) : (
+                            <Badge className="bg-red-100 text-red-700" title={r.error}>
+                              FAIL
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex flex-wrap gap-2 justify-end pt-2">
+                <Button variant="outline" onClick={copyResultsToClipboard}>
+                  {language === 'th' ? 'คัดลอกทั้งหมด' : 'Copy all'}
+                </Button>
+                <Button variant="outline" onClick={downloadResultsCsv}>
+                  {language === 'th' ? 'ดาวน์โหลด CSV' : 'Download CSV'}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setIsBulkPasswordOpen(false);
+                    clearSelection();
+                    setTimeout(() => setBulkResults([]), 250);
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {language === 'th' ? 'เสร็จสิ้น' : 'Done'}
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
