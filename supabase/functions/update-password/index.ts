@@ -55,24 +55,33 @@ serve(async (req) => {
     }
     const callerRole = callerRoleRow?.role as string | undefined;
 
-    // ----- 3. Validate inputs -----
-    const { email, newPassword } = await req.json();
-    if (!email || !newPassword) {
-      return json({ error: "Missing email or newPassword" }, 400);
+    // ----- 3. Validate inputs (accept userId or email) -----
+    const { email, userId, newPassword } = await req.json();
+    if ((!email && !userId) || !newPassword) {
+      return json({ error: "Missing userId/email or newPassword" }, 400);
     }
     if (typeof newPassword !== "string" || newPassword.length < 6) {
       return json({ error: "Password must be at least 6 characters" }, 400);
     }
 
-    // ----- 4. Find target user by email -----
-    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    if (listError) {
-      console.error("List users error:", listError);
-      return json({ error: listError.message }, 400);
-    }
-    const target = users.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-    if (!target) {
-      return json({ error: "User not found" }, 404);
+    // ----- 4. Find target user (prefer userId, fallback to email) -----
+    let target;
+    if (userId) {
+      const { data: u, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (error || !u?.user) {
+        return json({ error: "User not found" }, 404);
+      }
+      target = u.user;
+    } else {
+      const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      if (listError) {
+        console.error("List users error:", listError);
+        return json({ error: listError.message }, 400);
+      }
+      target = users.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      if (!target) {
+        return json({ error: "User not found" }, 404);
+      }
     }
 
     const isSelf = target.id === caller.id;
@@ -135,7 +144,7 @@ serve(async (req) => {
     }
 
     console.log(
-      `Password updated for user=${email} by caller=${caller.email} (role=${callerRole}, self=${isSelf}, must_change=${mustChange})`,
+      `Password updated for user=${target.email ?? target.id} by caller=${caller.email} (role=${callerRole}, self=${isSelf}, must_change=${mustChange})`,
     );
 
     return json({ success: true, message: "Password updated successfully", must_change_password: mustChange });

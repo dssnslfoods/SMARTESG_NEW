@@ -561,12 +561,19 @@ export default function UserManagement() {
     for (const u of targets) {
       const pwd = bulkPasswordMode === 'shared' ? bulkPassword : generateTempPassword();
       try {
+        // Use userId so we don't depend on email being pre-loaded
         const { data, error } = await supabase.functions.invoke('update-password', {
-          body: { email: u.email, newPassword: pwd },
+          body: { userId: u.user_id, newPassword: pwd },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        results.push({ email: u.email || '', full_name: u.full_name || '', password: pwd, ok: true });
+        // Try to grab the email returned (if any) for the result table
+        results.push({
+          email: u.email || (data?.email as string) || '',
+          full_name: u.full_name || '',
+          password: pwd,
+          ok: true,
+        });
       } catch (err: any) {
         results.push({
           email: u.email || '',
@@ -823,7 +830,7 @@ export default function UserManagement() {
                 <TableRow>
                   {isManager && (() => {
                     const selectableIds = filteredUsers
-                      .filter(u => u.role !== 'admin' && u.email)
+                      .filter(u => u.role !== 'admin')
                       .map(u => u.user_id);
                     const allSelected =
                       selectableIds.length > 0 && selectableIds.every(id => selectedUserIds.has(id));
@@ -862,7 +869,7 @@ export default function UserManagement() {
                     >
                       {isManager && (
                         <TableCell className="w-10 py-2 sm:py-4">
-                          {user.role === 'admin' || !user.email ? (
+                          {user.role === 'admin' ? (
                             <span className="text-muted-foreground text-xs">—</span>
                           ) : (
                             <Checkbox
