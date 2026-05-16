@@ -31,6 +31,7 @@ import DataEntry from "./pages/DataEntry";
 import BackupData from "./pages/BackupData";
 import HelpCenter from "./pages/HelpCenter";
 import NotFound from "./pages/NotFound";
+import PasswordChangeRequired from "@/components/PasswordChangeRequired";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
               <TooltipProvider>
             <Toaster />
             <Sonner />
+            <PasswordChangeRequired />
             <BrowserRouter>
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

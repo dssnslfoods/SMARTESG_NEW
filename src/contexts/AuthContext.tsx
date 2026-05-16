@@ -11,6 +11,7 @@ interface UserProfile {
   company_id: string | null;
   site_id: string | null;
   is_active: boolean;
+  must_change_password?: boolean;
   company_name?: string | null;
   site_name?: string | null;
   site_location?: string | null;
@@ -28,6 +29,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
   canAccess: (allowedRoles: AppRole[]) => boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           company_id: profileData.company_id,
           site_id: profileData.site_id,
           is_active: profileData.is_active,
+          must_change_password: (profileData as any).must_change_password ?? false,
           company_name: (profileData.company as any)?.company_name ?? null,
           site_name: (profileData.site as any)?.site_name ?? null,
           site_location: (profileData.site as any)?.location ?? null,
@@ -180,6 +183,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return allowedRoles.includes(role);
   };
 
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchUserData(user.id);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -194,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         hasRole,
         canAccess,
+        refreshProfile,
       }}
     >
       {children}

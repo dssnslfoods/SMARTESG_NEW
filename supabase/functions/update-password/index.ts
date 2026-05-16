@@ -121,11 +121,24 @@ serve(async (req) => {
       return json({ error: updateError.message }, 400);
     }
 
+    // ----- 8. Flag must_change_password on app_user_profile -----
+    // - When admin/supervisor resets someone else's password → set TRUE (force user to choose own pwd)
+    // - When user resets their own password → clear flag
+    const mustChange = !isSelf;
+    const { error: flagError } = await supabaseAdmin
+      .from("app_user_profile")
+      .update({ must_change_password: mustChange })
+      .eq("user_id", target.id);
+    if (flagError) {
+      // Non-fatal: log but still return success since the password did change
+      console.error("Failed to set must_change_password flag:", flagError);
+    }
+
     console.log(
-      `Password updated for user=${email} by caller=${caller.email} (role=${callerRole}, self=${isSelf})`,
+      `Password updated for user=${email} by caller=${caller.email} (role=${callerRole}, self=${isSelf}, must_change=${mustChange})`,
     );
 
-    return json({ success: true, message: "Password updated successfully" });
+    return json({ success: true, message: "Password updated successfully", must_change_password: mustChange });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Error:", message);
