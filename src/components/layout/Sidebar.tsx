@@ -25,6 +25,7 @@ import {
   Heart,
   Globe,
   BookOpen,
+  Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -105,6 +106,11 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
     { label: t('dimensions'), href: '/master/dimensions', icon: Layers },
     { label: t('themes'), href: '/master/themes', icon: Tag },
     { label: t('metrics'), href: '/master/metrics', icon: Activity },
+    {
+      label: language === 'th' ? 'เป้าหมาย KPI' : 'KPI Targets',
+      href: '/master/targets',
+      icon: Target,
+    },
     {
       label: language === 'th' ? 'ตั้งค่าระบบ' : 'System Settings',
       href: '/master/settings',
