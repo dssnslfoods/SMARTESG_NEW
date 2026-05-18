@@ -147,7 +147,6 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
         </div>
 
         {navItems
-          .filter((item) => item.roles.includes(role || ''))
           .map((item) => {
             // Reports menu with sub-menu for card settings
             if (item.href === '/reports' && !isGuest) {
@@ -314,7 +313,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
         )}
 
         {/* Admin Section */}
-        {adminItems.filter((item) => item.roles.includes(role || '')).length > 0 && (
+        {adminItems.length > 0 && (
           <>
             <div className="mb-3 mt-6 px-3">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
@@ -323,8 +322,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
             </div>
 
             {adminItems
-              .filter((item) => item.roles.includes(role || ''))
-              .map((item) => 
+              .map((item) =>
                 isGuest ? (
                   <div
                     key={item.href}
