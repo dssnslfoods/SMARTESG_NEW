@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useMenuPermissions } from '@/contexts/MenuPermissionsContext';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -26,6 +27,7 @@ import {
   Globe,
   BookOpen,
   Target,
+  LayoutGrid,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,106 +48,47 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
   const { pathname } = useLocation();
   const { role, signOut } = useAuth();
   const { t, language } = useLanguage();
+  const { canSeeMenu } = useMenuPermissions();
   const [masterDataOpen, setMasterDataOpen] = useState(pathname.startsWith('/master'));
   const [reportSettingsOpen, setReportSettingsOpen] = useState(pathname === '/reports');
-  
+
   const { sections, toggleSection } = useReportSections();
 
   const isGuest = role === 'guest';
   const isOnReportsPage = pathname === '/reports';
 
-  const navItems = [
-    {
-      label: t('dashboard'),
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      roles: ['admin', 'executive', 'supervisor', 'guest'],
-    },
-    {
-      label: t('dataEntry'),
-      href: '/data-entry',
-      icon: FileInput,
-      roles: ['admin', 'supervisor', 'staff', 'guest'],
-    },
-    {
-      label: t('reports'),
-      href: '/reports',
-      icon: BarChart3,
-      roles: ['admin', 'executive'],
-    },
-    {
-      label: language === 'th' ? 'สิ่งแวดล้อม' : 'Environmental',
-      href: '/reports/environmental',
-      icon: Leaf,
-      roles: ['admin', 'executive'],
-    },
-    {
-      label: language === 'th' ? 'สังคม' : 'Social',
-      href: '/reports/social',
-      icon: Heart,
-      roles: ['admin', 'executive'],
-    },
-    {
-      label: language === 'th' ? 'ธรรมาภิบาล' : 'Governance',
-      href: '/reports/governance',
-      icon: Scale,
-      roles: ['admin', 'executive'],
-    },
-    {
-      label: language === 'th' ? 'ESG Overview' : 'ESG Overview',
-      href: '/reports/esg-overview',
-      icon: Globe,
-      roles: ['admin', 'executive'],
-    },
+  // ── All nav items — filtered dynamically by canSeeMenu ────────────────────
+  const allNavItems = [
+    { label: t('dashboard'),                                    href: '/dashboard',             icon: LayoutDashboard },
+    { label: t('dataEntry'),                                    href: '/data-entry',             icon: FileInput },
+    { label: t('reports'),                                      href: '/reports',                icon: BarChart3 },
+    { label: language === 'th' ? 'สิ่งแวดล้อม' : 'Environmental', href: '/reports/environmental', icon: Leaf },
+    { label: language === 'th' ? 'สังคม' : 'Social',           href: '/reports/social',         icon: Heart },
+    { label: language === 'th' ? 'ธรรมาภิบาล' : 'Governance',  href: '/reports/governance',     icon: Scale },
+    { label: 'ESG Overview',                                    href: '/reports/esg-overview',   icon: Globe },
   ];
+  const navItems = allNavItems.filter((item) => canSeeMenu(item.href.slice(1)));
 
-  const masterDataItems = [
-    { label: t('companies'), href: '/master/companies', icon: Building2 },
-    { label: t('sites'), href: '/master/sites', icon: MapPin },
-    { label: t('reportingPeriods'), href: '/master/periods', icon: Calendar },
-    { label: t('dimensions'), href: '/master/dimensions', icon: Layers },
-    { label: t('themes'), href: '/master/themes', icon: Tag },
-    { label: t('metrics'), href: '/master/metrics', icon: Activity },
-    {
-      label: language === 'th' ? 'เป้าหมาย KPI' : 'KPI Targets',
-      href: '/master/targets',
-      icon: Target,
-    },
-    {
-      label: language === 'th' ? 'ตั้งค่าระบบ' : 'System Settings',
-      href: '/master/settings',
-      icon: Settings,
-      roles: ['admin'],
-    },
-  ].filter((item: any) => !item.roles || item.roles.includes(role));
-
-
-  const adminItems = [
-    {
-      label: t('users'),
-      href: '/users',
-      icon: Users,
-      roles: ['admin', 'supervisor', 'executive', 'staff', 'guest'],
-    },
-    {
-      label: t('auditLog'),
-      href: '/audit-log',
-      icon: History,
-      roles: ['admin', 'guest'],
-    },
-    {
-      label: language === 'th' ? 'สำรองข้อมูล' : 'Backup Data',
-      href: '/backup-data',
-      icon: HardDrive,
-      roles: ['admin'],
-    },
-    {
-      label: language === 'th' ? 'ศูนย์ช่วยเหลือ' : 'Help Center',
-      href: '/help-center',
-      icon: BookOpen,
-      roles: ['admin', 'supervisor'],
-    },
+  const allMasterDataItems = [
+    { label: t('companies'),                                            href: '/master/companies',         icon: Building2 },
+    { label: t('sites'),                                                href: '/master/sites',              icon: MapPin },
+    { label: t('reportingPeriods'),                                     href: '/master/periods',            icon: Calendar },
+    { label: t('dimensions'),                                           href: '/master/dimensions',         icon: Layers },
+    { label: t('themes'),                                               href: '/master/themes',             icon: Tag },
+    { label: t('metrics'),                                              href: '/master/metrics',            icon: Activity },
+    { label: language === 'th' ? 'เป้าหมาย KPI' : 'KPI Targets',      href: '/master/targets',            icon: Target },
+    { label: language === 'th' ? 'สิทธิ์เมนู' : 'Menu Permissions',   href: '/master/menu-permissions',   icon: LayoutGrid },
+    { label: language === 'th' ? 'ตั้งค่าระบบ' : 'System Settings',   href: '/master/settings',           icon: Settings },
   ];
+  const masterDataItems = allMasterDataItems.filter((item) => canSeeMenu(item.href.slice(1)));
+
+  const allAdminItems = [
+    { label: t('users'),                                               href: '/users',       icon: Users },
+    { label: t('auditLog'),                                            href: '/audit-log',   icon: History },
+    { label: language === 'th' ? 'สำรองข้อมูล' : 'Backup Data',      href: '/backup-data', icon: HardDrive },
+    { label: language === 'th' ? 'ศูนย์ช่วยเหลือ' : 'Help Center',   href: '/help-center', icon: BookOpen },
+  ];
+  const adminItems = allAdminItems.filter((item) => canSeeMenu(item.href.slice(1)));
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
@@ -311,7 +254,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
           })}
 
         {/* Master Data Section */}
-        {(role === 'admin' || role === 'supervisor' || role === 'guest') && (
+        {masterDataItems.length > 0 && (
           <>
             <div className="mb-3 mt-6 px-3">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">

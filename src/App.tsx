@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ReportSectionsProvider } from "@/contexts/ReportSectionsContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { TVModeProvider } from "@/contexts/TVModeContext";
+import { MenuPermissionsProvider } from "@/contexts/MenuPermissionsContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -28,6 +29,7 @@ import ThemeManagement from "./pages/master/ThemeManagement";
 import MetricManagement from "./pages/master/MetricManagement";
 import SystemSettings from "./pages/master/SystemSettings";
 import TargetManagement from "./pages/master/TargetManagement";
+import MenuPermission from "./pages/master/MenuPermission";
 import DataEntry from "./pages/DataEntry";
 import BackupData from "./pages/BackupData";
 import HelpCenter from "./pages/HelpCenter";
@@ -39,6 +41,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <MenuPermissionsProvider>
       <LanguageProvider>
         <TVModeProvider>
           <NotificationsProvider>
@@ -133,6 +136,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/master/menu-permissions"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <MenuPermission />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/master/settings"
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
@@ -212,6 +223,7 @@ const App = () => (
           </NotificationsProvider>
         </TVModeProvider>
       </LanguageProvider>
+      </MenuPermissionsProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
