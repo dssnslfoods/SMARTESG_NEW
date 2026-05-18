@@ -28,6 +28,7 @@ import {
   BookOpen,
   Target,
   LayoutGrid,
+  Network,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -60,6 +61,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
   // ── All nav items — filtered dynamically by canSeeMenu ────────────────────
   const allNavItems = [
     { label: t('dashboard'),                                    href: '/dashboard',             icon: LayoutDashboard },
+    { label: 'ESG Key Issues',                                  href: '/esg-key-issues',         icon: Network },
     { label: t('dataEntry'),                                    href: '/data-entry',             icon: FileInput },
     { label: t('reports'),                                      href: '/reports',                icon: BarChart3 },
     { label: language === 'th' ? 'สิ่งแวดล้อม' : 'Environmental', href: '/reports/environmental', icon: Leaf },

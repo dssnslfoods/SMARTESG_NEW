@@ -15,6 +15,7 @@ export interface MenuItemConfig {
 export const MENU_ITEMS: MenuItemConfig[] = [
   // ── Main Menu ──────────────────────────────────────────────────────────────
   { key: 'dashboard',             label: 'Dashboard',       labelTh: 'แดชบอร์ด',         section: 'main' },
+  { key: 'esg-key-issues',        label: 'ESG Key Issues',  labelTh: 'ESG Key Issues',    section: 'main' },
   { key: 'data-entry',            label: 'Data Entry',      labelTh: 'บันทึกข้อมูล',      section: 'main' },
   { key: 'reports',               label: 'Reports',         labelTh: 'รายงาน',            section: 'main' },
   { key: 'reports/environmental', label: 'Environmental',   labelTh: 'สิ่งแวดล้อม',       section: 'main' },
@@ -44,6 +45,7 @@ export const MENU_ITEMS: MenuItemConfig[] = [
 // admin always has access to everything — not listed here.
 export const DEFAULT_PERMISSIONS: Record<string, AppRole[]> = {
   'dashboard':              ['supervisor', 'executive', 'guest'],
+  'esg-key-issues':         ['supervisor', 'executive', 'staff', 'guest'],
   'data-entry':             ['supervisor', 'staff'],
   'reports':                ['executive'],
   'reports/environmental':  ['executive'],

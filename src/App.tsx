@@ -30,6 +30,7 @@ import MetricManagement from "./pages/master/MetricManagement";
 import SystemSettings from "./pages/master/SystemSettings";
 import TargetManagement from "./pages/master/TargetManagement";
 import MenuPermission from "./pages/master/MenuPermission";
+import ESGKeyIssues from "./pages/ESGKeyIssues";
 import DataEntry from "./pages/DataEntry";
 import BackupData from "./pages/BackupData";
 import HelpCenter from "./pages/HelpCenter";
@@ -60,6 +61,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/esg-key-issues"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive", "staff", "guest"]}>
+                    <ESGKeyIssues />
                   </ProtectedRoute>
                 }
               />
