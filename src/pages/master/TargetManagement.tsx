@@ -583,7 +583,22 @@ export default function TargetManagement() {
                                   </TableCell>
                                   {isManager && (
                                     <TableCell className="text-right py-2">
-                                      <div className="flex justify-end gap-1">
+                                      <div className="flex justify-end items-center gap-1">
+                                        {/* Back button on the highlighted row (deep-link return) */}
+                                        {m.metric_id === highlightMetricId && (
+                                          <Button
+                                            asChild
+                                            size="sm"
+                                            className="h-7 px-2.5 text-[11px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm whitespace-nowrap"
+                                          >
+                                            <Link
+                                              to={`/esg-key-issues?metric=${encodeURIComponent(m.metric_id)}`}
+                                            >
+                                              <ArrowLeft className="h-3 w-3" />
+                                              {th ? 'กลับ' : 'Back'}
+                                            </Link>
+                                          </Button>
+                                        )}
                                         {m.target_id ? (
                                           <>
                                             <Button
