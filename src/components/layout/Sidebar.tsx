@@ -30,6 +30,7 @@ import {
   LayoutGrid,
   Network,
   Crown,
+  Layers2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -159,7 +160,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
               to="/super-admin/tenants"
               onClick={onNavigate}
               className={cn(
-                'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border mb-4',
+                'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border',
                 isActive('/super-admin/tenants')
                   ? 'border-amber-300/60 text-amber-700'
                   : 'text-gray-600 hover:text-gray-900 border-transparent',
@@ -177,6 +178,34 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
             >
               <Crown className={cn('h-4 w-4', isActive('/super-admin/tenants') && 'text-amber-600')} />
               {language === 'th' ? 'จัดการ Tenants' : 'Tenant Management'}
+            </Link>
+            <Link
+              to="/super-admin/tenant-menu-access"
+              onClick={onNavigate}
+              className={cn(
+                'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border mb-4',
+                isActive('/super-admin/tenant-menu-access')
+                  ? 'border-amber-300/60 text-amber-700'
+                  : 'text-gray-600 hover:text-gray-900 border-transparent',
+              )}
+              style={
+                isActive('/super-admin/tenant-menu-access')
+                  ? {
+                      background:
+                        'linear-gradient(135deg, rgba(245,158,11,0.14), rgba(249,115,22,0.10))',
+                      boxShadow:
+                        '0 2px 12px rgba(245,158,11,0.18), inset 0 1px 0 rgba(255,255,255,0.6)',
+                    }
+                  : undefined
+              }
+            >
+              <Layers2
+                className={cn(
+                  'h-4 w-4',
+                  isActive('/super-admin/tenant-menu-access') && 'text-amber-600',
+                )}
+              />
+              {language === 'th' ? 'สิทธิ์ Menu ของ Tenant' : 'Tenant Menu Access'}
             </Link>
           </>
         )}
