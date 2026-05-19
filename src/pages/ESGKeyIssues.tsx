@@ -39,6 +39,7 @@ import {
   CartesianGrid,
   Tooltip as ReTooltip,
   Cell,
+  ReferenceLine,
 } from 'recharts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -618,6 +619,27 @@ function MetricHero({
     return { pct, onTrack, isLower };
   }, [target, stats]);
 
+  // Aggregated values per year — last 3 years (or fewer if not available)
+  // Used to plot a comparison chart against the target reference line.
+  const yearlyData = useMemo(() => {
+    const yearMap = new Map<number, number>();
+    values.forEach((v) => {
+      const year = v.period?.year;
+      if (!year) return;
+      yearMap.set(year, (yearMap.get(year) ?? 0) + Number(v.value));
+    });
+    const sortedYears = Array.from(yearMap.keys()).sort((a, b) => a - b);
+    const recentYears = sortedYears.length > 3 ? sortedYears.slice(-3) : sortedYears;
+    const targetVal = target ? Number(target.target_value) : null;
+    const isLower = target?.target_direction === 'lower_is_better';
+    return recentYears.map((year) => {
+      const actual = yearMap.get(year) ?? 0;
+      const isOnTrack =
+        targetVal === null ? true : isLower ? actual <= targetVal : actual >= targetVal;
+      return { year: String(year), actual, isOnTrack };
+    });
+  }, [values, target]);
+
   const hasData = values.length > 0;
   const unit = metric.unit ?? '';
 
@@ -874,6 +896,98 @@ function MetricHero({
                     </p>
                   </div>
                 </div>
+
+                {/* Yearly comparison chart — last 3 years vs target */}
+                {yearlyData.length > 0 && (
+                  <div className="rounded-xl bg-white/70 px-3 pt-3 pb-2 mb-3 border border-border/40">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1.5">
+                        <TrendingUp className="h-3 w-3" />
+                        {th ? 'เปรียบเทียบรายปี vs เป้าหมาย' : 'Yearly Performance vs Target'}
+                      </p>
+                      <span className="text-[10px] text-muted-foreground/70">
+                        {yearlyData.length}{' '}
+                        {th
+                          ? `ปีล่าสุด${yearlyData.length >= 3 ? ' (3 ปี)' : ''}`
+                          : `year${yearlyData.length > 1 ? 's' : ''}`}
+                      </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart
+                        data={yearlyData}
+                        margin={{ top: 18, right: 70, bottom: 0, left: -10 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                        <XAxis
+                          dataKey="year"
+                          tick={{ fontSize: 12, fill: '#475569', fontWeight: 700 }}
+                          axisLine={{ stroke: '#e5e7eb' }}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 10, fill: '#64748b' }}
+                          tickFormatter={formatCompact}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <ReTooltip
+                          content={<ChartTooltip unit={unit} />}
+                          cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                        />
+                        <ReferenceLine
+                          y={Number(target.target_value)}
+                          stroke="#f59e0b"
+                          strokeDasharray="6 4"
+                          strokeWidth={2}
+                          ifOverflow="extendDomain"
+                          label={{
+                            value: `${th ? 'เป้า' : 'Target'} ${formatCompact(Number(target.target_value))}`,
+                            position: 'right',
+                            fill: '#b45309',
+                            fontSize: 10,
+                            fontWeight: 700,
+                          }}
+                        />
+                        <Bar dataKey="actual" radius={[6, 6, 0, 0]} maxBarSize={72}>
+                          {yearlyData.map((d, i) => (
+                            <Cell key={i} fill={d.isOnTrack ? '#10b981' : '#ef4444'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    {/* Legend */}
+                    <div className="flex flex-wrap items-center justify-center gap-3 mt-1 text-[10px]">
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-sm bg-emerald-500" />
+                        <span className="text-muted-foreground">
+                          {th ? 'บรรลุเป้า' : 'On track'}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-sm bg-rose-500" />
+                        <span className="text-muted-foreground">
+                          {th ? 'ไม่บรรลุ' : 'Off track'}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <svg width="18" height="6" className="inline">
+                          <line
+                            x1="0"
+                            y1="3"
+                            x2="18"
+                            y2="3"
+                            stroke="#f59e0b"
+                            strokeWidth="2"
+                            strokeDasharray="3 2"
+                          />
+                        </svg>
+                        <span className="text-muted-foreground">
+                          {th ? `เป้าหมายปี ${new Date().getFullYear()}` : `Target line (${new Date().getFullYear()})`}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Progress bar */}
                 <div className="space-y-1">
