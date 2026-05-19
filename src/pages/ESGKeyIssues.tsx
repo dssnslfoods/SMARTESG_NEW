@@ -29,7 +29,7 @@ import {
   AlertTriangle,
   CheckCircle2,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   ResponsiveContainer,
   BarChart,
@@ -953,9 +953,34 @@ export default function ESGKeyIssues() {
   const [filterTheme, setFilterTheme] = useState<string | null>(null);
   const [filterMetric, setFilterMetric] = useState<string | null>(null);
 
+  // ── Deep-link: arrive via ?metric=ID and auto-select that metric ───────────
+  const [searchParams, setSearchParams] = useSearchParams();
+  const metricParamId = searchParams.get('metric');
+
   useEffect(() => {
     fetchData();
   }, []);
+
+  // After data loads, if a ?metric=ID is present, locate it and set all
+  // three filter levels so MetricHero shows. Then strip the URL param.
+  useEffect(() => {
+    if (!metricParamId || data.length === 0) return;
+    for (const dim of data) {
+      for (const theme of dim.themes) {
+        const m = theme.metrics.find((mm) => mm.metric_id === metricParamId);
+        if (m) {
+          setFilterDim(dim.dimension_id);
+          setFilterTheme(theme.theme_id);
+          setFilterMetric(m.metric_id);
+          const next = new URLSearchParams(searchParams);
+          next.delete('metric');
+          setSearchParams(next, { replace: true });
+          return;
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, metricParamId]);
 
   const fetchData = async () => {
     setLoading(true);

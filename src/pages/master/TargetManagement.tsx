@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +42,7 @@ import {
   CheckCircle2,
   Sparkles,
   X as XIcon,
+  ArrowLeft,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -385,15 +386,27 @@ export default function TargetManagement() {
                 </p>
               )}
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={clearHighlight}
-              className="text-amber-700 hover:text-amber-900 hover:bg-amber-100 gap-1 shrink-0"
-            >
-              <XIcon className="h-3.5 w-3.5" />
-              {th ? 'ปิด' : 'Clear'}
-            </Button>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                asChild
+                size="sm"
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+              >
+                <Link to={`/esg-key-issues?metric=${encodeURIComponent(highlightMetricId)}`}>
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  {th ? 'กลับไปดูตัวชี้วัด' : 'Back to Metric'}
+                </Link>
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearHighlight}
+                title={th ? 'ปิดการเน้น' : 'Clear highlight'}
+                className="h-8 w-8 p-0 text-amber-700 hover:text-amber-900 hover:bg-amber-100"
+              >
+                <XIcon className="h-4 w-4" />
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
