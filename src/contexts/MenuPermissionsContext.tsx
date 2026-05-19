@@ -68,8 +68,8 @@ export function MenuPermissionsProvider({ children }: { children: ReactNode }) {
 
   const canSeeMenu = useCallback(
     (menuKey: string): boolean => {
-      // Admin always sees everything
-      if (role === 'admin') return true;
+      // Admin and super_admin always see everything
+      if (role === 'admin' || role === 'super_admin') return true;
       if (!role) return false;
 
       if (loaded) {

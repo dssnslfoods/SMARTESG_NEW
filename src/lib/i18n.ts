@@ -18,6 +18,7 @@ export const translations = {
     signup: 'สมัครสมาชิก',
     
     // Roles
+    super_admin: 'ผู้ดูแลแพลตฟอร์ม',
     admin: 'ผู้ดูแลระบบ',
     executive: 'ผู้บริหาร',
     supervisor: 'หัวหน้างาน',
@@ -135,6 +136,7 @@ export const translations = {
     signup: 'Sign Up',
     
     // Roles
+    super_admin: 'Super Admin',
     admin: 'Administrator',
     executive: 'Executive',
     supervisor: 'Supervisor',

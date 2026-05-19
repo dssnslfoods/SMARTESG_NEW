@@ -47,7 +47,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Pencil, Search, UserPlus, Trash2, KeyRound, ShieldCheck, X as XIcon } from 'lucide-react';
 import { UserManagementLoadingSkeleton } from '@/components/ui/loading-skeleton';
 
-type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest';
+type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest' | 'super_admin';
 
 interface UserWithRole {
   user_id: string;
@@ -72,6 +72,7 @@ interface Site {
 }
 
 const roleColors: Record<AppRole, string> = {
+  super_admin: 'bg-gradient-to-r from-amber-500 to-orange-600 text-white',
   admin: 'bg-destructive text-destructive-foreground',
   executive: 'bg-primary text-primary-foreground',
   supervisor: 'bg-accent text-accent-foreground border border-border',
@@ -130,7 +131,10 @@ export default function UserManagement() {
   >([]);
 
   // Check if current user is admin or supervisor (can manage others)
-  const isManager = currentUserRole === 'admin' || currentUserRole === 'supervisor';
+  const isManager =
+    currentUserRole === 'admin' ||
+    currentUserRole === 'supervisor' ||
+    currentUserRole === 'super_admin';
   // Check if current user is staff or executive (can only manage self)
   const isSelfOnly = currentUserRole === 'executive' || currentUserRole === 'staff';
 
@@ -717,10 +721,15 @@ export default function UserManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {currentUserRole === 'admin' && (
+                    {currentUserRole === 'super_admin' && (
+                      <SelectItem value="super_admin">
+                        👑 {language === 'th' ? 'ผู้ดูแลแพลตฟอร์ม' : 'Super Admin'}
+                      </SelectItem>
+                    )}
+                    {(currentUserRole === 'admin' || currentUserRole === 'super_admin') && (
                       <SelectItem value="admin">{t('admin')}</SelectItem>
                     )}
-                    {currentUserRole === 'admin' && (
+                    {(currentUserRole === 'admin' || currentUserRole === 'super_admin') && (
                       <SelectItem value="executive">{t('executive')}</SelectItem>
                     )}
                     <SelectItem value="supervisor">{t('supervisor')}</SelectItem>
@@ -1079,7 +1088,15 @@ export default function UserManagement() {
                       <SelectValue placeholder={language === 'th' ? 'เลือกบทบาท' : 'Select role'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {currentUserRole === 'admin' && (
+                      {currentUserRole === 'super_admin' && (
+                        <>
+                          <SelectItem value="super_admin">
+                            👑 {language === 'th' ? 'ผู้ดูแลแพลตฟอร์ม' : 'Super Admin'}
+                          </SelectItem>
+                          <SelectItem value="admin">{t('admin')}</SelectItem>
+                        </>
+                      )}
+                      {(currentUserRole === 'admin' || currentUserRole === 'super_admin') && (
                         <SelectItem value="executive">{t('executive')}</SelectItem>
                       )}
                       <SelectItem value="supervisor">{t('supervisor')}</SelectItem>

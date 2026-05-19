@@ -3,7 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
-type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest';
+type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest' | 'super_admin';
 
 interface UserProfile {
   user_id: string;
@@ -81,13 +81,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('user_id', userId)
         .maybeSingle();
 
-      // Fetch super_admin flag (separate table — orthogonal to role)
-      const { data: superAdminRow } = await supabase
-        .from('super_admin')
-        .select('user_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-      setIsSuperAdmin(!!superAdminRow);
+      // Super admin = either role='super_admin' OR an entry in super_admin
+      // table (legacy / audit). Querying both keeps backward compat.
+      const isSuperViaRole = roleData?.role === 'super_admin';
+      let isSuperViaTable = false;
+      if (!isSuperViaRole) {
+        const { data: superAdminRow } = await supabase
+          .from('super_admin')
+          .select('user_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        isSuperViaTable = !!superAdminRow;
+      }
+      setIsSuperAdmin(isSuperViaRole || isSuperViaTable);
 
       if (roleData) {
         setRole(roleData.role as AppRole);
@@ -191,6 +197,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const canAccess = (allowedRoles: AppRole[]) => {
     if (!role) return false;
+    // super_admin bypasses every route guard
+    if (role === 'super_admin') return true;
     return allowedRoles.includes(role);
   };
 

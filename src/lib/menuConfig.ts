@@ -2,7 +2,7 @@
 // Single source of truth for all sidebar menu items and their default permissions.
 // Used by MenuPermissionsContext (runtime) and MenuPermission page (management UI).
 
-export type AppRole = 'admin' | 'supervisor' | 'executive' | 'staff' | 'guest';
+export type AppRole = 'admin' | 'supervisor' | 'executive' | 'staff' | 'guest' | 'super_admin';
 export const NON_ADMIN_ROLES: AppRole[] = ['supervisor', 'executive', 'staff', 'guest'];
 
 export interface MenuItemConfig {
