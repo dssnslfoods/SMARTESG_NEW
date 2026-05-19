@@ -18,6 +18,7 @@ const KEYS = {
   recentMonths: "data_entry_recent_months",
   fromYear: "data_entry_from_year",
   fromMonth: "data_entry_from_month",
+  longTermYear: "long_term_target_year",
 } as const;
 
 type FilterMode = "recent" | "from" | "all";
@@ -33,6 +34,7 @@ export default function SystemSettings() {
   const currentYear = new Date().getFullYear();
   const [fromYear, setFromYear] = useState<string>(String(currentYear));
   const [fromMonth, setFromMonth] = useState<string>("1");
+  const [longTermYear, setLongTermYear] = useState<string>(String(currentYear + 5));
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,6 +51,7 @@ export default function SystemSettings() {
       if (map.get(KEYS.recentMonths)) setRecentMonths(map.get(KEYS.recentMonths)!);
       if (map.get(KEYS.fromYear)) setFromYear(map.get(KEYS.fromYear)!);
       if (map.get(KEYS.fromMonth)) setFromMonth(map.get(KEYS.fromMonth)!);
+      if (map.get(KEYS.longTermYear)) setLongTermYear(map.get(KEYS.longTermYear)!);
       setLoading(false);
     })();
   }, []);
@@ -61,6 +64,7 @@ export default function SystemSettings() {
       { key: KEYS.recentMonths, value: recentMonths },
       { key: KEYS.fromYear, value: fromYear },
       { key: KEYS.fromMonth, value: fromMonth },
+      { key: KEYS.longTermYear, value: longTermYear },
     ];
     const { error } = await supabase
       .from("app_setting")
@@ -218,6 +222,51 @@ export default function SystemSettings() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── ESG Target settings ─────────────────────────────────────────── */}
+      <Card className="rounded-3xl border-white/40 bg-white/70 backdrop-blur-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            🎯 {language === "th" ? "ตั้งค่าเป้าหมาย ESG" : "ESG Target Settings"}
+          </CardTitle>
+          <CardDescription>
+            {language === "th"
+              ? "กำหนดปีของเป้าหมายระยะยาว เพื่อใช้กรอกควบคู่กับเป้าหมายปีปัจจุบันในหน้า KPI Target"
+              : "Configure the long-term target year used alongside annual targets on the KPI Target page"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="long-term-year">
+                {language === "th" ? "ปีเป้าหมายระยะยาว" : "Long-Term Target Year"}
+              </Label>
+              <Select value={longTermYear} onValueChange={setLongTermYear}>
+                <SelectTrigger id="long-term-year">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 26 }, (_, i) => currentYear + i).map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                      {y === currentYear && (
+                        <span className="text-muted-foreground ml-1 text-xs">
+                          ({language === "th" ? "ปีปัจจุบัน" : "current"})
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {language === "th"
+                  ? `เป้าหมายระยะยาวจะถูกบันทึกเป็น metric_target สำหรับปี ${longTermYear} แยกจากเป้าหมายปีปัจจุบัน`
+                  : `Long-term targets are stored as metric_target rows for year ${longTermYear}, separate from annual targets`}
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

@@ -46,21 +46,28 @@ import {
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface TargetCell {
+  target_id: string;
+  target_value: number;
+  target_direction: 'lower_is_better' | 'higher_is_better';
+  note: string | null;
+}
+
 interface MetricRow {
   metric_id: string;
   metric_name: string;
   unit: string | null;
   theme_name: string;
   dimension_name: string;
-  // target fields (optional — may not exist yet)
-  target_id?: string;
-  target_value?: number;
-  target_direction?: 'lower_is_better' | 'higher_is_better';
-  note?: string;
+  // Current-year target (for selected `year` filter)
+  currentTarget?: TargetCell;
+  // Long-term target (for configured long-term year)
+  longTermTarget?: TargetCell;
 }
 
 interface TargetForm {
-  target_value: string;
+  currentYearValue: string;
+  longTermValue: string;
   target_direction: 'lower_is_better' | 'higher_is_better';
   note: string;
 }
@@ -77,6 +84,7 @@ export default function TargetManagement() {
   const th = language === 'th';
 
   const [year, setYear] = useState(THIS_YEAR);
+  const [longTermYear, setLongTermYear] = useState<number>(THIS_YEAR + 5);
   const [metrics, setMetrics] = useState<MetricRow[]>([]);
   const [dimensions, setDimensions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +95,8 @@ export default function TargetManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingMetric, setEditingMetric] = useState<MetricRow | null>(null);
   const [form, setForm] = useState<TargetForm>({
-    target_value: '',
+    currentYearValue: '',
+    longTermValue: '',
     target_direction: 'lower_is_better',
     note: '',
   });
@@ -104,6 +113,20 @@ export default function TargetManagement() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // First read the configured long-term year so we know which rows to
+      // tag as "longTermTarget". Default = currentYear + 5.
+      const settingRes = await supabase
+        .from('app_setting')
+        .select('value')
+        .eq('key', 'long_term_target_year')
+        .maybeSingle();
+      const ltYear = settingRes.data?.value
+        ? parseInt(settingRes.data.value, 10)
+        : THIS_YEAR + 5;
+      setLongTermYear(ltYear);
+
+      // Fetch metrics + the two target rows we care about for each metric.
+      const yearsToFetch = ltYear === year ? [year] : [year, ltYear];
       const [metricsRes, targetsRes] = await Promise.all([
         supabase
           .from('esg_metric')
@@ -114,38 +137,36 @@ export default function TargetManagement() {
               dimension:dimension_id ( dimension_name )
             )
           `),
-        supabase
-          .from('metric_target')
-          .select('*')
-          .eq('year', year),
+        supabase.from('metric_target').select('*').in('year', yearsToFetch),
       ]);
 
-      const targetMap = new Map(
-        (targetsRes.data ?? []).map((t: any) => [t.metric_id, t]),
-      );
+      const currentTargetMap = new Map<string, TargetCell>();
+      const longTermTargetMap = new Map<string, TargetCell>();
+      (targetsRes.data ?? []).forEach((t: any) => {
+        const cell: TargetCell = {
+          target_id: t.target_id,
+          target_value: Number(t.target_value),
+          target_direction: t.target_direction,
+          note: t.note,
+        };
+        if (t.year === year) currentTargetMap.set(t.metric_id, cell);
+        if (t.year === ltYear) longTermTargetMap.set(t.metric_id, cell);
+      });
 
       const rows: MetricRow[] = (metricsRes.data ?? []).map((m: any) => {
         const theme = m.theme as any;
         const dimension = theme?.dimension as any;
-        const tgt = targetMap.get(m.metric_id) as any | undefined;
         return {
           metric_id: m.metric_id,
           metric_name: m.metric_name,
           unit: m.unit,
           theme_name: theme?.theme_name ?? '-',
           dimension_name: dimension?.dimension_name ?? '-',
-          ...(tgt
-            ? {
-                target_id: tgt.target_id,
-                target_value: Number(tgt.target_value),
-                target_direction: tgt.target_direction,
-                note: tgt.note,
-              }
-            : {}),
+          currentTarget: currentTargetMap.get(m.metric_id),
+          longTermTarget: longTermTargetMap.get(m.metric_id),
         };
       });
 
-      // Unique dimension names for filter
       const dimSet = new Set(rows.map((r) => r.dimension_name));
       setDimensions(Array.from(dimSet).sort());
       setMetrics(rows);
@@ -193,53 +214,111 @@ export default function TargetManagement() {
   // ── Dialog helpers ─────────────────────────────────────────────────────────
   const openAdd = (m: MetricRow) => {
     setEditingMetric(m);
-    setForm({ target_value: '', target_direction: 'lower_is_better', note: '' });
+    setForm({
+      currentYearValue: '',
+      longTermValue: '',
+      target_direction: 'lower_is_better',
+      note: '',
+    });
     setDialogOpen(true);
   };
 
   const openEdit = (m: MetricRow) => {
     setEditingMetric(m);
     setForm({
-      target_value: String(m.target_value ?? ''),
-      target_direction: m.target_direction ?? 'lower_is_better',
-      note: m.note ?? '',
+      currentYearValue: m.currentTarget ? String(m.currentTarget.target_value) : '',
+      longTermValue: m.longTermTarget ? String(m.longTermTarget.target_value) : '',
+      target_direction:
+        m.currentTarget?.target_direction ??
+        m.longTermTarget?.target_direction ??
+        'lower_is_better',
+      note: m.currentTarget?.note ?? m.longTermTarget?.note ?? '',
     });
     setDialogOpen(true);
   };
 
+  const validateNum = (s: string): { ok: boolean; n: number } => {
+    if (!s.trim()) return { ok: true, n: NaN }; // empty = skip
+    const n = parseFloat(s);
+    return { ok: !isNaN(n) && n >= 0, n };
+  };
+
   const handleSave = async () => {
     if (!editingMetric) return;
-    const val = parseFloat(form.target_value);
-    if (isNaN(val) || val < 0) {
+
+    const cy = validateNum(form.currentYearValue);
+    const lt = validateNum(form.longTermValue);
+    if (!cy.ok || !lt.ok) {
       toast({
         variant: 'destructive',
         title: th ? 'ข้อผิดพลาด' : 'Error',
-        description: th ? 'กรุณากรอกค่าเป้าหมายที่ถูกต้อง (ตัวเลข ≥ 0)' : 'Please enter a valid target value (number ≥ 0)',
+        description: th
+          ? 'กรุณากรอกค่าเป้าหมายที่ถูกต้อง (ตัวเลข ≥ 0) หรือเว้นว่างเพื่อไม่ตั้ง'
+          : 'Please enter valid target values (number ≥ 0), or leave empty to skip',
       });
       return;
     }
 
     setSaving(true);
     try {
-      const payload = {
-        metric_id: editingMetric.metric_id,
-        year,
-        target_value: val,
-        target_direction: form.target_direction,
-        note: form.note.trim() || null,
-        created_by: user?.id ?? null,
-      };
+      const note = form.note.trim() || null;
+      const direction = form.target_direction;
+      const ops: Promise<{ error: any }>[] = [];
 
-      if (editingMetric.target_id) {
-        const { error } = await supabase
-          .from('metric_target')
-          .update({ ...payload, updated_at: new Date().toISOString() })
-          .eq('target_id', editingMetric.target_id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('metric_target').insert(payload);
-        if (error) throw error;
+      // ── Current-year target ───────────────────────────────────────────
+      if (!isNaN(cy.n)) {
+        ops.push(
+          supabase.from('metric_target').upsert(
+            {
+              metric_id: editingMetric.metric_id,
+              year,
+              target_value: cy.n,
+              target_direction: direction,
+              note,
+              created_by: user?.id ?? null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'metric_id,year' },
+          ) as any,
+        );
+      } else if (editingMetric.currentTarget) {
+        // User cleared the field — remove the existing row
+        ops.push(
+          supabase
+            .from('metric_target')
+            .delete()
+            .eq('target_id', editingMetric.currentTarget.target_id) as any,
+        );
       }
+
+      // ── Long-term target ─────────────────────────────────────────────
+      if (!isNaN(lt.n) && longTermYear !== year) {
+        ops.push(
+          supabase.from('metric_target').upsert(
+            {
+              metric_id: editingMetric.metric_id,
+              year: longTermYear,
+              target_value: lt.n,
+              target_direction: direction,
+              note,
+              created_by: user?.id ?? null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'metric_id,year' },
+          ) as any,
+        );
+      } else if (editingMetric.longTermTarget && isNaN(lt.n)) {
+        ops.push(
+          supabase
+            .from('metric_target')
+            .delete()
+            .eq('target_id', editingMetric.longTermTarget.target_id) as any,
+        );
+      }
+
+      const results = await Promise.all(ops);
+      const failed = results.find((r) => (r as any).error);
+      if (failed) throw new Error((failed as any).error.message);
 
       toast({
         title: th ? 'สำเร็จ' : 'Success',
@@ -255,13 +334,17 @@ export default function TargetManagement() {
   };
 
   const handleDelete = async (m: MetricRow) => {
-    if (!m.target_id) return;
-    setDeletingId(m.target_id);
+    // Delete BOTH current-year and long-term targets for this metric
+    const ids = [m.currentTarget?.target_id, m.longTermTarget?.target_id].filter(
+      Boolean,
+    ) as string[];
+    if (ids.length === 0) return;
+    setDeletingId(ids[0]);
     try {
       const { error } = await supabase
         .from('metric_target')
         .delete()
-        .eq('target_id', m.target_id);
+        .in('target_id', ids);
       if (error) throw error;
       toast({
         title: th ? 'สำเร็จ' : 'Deleted',
@@ -305,7 +388,7 @@ export default function TargetManagement() {
   // Summary stats
   const stats = useMemo(() => {
     const total = metrics.length;
-    const set = metrics.filter((m) => m.target_id != null).length;
+    const set = metrics.filter((m) => m.currentTarget != null).length;
     const pct = total > 0 ? Math.round((set / total) * 100) : 0;
     return { total, set, pct };
   }, [metrics]);
@@ -500,8 +583,14 @@ export default function TargetManagement() {
                                 <TableHead className="text-xs w-32 hidden sm:table-cell">
                                   {th ? 'หน่วย' : 'Unit'}
                                 </TableHead>
-                                <TableHead className="text-xs w-36">
+                                <TableHead className="text-xs w-32">
                                   {th ? `เป้าหมาย ${year}` : `Target ${year}`}
+                                </TableHead>
+                                <TableHead className="text-xs w-36 hidden sm:table-cell">
+                                  <span className="flex items-center gap-1">
+                                    <Sparkles className="h-3 w-3 text-amber-500" />
+                                    {th ? `ระยะยาว ${longTermYear}` : `Long-Term ${longTermYear}`}
+                                  </span>
                                 </TableHead>
                                 <TableHead className="text-xs w-40 hidden md:table-cell">
                                   {th ? 'ทิศทาง' : 'Direction'}
@@ -517,14 +606,23 @@ export default function TargetManagement() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {themeMetrics.map((m) => (
+                              {themeMetrics.map((m) => {
+                                const hasAnyTarget = !!(m.currentTarget || m.longTermTarget);
+                                const direction =
+                                  m.currentTarget?.target_direction ??
+                                  m.longTermTarget?.target_direction;
+                                const note = m.currentTarget?.note ?? m.longTermTarget?.note;
+                                const deletingForRow =
+                                  deletingId === m.currentTarget?.target_id ||
+                                  deletingId === m.longTermTarget?.target_id;
+                                return (
                                 <TableRow
                                   key={m.metric_id}
                                   id={`target-row-${m.metric_id}`}
                                   className={
                                     m.metric_id === highlightMetricId
                                       ? 'bg-amber-100/60 outline outline-2 outline-amber-400 -outline-offset-[2px] hover:bg-amber-100/70'
-                                      : m.target_id
+                                      : hasAnyTarget
                                         ? 'bg-emerald-50/30'
                                         : ''
                                   }
@@ -532,7 +630,6 @@ export default function TargetManagement() {
                                   <TableCell className="text-xs font-medium py-2.5">
                                     <div>
                                       {m.metric_name}
-                                      {/* Unit on mobile */}
                                       <span className="sm:hidden text-muted-foreground ml-1">
                                         ({m.unit ?? '-'})
                                       </span>
@@ -541,10 +638,23 @@ export default function TargetManagement() {
                                   <TableCell className="text-xs text-muted-foreground hidden sm:table-cell">
                                     {m.unit ?? '-'}
                                   </TableCell>
+                                  {/* Current-year target */}
                                   <TableCell className="text-xs">
-                                    {m.target_value != null ? (
+                                    {m.currentTarget ? (
                                       <span className="font-bold text-emerald-700">
-                                        {m.target_value.toLocaleString()}
+                                        {m.currentTarget.target_value.toLocaleString()}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground/50 italic text-[11px]">
+                                        {th ? 'ยังไม่ตั้ง' : 'Not set'}
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                  {/* Long-term target */}
+                                  <TableCell className="text-xs hidden sm:table-cell">
+                                    {m.longTermTarget ? (
+                                      <span className="font-bold text-amber-700">
+                                        {m.longTermTarget.target_value.toLocaleString()}
                                       </span>
                                     ) : (
                                       <span className="text-muted-foreground/50 italic text-[11px]">
@@ -553,16 +663,16 @@ export default function TargetManagement() {
                                     )}
                                   </TableCell>
                                   <TableCell className="hidden md:table-cell">
-                                    {m.target_direction ? (
+                                    {direction ? (
                                       <Badge
                                         variant="outline"
                                         className={`text-xs gap-1 ${
-                                          m.target_direction === 'higher_is_better'
+                                          direction === 'higher_is_better'
                                             ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
                                             : 'border-blue-200 text-blue-700 bg-blue-50'
                                         }`}
                                       >
-                                        {m.target_direction === 'higher_is_better' ? (
+                                        {direction === 'higher_is_better' ? (
                                           <>
                                             <TrendingUp className="h-3 w-3" />
                                             {th ? 'ยิ่งสูงยิ่งดี' : 'Higher Better'}
@@ -579,12 +689,11 @@ export default function TargetManagement() {
                                     )}
                                   </TableCell>
                                   <TableCell className="text-xs text-muted-foreground max-w-52 truncate hidden lg:table-cell">
-                                    {m.note || '—'}
+                                    {note || '—'}
                                   </TableCell>
                                   {isManager && (
                                     <TableCell className="text-right py-2">
                                       <div className="flex justify-end items-center gap-1">
-                                        {/* Back button on the highlighted row (deep-link return) */}
                                         {m.metric_id === highlightMetricId && (
                                           <Button
                                             asChild
@@ -599,7 +708,7 @@ export default function TargetManagement() {
                                             </Link>
                                           </Button>
                                         )}
-                                        {m.target_id ? (
+                                        {hasAnyTarget ? (
                                           <>
                                             <Button
                                               variant="ghost"
@@ -613,10 +722,10 @@ export default function TargetManagement() {
                                               variant="ghost"
                                               size="sm"
                                               className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                                              disabled={deletingId === m.target_id}
+                                              disabled={deletingForRow}
                                               onClick={() => handleDelete(m)}
                                             >
-                                              {deletingId === m.target_id ? (
+                                              {deletingForRow ? (
                                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                               ) : (
                                                 <Trash2 className="h-3.5 w-3.5" />
@@ -638,7 +747,8 @@ export default function TargetManagement() {
                                     </TableCell>
                                   )}
                                 </TableRow>
-                              ))}
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         </div>
@@ -658,13 +768,13 @@ export default function TargetManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Target className="h-5 w-5 text-emerald-600" />
-              {editingMetric?.target_id
+              {editingMetric?.currentTarget || editingMetric?.longTermTarget
                 ? th
                   ? 'แก้ไขค่าเป้าหมาย'
                   : 'Edit Target'
                 : th
-                ? 'ตั้งค่าเป้าหมายใหม่'
-                : 'Set New Target'}
+                  ? 'ตั้งค่าเป้าหมายใหม่'
+                  : 'Set New Target'}
             </DialogTitle>
           </DialogHeader>
 
@@ -687,19 +797,50 @@ export default function TargetManagement() {
               {/* Target value */}
               <div className="space-y-1.5">
                 <Label>
-                  {th ? `ค่าเป้าหมายปี ${year}` : `Target Value for ${year}`}{' '}
-                  <span className="text-destructive">*</span>
+                  {th ? `ค่าเป้าหมายปี ${year}` : `Target Value for ${year}`}
                 </Label>
                 <Input
                   type="number"
-                  value={form.target_value}
-                  onChange={(e) => setForm((f) => ({ ...f, target_value: e.target.value }))}
-                  placeholder="0"
+                  value={form.currentYearValue}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, currentYearValue: e.target.value }))
+                  }
+                  placeholder={th ? 'เว้นว่าง = ไม่ตั้ง' : 'Leave empty to skip'}
                   min="0"
                   step="any"
                   autoFocus
                 />
               </div>
+
+              {/* Long-term target value */}
+              {longTermYear !== year && (
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                    {th
+                      ? `เป้าหมายระยะยาว ปี ${longTermYear}`
+                      : `Long-Term Target (${longTermYear})`}
+                  </Label>
+                  <Input
+                    type="number"
+                    value={form.longTermValue}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, longTermValue: e.target.value }))
+                    }
+                    placeholder={
+                      th ? 'เว้นว่าง = ไม่ตั้งระยะยาว' : 'Leave empty to skip long-term'
+                    }
+                    min="0"
+                    step="any"
+                    className="border-amber-200 focus-visible:ring-amber-300"
+                  />
+                  <p className="text-[10px] text-muted-foreground italic">
+                    {th
+                      ? `บันทึกเป็น metric_target ปี ${longTermYear} แยกจากเป้าหมายปีปัจจุบัน`
+                      : `Saved as a separate metric_target row for ${longTermYear}`}
+                  </p>
+                </div>
+              )}
 
               {/* Direction */}
               <div className="space-y-1.5">
@@ -760,7 +901,13 @@ export default function TargetManagement() {
                 </Button>
                 <Button
                   onClick={handleSave}
-                  disabled={saving || !form.target_value}
+                  disabled={
+                    saving ||
+                    (!form.currentYearValue.trim() &&
+                      !form.longTermValue.trim() &&
+                      !editingMetric?.currentTarget &&
+                      !editingMetric?.longTermTarget)
+                  }
                   className="bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
                   {saving ? (
