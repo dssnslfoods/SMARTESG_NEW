@@ -39,7 +39,20 @@ const SECTION_META = {
 export default function MenuPermission() {
   const { language } = useLanguage();
   const { toast } = useToast();
-  const { allPermissions, refresh: refreshContext, loading: ctxLoading } = useMenuPermissions();
+  const {
+    allPermissions,
+    tenantAllowlist,
+    refresh: refreshContext,
+    loading: ctxLoading,
+  } = useMenuPermissions();
+
+  // Only show menus the super_admin has allowed for this tenant.
+  // A menu missing from tenantAllowlist defaults to allowed (true).
+  const visibleMenuItems = useMemo(
+    () => MENU_ITEMS.filter((m) => tenantAllowlist[m.key] !== false),
+    [tenantAllowlist],
+  );
+  const blockedCount = MENU_ITEMS.length - visibleMenuItems.length;
   const th = language === 'th';
 
   // Local full permission state (all menu × non-admin roles)
@@ -51,7 +64,7 @@ export default function MenuPermission() {
   useEffect(() => {
     if (ctxLoading) return;
     const state: PermState = {};
-    MENU_ITEMS.forEach((item) => {
+    visibleMenuItems.forEach((item) => {
       state[item.key] = {};
       NON_ADMIN_ROLES.forEach((role) => {
         const fromCtx = allPermissions[item.key]?.[role];
@@ -63,7 +76,7 @@ export default function MenuPermission() {
     });
     setPerms(state);
     setInitialized(true);
-  }, [allPermissions, ctxLoading]);
+  }, [allPermissions, ctxLoading, visibleMenuItems]);
 
   // ── Toggle handler ──────────────────────────────────────────────────────────
   const handleToggle = async (menuKey: string, role: AppRole, newValue: boolean) => {
@@ -109,24 +122,24 @@ export default function MenuPermission() {
   const stats = useMemo(() => {
     let totalOn = 0;
     let total = 0;
-    MENU_ITEMS.forEach((item) => {
+    visibleMenuItems.forEach((item) => {
       NON_ADMIN_ROLES.forEach((role) => {
         total++;
         if (perms[item.key]?.[role]) totalOn++;
       });
     });
     return { totalOn, total };
-  }, [perms]);
+  }, [perms, visibleMenuItems]);
 
   // ── Group items by section ──────────────────────────────────────────────────
   const grouped = useMemo(() => {
     const map = new Map<string, typeof MENU_ITEMS>();
-    MENU_ITEMS.forEach((item) => {
+    visibleMenuItems.forEach((item) => {
       if (!map.has(item.section)) map.set(item.section, []);
       map.get(item.section)!.push(item);
     });
     return map;
-  }, []);
+  }, [visibleMenuItems]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -172,6 +185,27 @@ export default function MenuPermission() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Super-admin allowlist notice — only shown if any menus are blocked */}
+      {blockedCount > 0 && (
+        <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50">
+          <CardContent className="py-2.5 px-4 flex items-start gap-3 text-sm">
+            <Lock className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-amber-900 font-semibold mb-0.5">
+                {th
+                  ? `Super Admin ปิดการเข้าถึง ${blockedCount} menu สำหรับ tenant นี้`
+                  : `Super Admin has blocked ${blockedCount} menu${blockedCount > 1 ? 's' : ''} for this tenant`}
+              </p>
+              <p className="text-xs text-amber-800/80">
+                {th
+                  ? 'รายการด้านล่างแสดงเฉพาะ menu ที่ tenant นี้ได้รับสิทธิ์ — ไม่สามารถเปิด menu ที่ถูกปิดเองได้ ติดต่อ Super Admin หากต้องการเพิ่มสิทธิ์'
+                  : 'The list below only shows menus this tenant has access to. You cannot grant blocked menus yourself — contact your Super Admin to request access.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Matrix */}
       {!initialized ? (
