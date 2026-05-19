@@ -248,31 +248,58 @@ function FilterRow({
 }
 
 // ─── Theme column ─────────────────────────────────────────────────────────────
-function ThemeColumn({ theme, style, th }: { theme: Theme; style: DimStyle; th: boolean }) {
+function ThemeColumn({
+  theme,
+  style,
+  th,
+  onThemeClick,
+  onMetricClick,
+}: {
+  theme: Theme;
+  style: DimStyle;
+  th: boolean;
+  onThemeClick?: () => void;
+  onMetricClick?: (metricId: string) => void;
+}) {
+  const headerInner = (
+    <>
+      <h3 className={`text-sm font-bold ${style.themeHeaderText} leading-tight`}>
+        {cleanThemeName(theme.theme_name)}
+      </h3>
+      <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+        <Hash className="h-2.5 w-2.5" />
+        {theme.metrics.length} {th ? 'ตัวชี้วัด' : 'metrics'}
+      </p>
+    </>
+  );
+
   return (
     <div
       className={`rounded-2xl border-2 ${style.themeBorder} overflow-hidden bg-white/95 shadow-sm hover:shadow-md transition-shadow`}
     >
-      <div className={`${style.themeHeaderBg} px-3 py-2.5 border-b ${style.themeBorder} text-center`}>
-        <h3 className={`text-sm font-bold ${style.themeHeaderText} leading-tight`}>
-          {cleanThemeName(theme.theme_name)}
-        </h3>
-        <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-          <Hash className="h-2.5 w-2.5" />
-          {theme.metrics.length} {th ? 'ตัวชี้วัด' : 'metrics'}
-        </p>
-      </div>
+      {onThemeClick ? (
+        <button
+          type="button"
+          onClick={onThemeClick}
+          title={th ? 'ดูเฉพาะ Theme นี้' : 'Drill into this theme'}
+          className={`w-full ${style.themeHeaderBg} px-3 py-2.5 border-b ${style.themeBorder} text-center cursor-pointer hover:brightness-95 active:brightness-90 transition`}
+        >
+          {headerInner}
+        </button>
+      ) : (
+        <div className={`${style.themeHeaderBg} px-3 py-2.5 border-b ${style.themeBorder} text-center`}>
+          {headerInner}
+        </div>
+      )}
+
       <div className="p-2 space-y-1.5">
         {theme.metrics.length === 0 ? (
           <p className="text-[11px] text-muted-foreground/60 text-center py-3 italic">
             {th ? '(ยังไม่มีตัวชี้วัด)' : '(no metrics)'}
           </p>
         ) : (
-          theme.metrics.map((m) => (
-            <div
-              key={m.metric_id}
-              className={`rounded-lg border ${style.metricBg} ${style.metricHover} px-2.5 py-2 transition-all cursor-default`}
-            >
+          theme.metrics.map((m) => {
+            const innerContent = (
               <div className="flex items-start gap-2">
                 <span className={`mt-1 inline-block h-1.5 w-1.5 rounded-full ${style.accentDot} shrink-0`} />
                 <div className="flex-1 min-w-0">
@@ -281,9 +308,31 @@ function ThemeColumn({ theme, style, th }: { theme: Theme; style: DimStyle; th: 
                     <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{m.unit}</p>
                   )}
                 </div>
+                {onMetricClick && (
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all mt-0.5 shrink-0" />
+                )}
               </div>
-            </div>
-          ))
+            );
+
+            return onMetricClick ? (
+              <button
+                key={m.metric_id}
+                type="button"
+                onClick={() => onMetricClick(m.metric_id)}
+                title={th ? 'ดู Infographic ของตัวชี้วัดนี้' : 'View metric infographic'}
+                className={`w-full text-left rounded-lg border ${style.metricBg} ${style.metricHover} px-2.5 py-2 transition-all cursor-pointer hover:shadow-md group`}
+              >
+                {innerContent}
+              </button>
+            ) : (
+              <div
+                key={m.metric_id}
+                className={`rounded-lg border ${style.metricBg} px-2.5 py-2 transition-all cursor-default`}
+              >
+                {innerContent}
+              </div>
+            );
+          })
         )}
       </div>
     </div>
@@ -295,10 +344,12 @@ function DimensionCard({
   dim,
   themesOverride,
   th,
+  onSelect,
 }: {
   dim: Dimension;
   themesOverride?: Theme[];
   th: boolean;
+  onSelect?: (dimId: string, themeId: string, metricId?: string) => void;
 }) {
   const style = getStyle(dim.dimension_name);
   const Icon = style.icon;
@@ -346,7 +397,16 @@ function DimensionCard({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {themes.map((t) => (
-              <ThemeColumn key={t.theme_id} theme={t} style={style} th={th} />
+              <ThemeColumn
+                key={t.theme_id}
+                theme={t}
+                style={style}
+                th={th}
+                onThemeClick={onSelect ? () => onSelect(dim.dimension_id, t.theme_id) : undefined}
+                onMetricClick={
+                  onSelect ? (mid) => onSelect(dim.dimension_id, t.theme_id, mid) : undefined
+                }
+              />
             ))}
           </div>
         )}
@@ -953,6 +1013,17 @@ export default function ESGKeyIssues() {
     setFilterMetric(null);
   };
 
+  // Click-from-card handler: sets all filter levels at once and scrolls to top
+  // so the user sees the Filter chips update + the focused display appear.
+  const handleSelectFromCard = (dimId: string, themeId: string, metricId?: string) => {
+    setFilterDim(dimId);
+    setFilterTheme(themeId);
+    setFilterMetric(metricId ?? null);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const dimContext = useMemo(
     () => (filterDim ? data.find((d) => d.dimension_id === filterDim) ?? null : null),
     [data, filterDim],
@@ -1163,13 +1234,23 @@ export default function ESGKeyIssues() {
           th={th}
         />
       ) : themeContext ? (
-        <DimensionCard dim={themeContext.dim} themesOverride={[themeContext.theme]} th={th} />
+        <DimensionCard
+          dim={themeContext.dim}
+          themesOverride={[themeContext.theme]}
+          th={th}
+          onSelect={handleSelectFromCard}
+        />
       ) : dimContext ? (
-        <DimensionCard dim={dimContext} th={th} />
+        <DimensionCard dim={dimContext} th={th} onSelect={handleSelectFromCard} />
       ) : (
         <div className="space-y-5">
           {data.map((d) => (
-            <DimensionCard key={d.dimension_id} dim={d} th={th} />
+            <DimensionCard
+              key={d.dimension_id}
+              dim={d}
+              th={th}
+              onSelect={handleSelectFromCard}
+            />
           ))}
         </div>
       )}
