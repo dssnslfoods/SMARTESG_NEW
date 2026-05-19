@@ -629,13 +629,20 @@ export default function UserManagement() {
     URL.revokeObjectURL(url);
   };
 
-  // Filter users based on role
-  // Admin sees all, supervisor sees non-admin, executive/staff see only self
-  const visibleUsers = isSelfOnly
-    ? users.filter(u => u.user_id === currentUser?.id)
-    : currentUserRole === 'supervisor' 
-      ? users.filter(u => u.role !== 'admin')
-      : users;
+  // Filter users based on role:
+  //   • staff/executive: only self
+  //   • supervisor: non-admin users
+  //   • admin / super_admin (default): all users
+  // ALWAYS hide super_admin from the User Management list — they are
+  // platform-level operators and are managed via Tenant Management /
+  // direct SQL, not the per-tenant User Management UI.
+  const visibleUsers = (
+    isSelfOnly
+      ? users.filter(u => u.user_id === currentUser?.id)
+      : currentUserRole === 'supervisor'
+        ? users.filter(u => u.role !== 'admin')
+        : users
+  ).filter(u => u.role !== 'super_admin');
 
   const filteredUsers = visibleUsers.filter((user) =>
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
