@@ -354,7 +354,7 @@ export default function ResetPassword() {
         </div>
 
         <p className="mt-8 text-xs text-white/30 text-center gl-fade-in" style={{ animationDelay: "0.6s" }}>
-          © 2026 ESG Smart Performance | Developed by Arnon Arpaket
+          © 2026 D2Infinite Co.,Ltd. All rights reserved. ESG Smart Performance Application
         </p>
       </div>
 

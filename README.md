@@ -19,7 +19,7 @@ All rights reserved. การคัดลอก แจกจ่าย หรื
 
 ## ภาพรวมระบบ
 
-ESG Smart Performance คือ web application สำหรับให้องค์กรในเครือ NSL Foods PCL. และพันธมิตร บันทึก/ติดตาม/รายงาน metric ด้าน ESG ครอบคลุม 3 มิติ:
+ESG Smart Performance คือ multi-tenant web application สำหรับให้องค์กรลูกค้า บันทึก/ติดตาม/รายงาน metric ด้าน ESG ครอบคลุม 3 มิติ:
 
 | มิติ | ตัวอย่าง Metric |
 |---|---|
@@ -243,9 +243,9 @@ DNS records ที่ต้องตั้งใน `def2design.com`:
 ## Support
 
 ติดต่อ: **D2Infinite Co.,Ltd.**
-หากพบ bug หรือต้องการขอ feature ใหม่ กรุณาแจ้ง project owner ที่ NSL Foods PCL.
+หากพบ bug หรือต้องการขอ feature ใหม่ กรุณาแจ้ง project owner
 
 ---
 
 © 2026 D2Infinite Co.,Ltd. All rights reserved.
-ESG Smart Performance Application — Developed for NSL Foods PCL.
+ESG Smart Performance Application
