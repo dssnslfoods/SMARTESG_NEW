@@ -74,6 +74,7 @@ interface MetricValueRow {
   site: { site_id: string; site_name: string } | null;
 }
 interface TargetRow {
+  year: number;
   target_value: number;
   target_direction: 'lower_is_better' | 'higher_is_better';
   note: string | null;
@@ -518,16 +519,17 @@ function MetricHero({
   const Icon = style.icon;
 
   const [values, setValues] = useState<MetricValueRow[]>([]);
-  const [target, setTarget] = useState<TargetRow | null>(null);
+  const [targets, setTargets] = useState<TargetRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       setLoading(true);
       try {
-        const currentYear = new Date().getFullYear();
-        const [valuesRes, targetRes] = await Promise.all([
+        const [valuesRes, targetsRes] = await Promise.all([
           supabase
             .from('metric_value')
             .select(`
@@ -537,16 +539,16 @@ function MetricHero({
             `)
             .eq('metric_id', metric.metric_id)
             .in('status', ['approved', 'submitted']),
+          // Fetch ALL targets for this metric — not just current year — so we
+          // can compare each year's actual against its own target.
           supabase
             .from('metric_target')
-            .select('target_value, target_direction, note')
-            .eq('metric_id', metric.metric_id)
-            .eq('year', currentYear)
-            .maybeSingle(),
+            .select('year, target_value, target_direction, note')
+            .eq('metric_id', metric.metric_id),
         ]);
         if (cancelled) return;
         setValues((valuesRes.data ?? []) as any);
-        setTarget((targetRes.data ?? null) as any);
+        setTargets((targetsRes.data ?? []) as any);
       } catch (e) {
         console.error('MetricHero load error:', e);
       } finally {
@@ -558,6 +560,19 @@ function MetricHero({
       cancelled = true;
     };
   }, [metric.metric_id]);
+
+  // Current year target — drives the Target Achievement card
+  const currentTarget = useMemo(
+    () => targets.find((t) => t.year === currentYear) ?? null,
+    [targets, currentYear],
+  );
+
+  // Lookup by year — drives per-year bar coloring in the yearly chart
+  const targetByYear = useMemo(() => {
+    const m = new Map<number, TargetRow>();
+    targets.forEach((t) => m.set(t.year, t));
+    return m;
+  }, [targets]);
 
   // ── Aggregations ─────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -572,8 +587,19 @@ function MetricHero({
     });
     const latest = Number(sorted[sorted.length - 1]?.value ?? 0);
     const uniqueSites = new Set(values.map((v) => v.site?.site_id).filter(Boolean));
-    return { total, avg, latest, count: values.length, siteCount: uniqueSites.size };
-  }, [values]);
+    // Current-year only sum — used for per-year target achievement
+    const currentYearTotal = values
+      .filter((v) => v.period?.year === currentYear)
+      .reduce((s, v) => s + Number(v.value), 0);
+    return {
+      total,
+      avg,
+      latest,
+      count: values.length,
+      siteCount: uniqueSites.size,
+      currentYearTotal,
+    };
+  }, [values, currentYear]);
 
   const timeSeries = useMemo(() => {
     const map = new Map<string, { key: string; label: string; year: number; month: number; total: number }>();
@@ -620,16 +646,21 @@ function MetricHero({
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [values]);
 
+  // Achievement = current-year actual ÷ current-year target.
+  // Cumulative would be misleading because the target is per-year.
   const achievement = useMemo(() => {
-    if (!target || !stats) return null;
-    const pct = target.target_value === 0 ? 0 : (stats.total / target.target_value) * 100;
-    const isLower = target.target_direction === 'lower_is_better';
-    const onTrack = isLower ? stats.total <= target.target_value : stats.total >= target.target_value;
-    return { pct, onTrack, isLower };
-  }, [target, stats]);
+    if (!currentTarget || !stats) return null;
+    const tv = Number(currentTarget.target_value);
+    const actual = stats.currentYearTotal;
+    const pct = tv === 0 ? 0 : (actual / tv) * 100;
+    const isLower = currentTarget.target_direction === 'lower_is_better';
+    const onTrack = isLower ? actual <= tv : actual >= tv;
+    return { pct, onTrack, isLower, actual };
+  }, [currentTarget, stats]);
 
-  // Aggregated values per year — last 3 years (or fewer if not available)
-  // Used to plot a comparison chart against the target reference line.
+  // Aggregated values per year — last 3 years (or fewer if not available).
+  // Each year is compared to its OWN target (not the current year's target),
+  // because a 2024 bar should reflect whether 2024 hit its 2024 goal.
   const yearlyData = useMemo(() => {
     const yearMap = new Map<number, number>();
     values.forEach((v) => {
@@ -639,15 +670,23 @@ function MetricHero({
     });
     const sortedYears = Array.from(yearMap.keys()).sort((a, b) => a - b);
     const recentYears = sortedYears.length > 3 ? sortedYears.slice(-3) : sortedYears;
-    const targetVal = target ? Number(target.target_value) : null;
-    const isLower = target?.target_direction === 'lower_is_better';
     return recentYears.map((year) => {
       const actual = yearMap.get(year) ?? 0;
-      const isOnTrack =
-        targetVal === null ? true : isLower ? actual <= targetVal : actual >= targetVal;
-      return { year: String(year), actual, isOnTrack };
+      const t = targetByYear.get(year);
+      let status: 'on-track' | 'off-track' | 'no-target' = 'no-target';
+      if (t) {
+        const tv = Number(t.target_value);
+        const isLower = t.target_direction === 'lower_is_better';
+        status = (isLower ? actual <= tv : actual >= tv) ? 'on-track' : 'off-track';
+      }
+      return {
+        year: String(year),
+        actual,
+        status,
+        yearTarget: t ? Number(t.target_value) : null,
+      };
     });
-  }, [values, target]);
+  }, [values, targetByYear]);
 
   const hasData = values.length > 0;
   const unit = metric.unit ?? '';
@@ -833,7 +872,7 @@ function MetricHero({
             )}
 
             {/* Target achievement */}
-            {target && achievement && (
+            {currentTarget && achievement && (
               <div
                 className={`rounded-2xl border-2 p-4 ${
                   achievement.onTrack
@@ -850,12 +889,12 @@ function MetricHero({
                     <Badge
                       variant="outline"
                       className={`text-[10px] gap-1 ${
-                        target.target_direction === 'higher_is_better'
+                        currentTarget.target_direction === 'higher_is_better'
                           ? 'border-emerald-300 text-emerald-700 bg-white/50'
                           : 'border-blue-300 text-blue-700 bg-white/50'
                       }`}
                     >
-                      {target.target_direction === 'higher_is_better' ? (
+                      {currentTarget.target_direction === 'higher_is_better' ? (
                         <>
                           <TrendingUp className="h-3 w-3" />
                           {th ? 'ยิ่งสูงยิ่งดี' : 'Higher Better'}
@@ -884,23 +923,23 @@ function MetricHero({
                   </Badge>
                 </div>
 
-                {/* Actual vs Target values */}
+                {/* Actual vs Target values (per-year, not cumulative) */}
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div className="rounded-xl bg-white/70 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                      {th ? 'ค่าจริง (สะสม)' : 'Actual (cumulative)'}
+                      {th ? `ค่าจริงปี ${currentYear}` : `Actual ${currentYear}`}
                     </p>
                     <p className={`text-lg font-bold mt-0.5 ${style.heroAccent}`}>
-                      {formatCompact(stats!.total)}{' '}
+                      {formatCompact(stats!.currentYearTotal)}{' '}
                       <span className="text-xs font-normal text-muted-foreground">{unit}</span>
                     </p>
                   </div>
                   <div className="rounded-xl bg-white/70 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                      {th ? `เป้าหมายปี ${new Date().getFullYear()}` : `Target ${new Date().getFullYear()}`}
+                      {th ? `เป้าหมายปี ${currentYear}` : `Target ${currentYear}`}
                     </p>
                     <p className="text-lg font-bold mt-0.5 text-foreground">
-                      {formatCompact(target.target_value)}{' '}
+                      {formatCompact(Number(currentTarget.target_value))}{' '}
                       <span className="text-xs font-normal text-muted-foreground">{unit}</span>
                     </p>
                   </div>
@@ -944,13 +983,13 @@ function MetricHero({
                           cursor={{ fill: 'rgba(0,0,0,0.04)' }}
                         />
                         <ReferenceLine
-                          y={Number(target.target_value)}
+                          y={Number(currentTarget.target_value)}
                           stroke="#f59e0b"
                           strokeDasharray="6 4"
                           strokeWidth={2}
                           ifOverflow="extendDomain"
                           label={{
-                            value: `${th ? 'เป้า' : 'Target'} ${formatCompact(Number(target.target_value))}`,
+                            value: `${th ? 'เป้า' : 'Target'} ${formatCompact(Number(currentTarget.target_value))}`,
                             position: 'right',
                             fill: '#b45309',
                             fontSize: 10,
@@ -959,7 +998,16 @@ function MetricHero({
                         />
                         <Bar dataKey="actual" radius={[6, 6, 0, 0]} maxBarSize={72}>
                           {yearlyData.map((d, i) => (
-                            <Cell key={i} fill={d.isOnTrack ? '#10b981' : '#ef4444'} />
+                            <Cell
+                              key={i}
+                              fill={
+                                d.status === 'on-track'
+                                  ? '#10b981'
+                                  : d.status === 'off-track'
+                                    ? '#ef4444'
+                                    : '#94a3b8'
+                              }
+                            />
                           ))}
                         </Bar>
                       </BarChart>
@@ -978,6 +1026,14 @@ function MetricHero({
                           {th ? 'ไม่บรรลุ' : 'Off track'}
                         </span>
                       </span>
+                      {yearlyData.some((d) => d.status === 'no-target') && (
+                        <span className="flex items-center gap-1">
+                          <span className="inline-block h-2 w-2 rounded-sm bg-slate-400" />
+                          <span className="text-muted-foreground">
+                            {th ? 'ไม่ได้ตั้งเป้า' : 'No target'}
+                          </span>
+                        </span>
+                      )}
                       <span className="flex items-center gap-1">
                         <svg width="18" height="6" className="inline">
                           <line
@@ -991,7 +1047,7 @@ function MetricHero({
                           />
                         </svg>
                         <span className="text-muted-foreground">
-                          {th ? `เป้าหมายปี ${new Date().getFullYear()}` : `Target line (${new Date().getFullYear()})`}
+                          {th ? `เป้าหมายปี ${currentYear}` : `Target line (${currentYear})`}
                         </span>
                       </span>
                     </div>
@@ -1027,22 +1083,22 @@ function MetricHero({
                   </p>
                 </div>
 
-                {target.note && (
+                {currentTarget.note && (
                   <p className="text-[11px] text-muted-foreground italic mt-2 pt-2 border-t border-border/30">
-                    💬 {target.note}
+                    💬 {currentTarget.note}
                   </p>
                 )}
               </div>
             )}
 
             {/* No target hint */}
-            {!target && (
+            {!currentTarget && (
               <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50/50 px-4 py-3 flex items-start gap-3">
                 <Target className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
                 <div className="flex-1 text-sm">
                   <p className="font-semibold text-amber-900">
                     {th ? 'ยังไม่ได้กำหนดเป้าหมายปี ' : 'No target set for '}
-                    {new Date().getFullYear()}
+                    {currentYear}
                   </p>
                   <p className="text-xs text-amber-800/80 mt-0.5">
                     {th
