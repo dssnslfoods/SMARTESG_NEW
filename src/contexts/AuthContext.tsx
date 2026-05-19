@@ -7,6 +7,7 @@ type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest' | 'super
 
 interface UserProfile {
   user_id: string;
+  tenant_id: string | null;
   full_name: string | null;
   company_id: string | null;
   site_id: string | null;
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (profileData) {
         const enhancedProfile: UserProfile = {
           user_id: profileData.user_id,
+          tenant_id: (profileData as any).tenant_id ?? null,
           full_name: profileData.full_name,
           company_id: profileData.company_id,
           site_id: profileData.site_id,

@@ -40,6 +40,7 @@ import {
 import { useState } from 'react';
 import { useReportSections } from '@/contexts/ReportSectionsContext';
 import { Checkbox } from '@/components/ui/checkbox';
+import TenantSwitcher from '@/components/super/TenantSwitcher';
 
 interface SidebarProps {
   onNavigate?: () => void;
@@ -143,6 +144,9 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        {/* Tenant switcher (super_admin only) — placed above everything else */}
+        <TenantSwitcher />
+
         {/* Super Admin section — only for platform super_admins */}
         {isSuperAdmin && (
           <>
