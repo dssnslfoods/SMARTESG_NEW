@@ -19,8 +19,27 @@ import {
   Filter as FilterIcon,
   Target,
   FileInput,
+  TrendingUp,
+  TrendingDown,
+  Building2,
+  Calendar,
+  Activity,
+  Database,
+  Inbox,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as ReTooltip,
+  Cell,
+} from 'recharts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Metric {
@@ -28,20 +47,29 @@ interface Metric {
   metric_name: string;
   unit: string | null;
 }
-
 interface Theme {
   theme_id: string;
   theme_name: string;
   metrics: Metric[];
 }
-
 interface Dimension {
   dimension_id: string;
   dimension_name: string;
   themes: Theme[];
 }
+interface MetricValueRow {
+  value: number;
+  status: string;
+  period: { year: number; month: number } | null;
+  site: { site_id: string; site_name: string } | null;
+}
+interface TargetRow {
+  target_value: number;
+  target_direction: 'lower_is_better' | 'higher_is_better';
+  note: string | null;
+}
 
-// ─── Visual styling per dimension ─────────────────────────────────────────────
+// ─── Visual styles per dimension ──────────────────────────────────────────────
 interface DimStyle {
   icon: typeof Leaf;
   bannerGradient: string;
@@ -53,6 +81,8 @@ interface DimStyle {
   metricHover: string;
   accentDot: string;
   heroAccent: string;
+  chartColor: string;
+  chartColorLight: string;
 }
 
 const STYLES: Record<string, DimStyle> = {
@@ -67,6 +97,8 @@ const STYLES: Record<string, DimStyle> = {
     metricHover: 'hover:bg-emerald-50 hover:border-emerald-300',
     accentDot: 'bg-emerald-500',
     heroAccent: 'text-emerald-600',
+    chartColor: '#10b981',
+    chartColorLight: '#a7f3d0',
   },
   Social: {
     icon: Heart,
@@ -79,6 +111,8 @@ const STYLES: Record<string, DimStyle> = {
     metricHover: 'hover:bg-blue-50 hover:border-blue-300',
     accentDot: 'bg-blue-500',
     heroAccent: 'text-blue-600',
+    chartColor: '#3b82f6',
+    chartColorLight: '#bfdbfe',
   },
   Governance: {
     icon: Scale,
@@ -91,6 +125,8 @@ const STYLES: Record<string, DimStyle> = {
     metricHover: 'hover:bg-amber-50 hover:border-amber-300',
     accentDot: 'bg-amber-500',
     heroAccent: 'text-amber-600',
+    chartColor: '#f59e0b',
+    chartColorLight: '#fde68a',
   },
   'General Information': {
     icon: FileText,
@@ -103,23 +139,40 @@ const STYLES: Record<string, DimStyle> = {
     metricHover: 'hover:bg-slate-50 hover:border-slate-400',
     accentDot: 'bg-slate-500',
     heroAccent: 'text-slate-600',
+    chartColor: '#64748b',
+    chartColorLight: '#cbd5e1',
   },
 };
 
 const FALLBACK_STYLE = STYLES['General Information'];
-
 const DIM_ORDER = ['Environment', 'Social', 'Governance', 'General Information'];
-
 const cleanThemeName = (s: string) => s.replace(/^\d+\.\s*/, '').trim();
-
 const getStyle = (name: string) => STYLES[name] ?? FALLBACK_STYLE;
+
+// ─── Format helpers ───────────────────────────────────────────────────────────
+const MONTH_NAMES = {
+  th: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'],
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+};
+const periodLabel = (y: number, m: number, th: boolean) =>
+  `${MONTH_NAMES[th ? 'th' : 'en'][m - 1] ?? '?'} ${String(y).slice(-2)}`;
+
+const formatNumber = (n: number) =>
+  n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+const formatCompact = (n: number) => {
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (abs >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toFixed(0);
+};
 
 // ─── Chip ─────────────────────────────────────────────────────────────────────
 interface ChipItem {
   id: string | null;
   label: string;
 }
-
 type ChipColor = 'emerald' | 'blue' | 'amber';
 
 function FilterChip({
@@ -139,7 +192,6 @@ function FilterChip({
     amber: 'bg-amber-600 hover:bg-amber-700 ring-amber-200',
   };
   const isAllChip = item.id === null;
-
   return (
     <button
       type="button"
@@ -157,11 +209,9 @@ function FilterChip({
   );
 }
 
-// ─── Filter Row ───────────────────────────────────────────────────────────────
 function FilterRow({
   icon: Icon,
   label,
-  hintText,
   items,
   selected,
   onChange,
@@ -170,7 +220,6 @@ function FilterRow({
 }: {
   icon: typeof Layers3;
   label: string;
-  hintText?: string;
   items: ChipItem[];
   selected: string | null;
   onChange: (id: string | null) => void;
@@ -193,17 +242,12 @@ function FilterRow({
             color={color}
           />
         ))}
-        {hintText && items.length <= 1 && (
-          <span className="text-[11px] text-muted-foreground/60 italic self-center pl-1">
-            {hintText}
-          </span>
-        )}
       </div>
     </div>
   );
 }
 
-// ─── Theme column renderer ───────────────────────────────────────────────────
+// ─── Theme column ─────────────────────────────────────────────────────────────
 function ThemeColumn({ theme, style, th }: { theme: Theme; style: DimStyle; th: boolean }) {
   return (
     <div
@@ -246,7 +290,7 @@ function ThemeColumn({ theme, style, th }: { theme: Theme; style: DimStyle; th: 
   );
 }
 
-// ─── Dimension card renderer ─────────────────────────────────────────────────
+// ─── Dimension card ───────────────────────────────────────────────────────────
 function DimensionCard({
   dim,
   themesOverride,
@@ -268,7 +312,6 @@ function DimensionCard({
           <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white blur-3xl" />
           <div className="absolute -bottom-12 left-1/3 w-32 h-32 rounded-full bg-white blur-3xl" />
         </div>
-
         <div className="relative flex items-center gap-4">
           <div className="rounded-2xl bg-white/25 backdrop-blur-sm p-3 ring-1 ring-white/30">
             <Icon className="h-7 w-7" />
@@ -287,7 +330,6 @@ function DimensionCard({
               </span>
             </div>
           </div>
-
           <Badge
             variant="secondary"
             className="bg-white/25 text-white border-0 backdrop-blur-sm uppercase tracking-wider text-[10px] hidden sm:inline-flex"
@@ -296,7 +338,6 @@ function DimensionCard({
           </Badge>
         </div>
       </div>
-
       <CardContent className={`p-3 sm:p-4 ${style.bannerBgPattern}`}>
         {themes.length === 0 ? (
           <p className="text-center text-sm text-muted-foreground py-6">
@@ -314,7 +355,84 @@ function DimensionCard({
   );
 }
 
-// ─── Metric hero card ────────────────────────────────────────────────────────
+// ─── Stat card ────────────────────────────────────────────────────────────────
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  sublabel,
+  color,
+}: {
+  icon: typeof Hash;
+  label: string;
+  value: string;
+  sublabel?: string;
+  color: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-white/90 border border-white p-3 shadow-sm backdrop-blur-sm">
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+          {label}
+        </p>
+        <Icon className={`h-4 w-4 opacity-60 ${color}`} />
+      </div>
+      <p className={`text-xl font-bold ${color} leading-tight`}>{value}</p>
+      {sublabel && (
+        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{sublabel}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Section header for charts ────────────────────────────────────────────────
+function SectionHeader({
+  icon: Icon,
+  title,
+  sublabel,
+  color,
+}: {
+  icon: typeof Hash;
+  title: string;
+  sublabel?: string;
+  color: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <Icon className={`h-4 w-4 ${color}`} />
+      <h3 className="text-sm font-bold text-foreground">{title}</h3>
+      {sublabel && <span className="text-xs text-muted-foreground">· {sublabel}</span>}
+    </div>
+  );
+}
+
+// ─── Custom recharts tooltip ──────────────────────────────────────────────────
+function ChartTooltip({
+  active,
+  payload,
+  label,
+  unit,
+}: {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+  unit?: string | null;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-border bg-white/95 backdrop-blur-sm shadow-xl px-3 py-2 text-xs">
+      <p className="font-semibold text-foreground mb-0.5">{label}</p>
+      <p className="text-muted-foreground">
+        <span className="font-mono font-bold text-foreground">
+          {formatNumber(Number(payload[0].value))}
+        </span>{' '}
+        {unit ?? ''}
+      </p>
+    </div>
+  );
+}
+
+// ─── Metric Hero (drill-down infographic) ─────────────────────────────────────
 function MetricHero({
   dim,
   theme,
@@ -328,6 +446,120 @@ function MetricHero({
 }) {
   const style = getStyle(dim.dimension_name);
   const Icon = style.icon;
+
+  const [values, setValues] = useState<MetricValueRow[]>([]);
+  const [target, setTarget] = useState<TargetRow | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const currentYear = new Date().getFullYear();
+        const [valuesRes, targetRes] = await Promise.all([
+          supabase
+            .from('metric_value')
+            .select(`
+              value, status,
+              period:period_id(year, month),
+              site:site_id(site_id, site_name)
+            `)
+            .eq('metric_id', metric.metric_id)
+            .in('status', ['approved', 'submitted']),
+          supabase
+            .from('metric_target')
+            .select('target_value, target_direction, note')
+            .eq('metric_id', metric.metric_id)
+            .eq('year', currentYear)
+            .maybeSingle(),
+        ]);
+        if (cancelled) return;
+        setValues((valuesRes.data ?? []) as any);
+        setTarget((targetRes.data ?? null) as any);
+      } catch (e) {
+        console.error('MetricHero load error:', e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [metric.metric_id]);
+
+  // ── Aggregations ─────────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    if (values.length === 0) return null;
+    const nums = values.map((v) => Number(v.value));
+    const total = nums.reduce((s, n) => s + n, 0);
+    const avg = total / nums.length;
+    const sorted = [...values].sort((a, b) => {
+      const ka = `${a.period?.year ?? 0}-${String(a.period?.month ?? 0).padStart(2, '0')}`;
+      const kb = `${b.period?.year ?? 0}-${String(b.period?.month ?? 0).padStart(2, '0')}`;
+      return ka.localeCompare(kb);
+    });
+    const latest = Number(sorted[sorted.length - 1]?.value ?? 0);
+    const uniqueSites = new Set(values.map((v) => v.site?.site_id).filter(Boolean));
+    return { total, avg, latest, count: values.length, siteCount: uniqueSites.size };
+  }, [values]);
+
+  const timeSeries = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; year: number; month: number; total: number }>();
+    values.forEach((v) => {
+      const y = v.period?.year ?? 0;
+      const m = v.period?.month ?? 0;
+      if (!y || !m) return;
+      const key = `${y}-${String(m).padStart(2, '0')}`;
+      const existing = map.get(key);
+      if (existing) existing.total += Number(v.value);
+      else
+        map.set(key, {
+          key,
+          label: periodLabel(y, m, th),
+          year: y,
+          month: m,
+          total: Number(v.value),
+        });
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
+  }, [values, th]);
+
+  const bySite = useMemo(() => {
+    const map = new Map<string, { site_id: string; site_name: string; total: number; count: number }>();
+    values.forEach((v) => {
+      const id = v.site?.site_id;
+      if (!id) return;
+      const existing = map.get(id);
+      if (existing) {
+        existing.total += Number(v.value);
+        existing.count += 1;
+      } else {
+        map.set(id, {
+          site_id: id,
+          site_name: v.site?.site_name ?? id,
+          total: Number(v.value),
+          count: 1,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [values]);
+
+  const achievement = useMemo(() => {
+    if (!target || !stats) return null;
+    const pct = target.target_value === 0 ? 0 : (stats.total / target.target_value) * 100;
+    const isLower = target.target_direction === 'lower_is_better';
+    const onTrack = isLower ? stats.total <= target.target_value : stats.total >= target.target_value;
+    return { pct, onTrack, isLower };
+  }, [target, stats]);
+
+  const hasData = values.length > 0;
+  const unit = metric.unit ?? '';
 
   return (
     <Card className="glass-card-solid overflow-hidden border-0 shadow-2xl">
@@ -348,48 +580,302 @@ function MetricHero({
         </div>
       </div>
 
-      <CardContent className={`py-8 px-6 ${style.bannerBgPattern} text-center`}>
-        <div className={`inline-flex items-center justify-center h-16 w-16 rounded-full ${style.accentDot}/10 mb-3`}>
-          <Hash className={`h-8 w-8 ${style.heroAccent}`} />
+      <CardContent className={`${style.bannerBgPattern} p-0`}>
+        {/* Hero title */}
+        <div className="py-7 px-6 text-center border-b border-border/30 bg-white/40">
+          <div className={`inline-flex items-center justify-center h-14 w-14 rounded-full bg-white mb-3 ring-4 ring-${dim.dimension_name === 'Environment' ? 'emerald' : dim.dimension_name === 'Social' ? 'blue' : dim.dimension_name === 'Governance' ? 'amber' : 'slate'}-100`}>
+            <Hash className={`h-7 w-7 ${style.heroAccent}`} />
+          </div>
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70 mb-2 font-mono">
+            {metric.metric_id}
+          </p>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground max-w-3xl mx-auto leading-tight">
+            {metric.metric_name}
+          </h2>
+          {metric.unit && (
+            <div className="mt-3 flex justify-center">
+              <Badge variant="outline" className="text-sm font-mono px-3 py-1 bg-white/70 backdrop-blur-sm">
+                {th ? 'หน่วย: ' : 'Unit: '}
+                <span className={`ml-1 font-bold ${style.heroAccent}`}>{metric.unit}</span>
+              </Badge>
+            </div>
+          )}
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Button asChild size="sm" variant="outline" className="gap-1.5">
+              <Link to="/data-entry">
+                <FileInput className="h-3.5 w-3.5" />
+                {th ? 'บันทึกข้อมูล' : 'Data Entry'}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="gap-1.5">
+              <Link to="/master/targets">
+                <Target className="h-3.5 w-3.5" />
+                {th ? 'กำหนดเป้าหมาย' : 'Set KPI Target'}
+              </Link>
+            </Button>
+          </div>
         </div>
 
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70 mb-2 font-mono">
-          {metric.metric_id}
-        </p>
+        {/* Infographic body */}
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+          </div>
+        ) : !hasData ? (
+          <div className="px-6 py-12 text-center">
+            <Inbox className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-semibold text-muted-foreground">
+              {th ? 'ยังไม่มีข้อมูลของตัวชี้วัดนี้' : 'No data yet for this metric'}
+            </p>
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              {th
+                ? 'ไปที่ Data Entry เพื่อเริ่มบันทึกข้อมูล'
+                : 'Head to Data Entry to start recording values'}
+            </p>
+          </div>
+        ) : (
+          <div className="p-4 sm:p-6 space-y-6">
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <StatCard
+                icon={Database}
+                label={th ? 'ยอดรวมสะสม' : 'Total'}
+                value={formatCompact(stats!.total)}
+                sublabel={unit}
+                color={style.heroAccent}
+              />
+              <StatCard
+                icon={Activity}
+                label={th ? 'ค่าล่าสุด' : 'Latest'}
+                value={formatCompact(stats!.latest)}
+                sublabel={unit}
+                color={style.heroAccent}
+              />
+              <StatCard
+                icon={Calendar}
+                label={th ? 'บันทึก' : 'Records'}
+                value={String(stats!.count)}
+                sublabel={th ? 'รายการ' : 'entries'}
+                color={style.heroAccent}
+              />
+              <StatCard
+                icon={Building2}
+                label={th ? 'สาขา' : 'Sites'}
+                value={String(stats!.siteCount)}
+                sublabel={th ? 'สาขา' : 'locations'}
+                color={style.heroAccent}
+              />
+            </div>
 
-        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground max-w-3xl mx-auto leading-tight">
-          {metric.metric_name}
-        </h2>
+            {/* Time series chart */}
+            {timeSeries.length > 0 && (
+              <div className="rounded-2xl bg-white/90 border border-white p-4 shadow-sm">
+                <SectionHeader
+                  icon={TrendingUp}
+                  title={th ? 'แนวโน้มตามช่วงเวลา' : 'Trend by Period'}
+                  sublabel={`${timeSeries.length} ${th ? 'ช่วง' : 'periods'}`}
+                  color={style.heroAccent}
+                />
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={timeSeries} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      axisLine={{ stroke: '#e5e7eb' }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      tickFormatter={formatCompact}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <ReTooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                    <Bar dataKey="total" fill={style.chartColor} radius={[6, 6, 0, 0]} maxBarSize={48} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
-        {metric.unit && (
-          <div className="mt-4 flex justify-center">
-            <Badge variant="outline" className="text-sm font-mono px-3 py-1 bg-white/70 backdrop-blur-sm">
-              {th ? 'หน่วย: ' : 'Unit: '}
-              <span className={`ml-1 font-bold ${style.heroAccent}`}>{metric.unit}</span>
-            </Badge>
+            {/* Per-site chart */}
+            {bySite.length > 1 && (
+              <div className="rounded-2xl bg-white/90 border border-white p-4 shadow-sm">
+                <SectionHeader
+                  icon={Building2}
+                  title={th ? 'เปรียบเทียบรายสาขา' : 'Per-Site Comparison'}
+                  sublabel={`${bySite.length} ${th ? 'สาขา' : 'sites'}`}
+                  color={style.heroAccent}
+                />
+                <ResponsiveContainer width="100%" height={Math.max(200, bySite.length * 38)}>
+                  <BarChart
+                    data={bySite}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, bottom: 5, left: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      tickFormatter={formatCompact}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="site_name"
+                      tick={{ fontSize: 10, fill: '#475569' }}
+                      width={140}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <ReTooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                    <Bar dataKey="total" radius={[0, 6, 6, 0]} maxBarSize={28}>
+                      {bySite.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={i === 0 ? style.chartColor : style.chartColorLight}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Target achievement */}
+            {target && achievement && (
+              <div
+                className={`rounded-2xl border-2 p-4 ${
+                  achievement.onTrack
+                    ? 'bg-emerald-50/70 border-emerald-200'
+                    : 'bg-rose-50/70 border-rose-200'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <Target className={`h-4 w-4 ${achievement.onTrack ? 'text-emerald-600' : 'text-rose-600'}`} />
+                    <h3 className="text-sm font-bold text-foreground">
+                      {th ? 'ความคืบหน้าตามเป้าหมาย' : 'Target Achievement'}
+                    </h3>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] gap-1 ${
+                        target.target_direction === 'higher_is_better'
+                          ? 'border-emerald-300 text-emerald-700 bg-white/50'
+                          : 'border-blue-300 text-blue-700 bg-white/50'
+                      }`}
+                    >
+                      {target.target_direction === 'higher_is_better' ? (
+                        <>
+                          <TrendingUp className="h-3 w-3" />
+                          {th ? 'ยิ่งสูงยิ่งดี' : 'Higher Better'}
+                        </>
+                      ) : (
+                        <>
+                          <TrendingDown className="h-3 w-3" />
+                          {th ? 'ยิ่งต่ำยิ่งดี' : 'Lower Better'}
+                        </>
+                      )}
+                    </Badge>
+                  </div>
+                  <Badge
+                    className={`text-sm font-bold px-3 py-1 ${
+                      achievement.onTrack
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-rose-600 hover:bg-rose-700 text-white'
+                    }`}
+                  >
+                    {achievement.onTrack ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                    )}
+                    {achievement.pct.toFixed(1)}%
+                  </Badge>
+                </div>
+
+                {/* Actual vs Target values */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="rounded-xl bg-white/70 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                      {th ? 'ค่าจริง (สะสม)' : 'Actual (cumulative)'}
+                    </p>
+                    <p className={`text-lg font-bold mt-0.5 ${style.heroAccent}`}>
+                      {formatCompact(stats!.total)}{' '}
+                      <span className="text-xs font-normal text-muted-foreground">{unit}</span>
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-white/70 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                      {th ? `เป้าหมายปี ${new Date().getFullYear()}` : `Target ${new Date().getFullYear()}`}
+                    </p>
+                    <p className="text-lg font-bold mt-0.5 text-foreground">
+                      {formatCompact(target.target_value)}{' '}
+                      <span className="text-xs font-normal text-muted-foreground">{unit}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="space-y-1">
+                  <div className="h-3 rounded-full bg-white/60 overflow-hidden ring-1 ring-border/40">
+                    <div
+                      className={`h-full transition-all ${
+                        achievement.onTrack ? 'bg-emerald-500' : 'bg-rose-500'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(2, achievement.pct))}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {achievement.isLower
+                      ? achievement.onTrack
+                        ? th
+                          ? '✓ อยู่ในเกณฑ์เป้าหมาย — ดีกว่าหรือเท่ากับเป้า'
+                          : '✓ Within target — at or below goal'
+                        : th
+                        ? `⚠️ เกินเป้า ${(achievement.pct - 100).toFixed(1)}% (ทิศทาง: ยิ่งต่ำยิ่งดี)`
+                        : `⚠️ Over target by ${(achievement.pct - 100).toFixed(1)}% (lower is better)`
+                      : achievement.onTrack
+                      ? th
+                        ? '✓ บรรลุเป้าหมาย — มากกว่าหรือเท่ากับเป้า'
+                        : '✓ Target met — at or above goal'
+                      : th
+                      ? `⚠️ ต่ำกว่าเป้า ${(100 - achievement.pct).toFixed(1)}% (ทิศทาง: ยิ่งสูงยิ่งดี)`
+                      : `⚠️ Below target by ${(100 - achievement.pct).toFixed(1)}% (higher is better)`}
+                  </p>
+                </div>
+
+                {target.note && (
+                  <p className="text-[11px] text-muted-foreground italic mt-2 pt-2 border-t border-border/30">
+                    💬 {target.note}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* No target hint */}
+            {!target && (
+              <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50/50 px-4 py-3 flex items-start gap-3">
+                <Target className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1 text-sm">
+                  <p className="font-semibold text-amber-900">
+                    {th ? 'ยังไม่ได้กำหนดเป้าหมายปี ' : 'No target set for '}
+                    {new Date().getFullYear()}
+                  </p>
+                  <p className="text-xs text-amber-800/80 mt-0.5">
+                    {th
+                      ? 'กำหนดค่าเป้าหมายเพื่อติดตามความคืบหน้าและประเมินผลตามมาตรฐาน ESG'
+                      : 'Define a target value to track progress and measure ESG performance'}
+                  </p>
+                </div>
+                <Button asChild size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100">
+                  <Link to="/master/targets">{th ? 'ตั้งค่า' : 'Set'}</Link>
+                </Button>
+              </div>
+            )}
           </div>
         )}
-
-        <p className="mt-5 text-xs text-muted-foreground italic max-w-md mx-auto">
-          {th
-            ? 'ตัวชี้วัด (Key Issue) ที่สามารถวัดผลและรายงานความคืบหน้าได้ตามมาตรฐาน ESG'
-            : 'A measurable Key Issue tracked and reported against ESG standards'}
-        </p>
-
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <Button asChild size="sm" variant="outline" className="gap-1.5">
-            <Link to="/data-entry">
-              <FileInput className="h-3.5 w-3.5" />
-              {th ? 'บันทึกข้อมูล' : 'Data Entry'}
-            </Link>
-          </Button>
-          <Button asChild size="sm" variant="outline" className="gap-1.5">
-            <Link to="/master/targets">
-              <Target className="h-3.5 w-3.5" />
-              {th ? 'กำหนดเป้าหมาย' : 'Set KPI Target'}
-            </Link>
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );
@@ -403,12 +889,10 @@ export default function ESGKeyIssues() {
   const [data, setData] = useState<Dimension[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ── Filter state ──────────────────────────────────────────────────────────
   const [filterDim, setFilterDim] = useState<string | null>(null);
   const [filterTheme, setFilterTheme] = useState<string | null>(null);
   const [filterMetric, setFilterMetric] = useState<string | null>(null);
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchData();
   }, []);
@@ -426,7 +910,6 @@ export default function ESGKeyIssues() {
           )
         `);
       if (error) throw error;
-
       const processed: Dimension[] = (rows ?? [])
         .map((d: any) => ({
           dimension_id: d.dimension_id,
@@ -446,7 +929,6 @@ export default function ESGKeyIssues() {
           const bi = DIM_ORDER.indexOf(b.dimension_name);
           return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
         });
-
       setData(processed);
     } catch (e) {
       console.error('ESGKeyIssues fetch error:', e);
@@ -455,7 +937,6 @@ export default function ESGKeyIssues() {
     }
   };
 
-  // ── Cascade handlers ──────────────────────────────────────────────────────
   const handleDimClick = (id: string | null) => {
     setFilterDim(id);
     setFilterTheme(null);
@@ -465,16 +946,13 @@ export default function ESGKeyIssues() {
     setFilterTheme(id);
     setFilterMetric(null);
   };
-  const handleMetricClick = (id: string | null) => {
-    setFilterMetric(id);
-  };
+  const handleMetricClick = (id: string | null) => setFilterMetric(id);
   const resetFilters = () => {
     setFilterDim(null);
     setFilterTheme(null);
     setFilterMetric(null);
   };
 
-  // ── Derived contexts ──────────────────────────────────────────────────────
   const dimContext = useMemo(
     () => (filterDim ? data.find((d) => d.dimension_id === filterDim) ?? null : null),
     [data, filterDim],
@@ -494,7 +972,6 @@ export default function ESGKeyIssues() {
 
   const hasFilter = !!(filterDim || filterTheme || filterMetric);
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const totalDims = data.length;
     const totalThemes = data.reduce((sum, d) => sum + d.themes.length, 0);
@@ -505,7 +982,6 @@ export default function ESGKeyIssues() {
     return { totalDims, totalThemes, totalMetrics };
   }, [data]);
 
-  // ── Chip items ────────────────────────────────────────────────────────────
   const dimItems: ChipItem[] = useMemo(
     () => [
       { id: null, label: th ? 'ทั้งหมด' : 'All' },
@@ -530,7 +1006,6 @@ export default function ESGKeyIssues() {
     ];
   }, [themeContext, th]);
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
@@ -549,9 +1024,9 @@ export default function ESGKeyIssues() {
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: th ? 'Dimensions' : 'Dimensions', value: stats.totalDims, icon: Layers3, color: 'text-emerald-600' },
-          { label: th ? 'Themes' : 'Themes', value: stats.totalThemes, icon: Sparkles, color: 'text-blue-600' },
-          { label: th ? 'Metrics' : 'Metrics', value: stats.totalMetrics, icon: Hash, color: 'text-amber-600' },
+          { label: 'Dimensions', value: stats.totalDims, icon: Layers3, color: 'text-emerald-600' },
+          { label: 'Themes', value: stats.totalThemes, icon: Sparkles, color: 'text-blue-600' },
+          { label: 'Metrics', value: stats.totalMetrics, icon: Hash, color: 'text-amber-600' },
         ].map((s) => {
           const Icon = s.icon;
           return (
@@ -570,10 +1045,9 @@ export default function ESGKeyIssues() {
         })}
       </div>
 
-      {/* ─── Interactive Filter (mindmap drill-down) ─────────────────────── */}
+      {/* Filter card */}
       <Card className="glass-card-solid border-emerald-100">
         <CardContent className="py-4 px-4 space-y-3">
-          {/* Title row */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <FilterIcon className="h-3.5 w-3.5" />
@@ -592,7 +1066,6 @@ export default function ESGKeyIssues() {
             )}
           </div>
 
-          {/* Dimension row */}
           <FilterRow
             icon={Layers3}
             label="Dimension"
@@ -603,24 +1076,20 @@ export default function ESGKeyIssues() {
             onChange={handleDimClick}
           />
 
-          {/* Theme row — only when dim selected */}
           {dimContext && (
-            <>
-              <div className="ml-9 pl-3 border-l-2 border-dashed border-emerald-200">
-                <FilterRow
-                  icon={Sparkles}
-                  label="Theme"
-                  iconColor="text-blue-600"
-                  color="blue"
-                  items={themeItems}
-                  selected={filterTheme}
-                  onChange={handleThemeClick}
-                />
-              </div>
-            </>
+            <div className="ml-9 pl-3 border-l-2 border-dashed border-emerald-200">
+              <FilterRow
+                icon={Sparkles}
+                label="Theme"
+                iconColor="text-blue-600"
+                color="blue"
+                items={themeItems}
+                selected={filterTheme}
+                onChange={handleThemeClick}
+              />
+            </div>
           )}
 
-          {/* Metric row — only when theme selected */}
           {themeContext && (
             <div className="ml-9 pl-3 border-l-2 border-dashed border-emerald-200">
               <div className="ml-9 pl-3 border-l-2 border-dashed border-blue-200">
@@ -637,12 +1106,11 @@ export default function ESGKeyIssues() {
             </div>
           )}
 
-          {/* Breadcrumb + hint */}
           {!hasFilter ? (
             <p className="text-[11px] text-muted-foreground/70 italic pt-1">
               {th
-                ? '💡 เลือก Dimension เพื่อดูรายละเอียดเชิงลึก — คลิกเพื่อ drill down ทีละขั้น'
-                : '💡 Pick a Dimension to drill down — click any chip to explore deeper'}
+                ? '💡 เลือก Dimension เพื่อดูรายละเอียดเชิงลึก — คลิก Metric เพื่อดู infographic + chart'
+                : '💡 Pick a Dimension to drill down — click a Metric to see its infographic + charts'}
             </p>
           ) : (
             <div className="flex flex-wrap items-center gap-1.5 pt-2 mt-1 border-t border-border/30 text-xs">
@@ -678,7 +1146,7 @@ export default function ESGKeyIssues() {
         </CardContent>
       </Card>
 
-      {/* ─── Filtered display below ──────────────────────────────────────── */}
+      {/* Display */}
       {loading ? (
         <div className="flex justify-center py-20">
           <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
@@ -706,7 +1174,6 @@ export default function ESGKeyIssues() {
         </div>
       )}
 
-      {/* Footer note */}
       <p className="text-xs text-muted-foreground text-center pt-2 italic">
         {th
           ? '💡 ข้อมูลนี้สอดคล้องกับมาตรฐาน MSCI ESG Score และ GRI Standards'
