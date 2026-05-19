@@ -1,9 +1,15 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Loader2,
   Leaf,
@@ -28,6 +34,9 @@ import {
   Inbox,
   AlertTriangle,
   CheckCircle2,
+  LayoutGrid,
+  Download,
+  Maximize2,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -1066,6 +1075,7 @@ export default function ESGKeyIssues() {
   const [filterDim, setFilterDim] = useState<string | null>(null);
   const [filterTheme, setFilterTheme] = useState<string | null>(null);
   const [filterMetric, setFilterMetric] = useState<string | null>(null);
+  const [bigPictureOpen, setBigPictureOpen] = useState(false);
 
   // ── Deep-link: arrive via ?metric=ID and auto-select that metric ───────────
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1219,17 +1229,30 @@ export default function ESGKeyIssues() {
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-          <Network className="h-6 w-6 text-emerald-600" />
-          {th ? 'ESG Key Issues' : 'ESG Key Issues'}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-          {th
-            ? 'โครงสร้างประเด็นความยั่งยืน (Materiality) ขององค์กร จัดเรียงตามลำดับขั้น Dimension → Theme → Metric — ใช้เป็นกรอบการวัดผลและรายงาน ESG'
-            : 'Materiality structure organized as Dimension → Theme → Metric — the framework used for ESG measurement and reporting'}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+            <Network className="h-6 w-6 text-emerald-600" />
+            {th ? 'ESG Key Issues' : 'ESG Key Issues'}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
+            {th
+              ? 'โครงสร้างประเด็นความยั่งยืน (Materiality) ขององค์กร จัดเรียงตามลำดับขั้น Dimension → Theme → Metric — ใช้เป็นกรอบการวัดผลและรายงาน ESG'
+              : 'Materiality structure organized as Dimension → Theme → Metric — the framework used for ESG measurement and reporting'}
+          </p>
+        </div>
+        <Button
+          onClick={() => setBigPictureOpen(true)}
+          className="gap-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-md shrink-0"
+        >
+          <LayoutGrid className="h-4 w-4" />
+          {th ? 'ภาพรวมทั้งหมด' : 'Big Picture View'}
+          <Download className="h-3 w-3 opacity-70" />
+        </Button>
       </div>
+
+      {/* Big picture modal */}
+      <BigPictureModal data={data} open={bigPictureOpen} onClose={() => setBigPictureOpen(false)} th={th} />
 
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-3">
@@ -1399,6 +1422,395 @@ export default function ESGKeyIssues() {
           ? '💡 ข้อมูลนี้สอดคล้องกับมาตรฐาน MSCI ESG Score และ GRI Standards'
           : '💡 Aligned with MSCI ESG Score framework and GRI Standards'}
       </p>
+    </div>
+  );
+}
+
+// ─── Big Picture Modal (MSCI-style one-page framework view) ──────────────────
+function BigPictureModal({
+  data,
+  open,
+  onClose,
+  th,
+}: {
+  data: Dimension[];
+  open: boolean;
+  onClose: () => void;
+  th: boolean;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!contentRef.current) return;
+    setDownloading(true);
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
+      const canvas = await html2canvas(contentRef.current, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
+      const pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      pdf.save(`esg-framework-${dateStr}.pdf`);
+    } catch (e) {
+      console.error('PDF download error:', e);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const dateLabel = new Date().toLocaleDateString(th ? 'th-TH' : 'en-GB', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent
+        className="max-w-[1240px] w-[95vw] max-h-[95vh] p-0 overflow-hidden gap-0"
+        style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)' }}
+      >
+        <DialogHeader className="px-5 py-3 border-b border-border bg-white flex-row items-center justify-between space-y-0 gap-3">
+          <div className="flex-1 min-w-0">
+            <DialogTitle className="text-base flex items-center gap-2">
+              <Maximize2 className="h-4 w-4 text-emerald-600" />
+              {th ? 'ภาพรวม ESG Framework — One Page' : 'ESG Framework — Big Picture'}
+            </DialogTitle>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {th
+                ? 'แผนผังโครงสร้างทั้งหมด พร้อมดาวน์โหลดเป็น PDF ที่พิมพ์ได้'
+                : 'Complete materiality structure · ready to share & print'}
+            </p>
+          </div>
+          <Button
+            onClick={handleDownload}
+            disabled={downloading}
+            size="sm"
+            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shrink-0"
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {downloading
+              ? th
+                ? 'กำลังสร้าง...'
+                : 'Preparing...'
+              : th
+              ? 'ดาวน์โหลด PDF'
+              : 'Download PDF'}
+          </Button>
+        </DialogHeader>
+
+        <div className="overflow-auto bg-slate-100" style={{ maxHeight: '85vh' }}>
+          <div className="p-4 sm:p-6 min-w-[1120px]">
+            <div
+              ref={contentRef}
+              className="bg-white rounded-xl shadow-xl mx-auto"
+              style={{ width: '1100px', padding: '24px' }}
+            >
+              <BigPictureContent data={data} dateLabel={dateLabel} th={th} />
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Big Picture content (captured for PDF) ──────────────────────────────────
+function BigPictureContent({
+  data,
+  dateLabel,
+  th,
+}: {
+  data: Dimension[];
+  dateLabel: string;
+  th: boolean;
+}) {
+  const totalMetrics = data.reduce(
+    (sum, d) => sum + d.themes.reduce((s, t) => s + t.metrics.length, 0),
+    0,
+  );
+  const totalThemes = data.reduce((sum, d) => sum + d.themes.length, 0);
+
+  return (
+    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {/* ── Branded header ─────────────────────────────────────────────── */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+          color: 'white',
+          padding: '16px 20px',
+          borderRadius: '12px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            style={{
+              backgroundColor: '#10b981',
+              borderRadius: '10px',
+              height: '42px',
+              width: '42px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(16,185,129,0.4)',
+            }}
+          >
+            <Leaf style={{ height: '22px', width: '22px', color: 'white' }} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.01em', margin: 0 }}>
+              {th ? 'ESG Key Issues Framework' : 'ESG Key Issues Framework'}
+            </h1>
+            <p style={{ fontSize: '11px', opacity: 0.8, marginTop: '2px', margin: 0 }}>
+              {th
+                ? 'NSL Foods PCL · โครงสร้างประเด็นความยั่งยืน (Materiality Structure)'
+                : 'NSL Foods PCL · Materiality Structure'}
+            </p>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', fontSize: '11px', opacity: 0.85 }}>
+          <p style={{ margin: 0, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            {th ? 'จัดทำเมื่อ' : 'Generated'}
+          </p>
+          <p style={{ fontFamily: 'monospace', margin: 0, marginTop: '2px' }}>{dateLabel}</p>
+          <p style={{ margin: 0, marginTop: '4px', fontSize: '10px', opacity: 0.7 }}>
+            {data.length} Dimensions · {totalThemes} Themes · {totalMetrics} Metrics
+          </p>
+        </div>
+      </div>
+
+      {/* ── Pillar columns ─────────────────────────────────────────────── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${Math.max(data.length, 1)}, 1fr)`,
+          gap: '12px',
+        }}
+      >
+        {data.map((dim) => (
+          <DimensionColumnCompact key={dim.dimension_id} dim={dim} th={th} />
+        ))}
+      </div>
+
+      {/* ── Footer ─────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          marginTop: '16px',
+          paddingTop: '12px',
+          borderTop: '2px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '10px',
+          color: '#64748b',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Sparkles style={{ height: '12px', width: '12px' }} />
+          {th
+            ? 'สอดคล้องกับมาตรฐาน MSCI ESG Score และ GRI Standards'
+            : 'Aligned with MSCI ESG Score framework and GRI Standards'}
+        </span>
+        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>ESG Smart Performance</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Compact pillar column for big-picture view ──────────────────────────────
+function DimensionColumnCompact({ dim, th }: { dim: Dimension; th: boolean }) {
+  const style = getStyle(dim.dimension_name);
+  const Icon = style.icon;
+  const metricCount = dim.themes.reduce((s, t) => s + t.metrics.length, 0);
+
+  // Map dimension to explicit hex colors (html2canvas-safe)
+  const colors: Record<string, { bg: string; from: string; to: string; lite: string; dot: string; border: string }> = {
+    Environment: {
+      bg: '#10b981',
+      from: '#10b981',
+      to: '#0f766e',
+      lite: '#d1fae5',
+      dot: '#10b981',
+      border: '#86efac',
+    },
+    Social: {
+      bg: '#3b82f6',
+      from: '#3b82f6',
+      to: '#0891b2',
+      lite: '#dbeafe',
+      dot: '#3b82f6',
+      border: '#93c5fd',
+    },
+    Governance: {
+      bg: '#f59e0b',
+      from: '#f59e0b',
+      to: '#d97706',
+      lite: '#fef3c7',
+      dot: '#f59e0b',
+      border: '#fcd34d',
+    },
+    'General Information': {
+      bg: '#64748b',
+      from: '#64748b',
+      to: '#475569',
+      lite: '#f1f5f9',
+      dot: '#64748b',
+      border: '#cbd5e1',
+    },
+  };
+  const c = colors[dim.dimension_name] ?? colors['General Information'];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Pillar header */}
+      <div
+        style={{
+          background: `linear-gradient(135deg, ${c.from} 0%, ${c.to} 100%)`,
+          color: 'white',
+          padding: '10px 12px',
+          borderRadius: '10px 10px 0 0',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Icon style={{ height: '16px', width: '16px', flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontWeight: 700, fontSize: '13px', lineHeight: 1.2, margin: 0 }}>
+              {dim.dimension_name}
+            </p>
+            <p style={{ fontSize: '9px', opacity: 0.85, marginTop: '1px', margin: 0 }}>
+              {dim.themes.length} {th ? 'หัวข้อ' : 'themes'} · {metricCount}{' '}
+              {th ? 'ตัวชี้วัด' : 'metrics'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Themes container */}
+      <div
+        style={{
+          backgroundColor: c.lite,
+          border: `1px solid ${c.border}`,
+          borderTop: 'none',
+          borderRadius: '0 0 10px 10px',
+          padding: '6px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          flex: 1,
+        }}
+      >
+        {dim.themes.map((theme) => (
+          <ThemeBoxCompact key={theme.theme_id} theme={theme} color={c} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ThemeBoxCompact({
+  theme,
+  color,
+}: {
+  theme: Theme;
+  color: { dot: string; border: string };
+}) {
+  return (
+    <div
+      style={{
+        backgroundColor: 'white',
+        borderRadius: '6px',
+        border: `1px solid ${color.border}`,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: '#f8fafc',
+          padding: '5px 8px',
+          borderBottom: `1px solid ${color.border}`,
+          textAlign: 'center',
+        }}
+      >
+        <p
+          style={{
+            fontSize: '10px',
+            fontWeight: 700,
+            color: '#0f172a',
+            lineHeight: 1.2,
+            margin: 0,
+          }}
+        >
+          {cleanThemeName(theme.theme_name)}
+        </p>
+      </div>
+      <ul style={{ padding: '6px', margin: 0, listStyle: 'none' }}>
+        {theme.metrics.map((m) => (
+          <li
+            key={m.metric_id}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '4px',
+              fontSize: '9px',
+              color: '#334155',
+              lineHeight: 1.35,
+              marginBottom: '3px',
+            }}
+          >
+            <span
+              style={{
+                display: 'inline-block',
+                height: '5px',
+                width: '5px',
+                minWidth: '5px',
+                borderRadius: '50%',
+                backgroundColor: color.dot,
+                marginTop: '4px',
+                flexShrink: 0,
+              }}
+            />
+            <span>{m.metric_name}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
