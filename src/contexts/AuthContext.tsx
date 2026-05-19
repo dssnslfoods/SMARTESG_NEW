@@ -22,6 +22,7 @@ interface AuthContextType {
   session: Session | null;
   profile: UserProfile | null;
   role: AppRole | null;
+  isSuperAdmin: boolean;
   loading: boolean;
   roleLoaded: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; inactive?: boolean }>;
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [roleLoaded, setRoleLoaded] = useState(false);
 
@@ -79,12 +81,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('user_id', userId)
         .maybeSingle();
 
+      // Fetch super_admin flag (separate table — orthogonal to role)
+      const { data: superAdminRow } = await supabase
+        .from('super_admin')
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      setIsSuperAdmin(!!superAdminRow);
+
       if (roleData) {
         setRole(roleData.role as AppRole);
         setRoleLoaded(true);
         return { hasRole: true, isActive: profileData?.is_active ?? true };
       }
-      
+
       setRoleLoaded(true);
       return { hasRole: false, isActive: profileData?.is_active ?? true };
     } catch (error) {
@@ -174,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setRole(null);
+    setIsSuperAdmin(false);
   };
 
   const hasRole = (checkRole: AppRole) => role === checkRole;
@@ -196,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         profile,
         role,
+        isSuperAdmin,
         loading,
         roleLoaded,
         signIn,

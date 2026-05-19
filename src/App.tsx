@@ -30,6 +30,7 @@ import MetricManagement from "./pages/master/MetricManagement";
 import SystemSettings from "./pages/master/SystemSettings";
 import TargetManagement from "./pages/master/TargetManagement";
 import MenuPermission from "./pages/master/MenuPermission";
+import TenantManagement from "./pages/super/TenantManagement";
 import ESGKeyIssues from "./pages/ESGKeyIssues";
 import DataEntry from "./pages/DataEntry";
 import BackupData from "./pages/BackupData";
@@ -149,6 +150,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <MenuPermission />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/super-admin/tenants"
+                element={
+                  <ProtectedRoute>
+                    <TenantManagement />
                   </ProtectedRoute>
                 }
               />

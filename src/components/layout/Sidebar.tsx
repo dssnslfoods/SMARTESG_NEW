@@ -29,6 +29,7 @@ import {
   Target,
   LayoutGrid,
   Network,
+  Crown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -47,7 +48,7 @@ interface SidebarProps {
 
 export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
   const { pathname } = useLocation();
-  const { role, signOut } = useAuth();
+  const { role, signOut, isSuperAdmin } = useAuth();
   const { t, language } = useLanguage();
   const { canSeeMenu } = useMenuPermissions();
   const [masterDataOpen, setMasterDataOpen] = useState(pathname.startsWith('/master'));
@@ -142,6 +143,40 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        {/* Super Admin section — only for platform super_admins */}
+        {isSuperAdmin && (
+          <>
+            <div className="mb-3 px-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600/80">
+                {language === 'th' ? '👑 Super Admin' : '👑 Super Admin'}
+              </span>
+            </div>
+            <Link
+              to="/super-admin/tenants"
+              onClick={onNavigate}
+              className={cn(
+                'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border mb-4',
+                isActive('/super-admin/tenants')
+                  ? 'border-amber-300/60 text-amber-700'
+                  : 'text-gray-600 hover:text-gray-900 border-transparent',
+              )}
+              style={
+                isActive('/super-admin/tenants')
+                  ? {
+                      background:
+                        'linear-gradient(135deg, rgba(245,158,11,0.14), rgba(249,115,22,0.10))',
+                      boxShadow:
+                        '0 2px 12px rgba(245,158,11,0.18), inset 0 1px 0 rgba(255,255,255,0.6)',
+                    }
+                  : undefined
+              }
+            >
+              <Crown className={cn('h-4 w-4', isActive('/super-admin/tenants') && 'text-amber-600')} />
+              {language === 'th' ? 'จัดการ Tenants' : 'Tenant Management'}
+            </Link>
+          </>
+        )}
+
         <div className="mb-3 px-3">
           <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "rgba(16,185,129,0.7)" }}>
             {language === 'th' ? 'เมนูหลัก' : 'Main Menu'}
