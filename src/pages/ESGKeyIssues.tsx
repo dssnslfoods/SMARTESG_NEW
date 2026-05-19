@@ -660,17 +660,15 @@ function MetricHero({
               </Badge>
             </div>
           )}
-          <div className="mt-5 flex flex-wrap justify-center gap-2">
-            <Button asChild size="sm" variant="outline" className="gap-1.5">
-              <Link to="/data-entry">
-                <FileInput className="h-3.5 w-3.5" />
-                {th ? 'บันทึกข้อมูล' : 'Data Entry'}
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline" className="gap-1.5">
-              <Link to="/master/targets">
+          <div className="mt-5 flex justify-center">
+            <Button
+              asChild
+              size="sm"
+              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+            >
+              <Link to={`/master/targets?metric=${encodeURIComponent(metric.metric_id)}`}>
                 <Target className="h-3.5 w-3.5" />
-                {th ? 'กำหนดเป้าหมาย' : 'Set KPI Target'}
+                {th ? 'กำหนดเป้าหมายให้ตัวชี้วัดนี้' : 'Set Target for This Metric'}
               </Link>
             </Button>
           </div>
@@ -930,7 +928,9 @@ function MetricHero({
                   </p>
                 </div>
                 <Button asChild size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100">
-                  <Link to="/master/targets">{th ? 'ตั้งค่า' : 'Set'}</Link>
+                  <Link to={`/master/targets?metric=${encodeURIComponent(metric.metric_id)}`}>
+                    {th ? 'ตั้งค่า' : 'Set'}
+                  </Link>
                 </Button>
               </div>
             )}

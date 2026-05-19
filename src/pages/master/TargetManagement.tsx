@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +40,8 @@ import {
   TrendingDown,
   Loader2,
   CheckCircle2,
+  Sparkles,
+  X as XIcon,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -89,6 +92,10 @@ export default function TargetManagement() {
   });
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // ── Deep-link from ESGKeyIssues: ?metric=ID ────────────────────────────────
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightMetricId = searchParams.get('metric');
 
   const isManager = role === 'admin' || role === 'supervisor';
 
@@ -152,6 +159,35 @@ export default function TargetManagement() {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
+
+  // ── Highlight & scroll on deep-link arrival ─────────────────────────────────
+  useEffect(() => {
+    if (!highlightMetricId) return;
+    // Make sure the metric is visible — clear dim filter + search
+    setFilterDim('all');
+    setSearchTerm('');
+  }, [highlightMetricId]);
+
+  useEffect(() => {
+    if (!highlightMetricId || loading) return;
+    // wait for DOM after data renders, then scroll into view
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`target-row-${highlightMetricId}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [highlightMetricId, loading]);
+
+  const clearHighlight = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('metric');
+    setSearchParams(next, { replace: true });
+  };
+
+  const highlightedMetric = useMemo(
+    () => (highlightMetricId ? metrics.find((m) => m.metric_id === highlightMetricId) ?? null : null),
+    [metrics, highlightMetricId],
+  );
 
   // ── Dialog helpers ─────────────────────────────────────────────────────────
   const openAdd = (m: MetricRow) => {
@@ -322,6 +358,46 @@ export default function TargetManagement() {
         ))}
       </div>
 
+      {/* Contextual banner — when arriving via ?metric=ID deep link */}
+      {highlightMetricId && (
+        <Card className="border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 shadow-md animate-in fade-in slide-in-from-top-2 duration-300">
+          <CardContent className="py-3 px-4 flex items-center gap-3">
+            <div className="rounded-xl bg-amber-100 p-2 shrink-0">
+              <Target className="h-5 w-5 text-amber-700" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-900">
+                {th ? '🎯 มาตั้งค่าเป้าหมายให้:' : '🎯 Setting target for:'}
+              </p>
+              {highlightedMetric ? (
+                <p className="text-xs text-amber-800/90 truncate mt-0.5">
+                  <span className="font-mono mr-1.5 opacity-70">{highlightedMetric.metric_id}</span>
+                  <span className="font-medium">{highlightedMetric.metric_name}</span>
+                  <span className="ml-2 text-amber-700/70 inline-flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    {highlightedMetric.theme_name} · {highlightedMetric.dimension_name}
+                  </span>
+                </p>
+              ) : (
+                <p className="text-xs text-amber-800/70 mt-0.5 italic">
+                  <span className="font-mono">{highlightMetricId}</span>{' '}
+                  {th ? '(ไม่พบในรายการ — อาจถูกลบไปแล้ว)' : '(not found — may have been removed)'}
+                </p>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={clearHighlight}
+              className="text-amber-700 hover:text-amber-900 hover:bg-amber-100 gap-1 shrink-0"
+            >
+              <XIcon className="h-3.5 w-3.5" />
+              {th ? 'ปิด' : 'Clear'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filters + Table */}
       <Card className="glass-card-solid">
         <CardHeader className="pb-3">
@@ -431,8 +507,13 @@ export default function TargetManagement() {
                               {themeMetrics.map((m) => (
                                 <TableRow
                                   key={m.metric_id}
+                                  id={`target-row-${m.metric_id}`}
                                   className={
-                                    m.target_id ? 'bg-emerald-50/30' : ''
+                                    m.metric_id === highlightMetricId
+                                      ? 'bg-amber-100/60 outline outline-2 outline-amber-400 -outline-offset-[2px] hover:bg-amber-100/70'
+                                      : m.target_id
+                                        ? 'bg-emerald-50/30'
+                                        : ''
                                   }
                                 >
                                   <TableCell className="text-xs font-medium py-2.5">
