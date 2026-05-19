@@ -1,8 +1,10 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ReportSectionsProvider } from "@/contexts/ReportSectionsContext";
@@ -10,33 +12,43 @@ import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { TVModeProvider } from "@/contexts/TVModeContext";
 import { MenuPermissionsProvider } from "@/contexts/MenuPermissionsContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import PasswordChangeRequired from "@/components/PasswordChangeRequired";
+
+// Auth pages — eagerly imported (small + always needed before user is logged in)
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
-import Dashboard from "./pages/Dashboard";
-import UserManagement from "./pages/UserManagement";
-import AuditLog from "./pages/AuditLog";
-import Reports from "./pages/Reports";
-import Environmental from "./pages/reports/Environmental";
-
-import Governance from "./pages/reports/Governance";
-import Social from "./pages/reports/Social";
-import ESGOverview from "./pages/reports/ESGOverview";
-import CompanyManagement from "./pages/master/CompanyManagement";
-import SiteManagement from "./pages/master/SiteManagement";
-import PeriodManagement from "./pages/master/PeriodManagement";
-import DimensionManagement from "./pages/master/DimensionManagement";
-import ThemeManagement from "./pages/master/ThemeManagement";
-import MetricManagement from "./pages/master/MetricManagement";
-import SystemSettings from "./pages/master/SystemSettings";
-import TargetManagement from "./pages/master/TargetManagement";
-import MenuPermission from "./pages/master/MenuPermission";
-import TenantManagement from "./pages/super/TenantManagement";
-import ESGKeyIssues from "./pages/ESGKeyIssues";
-import DataEntry from "./pages/DataEntry";
-import BackupData from "./pages/BackupData";
-import HelpCenter from "./pages/HelpCenter";
 import NotFound from "./pages/NotFound";
-import PasswordChangeRequired from "@/components/PasswordChangeRequired";
+
+// All other pages — lazy-loaded so the initial bundle stays small
+// and each route only downloads its own chunk on first visit.
+const Dashboard           = lazy(() => import("./pages/Dashboard"));
+const ESGKeyIssues        = lazy(() => import("./pages/ESGKeyIssues"));
+const DataEntry           = lazy(() => import("./pages/DataEntry"));
+const UserManagement      = lazy(() => import("./pages/UserManagement"));
+const AuditLog            = lazy(() => import("./pages/AuditLog"));
+const Reports             = lazy(() => import("./pages/Reports"));
+const Environmental       = lazy(() => import("./pages/reports/Environmental"));
+const Governance          = lazy(() => import("./pages/reports/Governance"));
+const Social              = lazy(() => import("./pages/reports/Social"));
+const ESGOverview         = lazy(() => import("./pages/reports/ESGOverview"));
+const CompanyManagement   = lazy(() => import("./pages/master/CompanyManagement"));
+const SiteManagement      = lazy(() => import("./pages/master/SiteManagement"));
+const PeriodManagement    = lazy(() => import("./pages/master/PeriodManagement"));
+const DimensionManagement = lazy(() => import("./pages/master/DimensionManagement"));
+const ThemeManagement     = lazy(() => import("./pages/master/ThemeManagement"));
+const MetricManagement    = lazy(() => import("./pages/master/MetricManagement"));
+const SystemSettings      = lazy(() => import("./pages/master/SystemSettings"));
+const TargetManagement    = lazy(() => import("./pages/master/TargetManagement"));
+const MenuPermission      = lazy(() => import("./pages/master/MenuPermission"));
+const TenantManagement    = lazy(() => import("./pages/super/TenantManagement"));
+const BackupData          = lazy(() => import("./pages/BackupData"));
+const HelpCenter          = lazy(() => import("./pages/HelpCenter"));
+
+const RouteFallback = () => (
+  <div className="flex items-center justify-center min-h-[40vh]">
+    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+  </div>
+);
 
 const queryClient = new QueryClient();
 
@@ -53,6 +65,7 @@ const App = () => (
             <Sonner />
             <PasswordChangeRequired />
             <BrowserRouter>
+            <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/auth" element={<Auth />} />
@@ -235,6 +248,7 @@ const App = () => (
               />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
             </BrowserRouter>
               </TooltipProvider>
             </ReportSectionsProvider>
