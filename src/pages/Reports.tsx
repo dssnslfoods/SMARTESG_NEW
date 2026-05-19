@@ -152,6 +152,7 @@ export default function Reports() {
   const [drilldownDialogOpen, setDrilldownDialogOpen] = useState(false);
 
   // Interactive trend chart filters
+  const [trendDimensionFilter, setTrendDimensionFilter] = useState<string>("__all__");
   const [trendThemeFilter, setTrendThemeFilter] = useState<string>("__all__");
   const [trendMetricFilter, setTrendMetricFilter] = useState<string>("__all__");
   const [trendYearFilter, setTrendYearFilter] = useState<string>("__all__");
@@ -805,7 +806,35 @@ export default function Reports() {
         </CardHeader>
         <CardContent>
           {/* Trend Chart Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                {language === "th" ? "มิติ ESG" : "Dimension"}
+              </Label>
+              <Select
+                value={trendDimensionFilter}
+                onValueChange={(val) => {
+                  setTrendDimensionFilter(val);
+                  // Reset deeper filters when dimension changes
+                  setTrendThemeFilter("__all__");
+                  setTrendMetricFilter("__all__");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={language === "th" ? "ทั้งหมด" : "All Dimensions"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">
+                    {language === "th" ? "ทั้งหมด" : "All Dimensions"}
+                  </SelectItem>
+                  {dimensions.map((dim) => (
+                    <SelectItem key={dim.dimension_id} value={dim.dimension_id}>
+                      {dim.dimension_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium">
                 {language === "th" ? "หัวข้อ" : "Theme"}
@@ -821,14 +850,23 @@ export default function Reports() {
                   <SelectItem value="__all__">
                     {language === "th" ? "เลือกหัวข้อ" : "Select Theme"}
                   </SelectItem>
-                  {themes.map((theme) => {
-                    const dimension = dimensions.find((d) => d.dimension_id === theme.dimension_id);
-                    return (
-                      <SelectItem key={theme.theme_id} value={theme.theme_id}>
-                        {theme.theme_name} ({dimension?.dimension_name})
-                      </SelectItem>
-                    );
-                  })}
+                  {themes
+                    .filter(
+                      (theme) =>
+                        trendDimensionFilter === "__all__" ||
+                        theme.dimension_id === trendDimensionFilter,
+                    )
+                    .map((theme) => {
+                      const dimension = dimensions.find((d) => d.dimension_id === theme.dimension_id);
+                      return (
+                        <SelectItem key={theme.theme_id} value={theme.theme_id}>
+                          {theme.theme_name}
+                          {trendDimensionFilter === "__all__" && dimension
+                            ? ` (${dimension.dimension_name})`
+                            : ""}
+                        </SelectItem>
+                      );
+                    })}
                 </SelectContent>
               </Select>
             </div>
@@ -836,8 +874,8 @@ export default function Reports() {
               <Label className="text-sm font-medium">
                 {language === "th" ? "ตัวชี้วัด" : "Metric"}
               </Label>
-              <Select 
-                value={trendMetricFilter} 
+              <Select
+                value={trendMetricFilter}
                 onValueChange={setTrendMetricFilter}
                 disabled={trendThemeFilter === "__all__"}
               >
