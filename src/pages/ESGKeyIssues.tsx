@@ -520,9 +520,34 @@ function MetricHero({
 
   const [values, setValues] = useState<MetricValueRow[]>([]);
   const [targets, setTargets] = useState<TargetRow[]>([]);
+  const [longTermYear, setLongTermYear] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const currentYear = new Date().getFullYear();
+
+  // Fetch the configured long-term target year once
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('app_setting')
+      .select('value')
+      .eq('key', 'long_term_target_year')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const parsed = data?.value ? parseInt(data.value, 10) : NaN;
+        setLongTermYear(Number.isFinite(parsed) ? parsed : currentYear + 5);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentYear]);
+
+  // Long-term target — only relevant if it's a different year from current
+  const longTermTarget = useMemo(() => {
+    if (!longTermYear || longTermYear === currentYear) return null;
+    return targets.find((t) => t.year === longTermYear) ?? null;
+  }, [targets, longTermYear, currentYear]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1054,34 +1079,192 @@ function MetricHero({
                   </div>
                 )}
 
-                {/* Progress bar */}
-                <div className="space-y-1">
-                  <div className="h-3 rounded-full bg-white/60 overflow-hidden ring-1 ring-border/40">
-                    <div
-                      className={`h-full transition-all ${
-                        achievement.onTrack ? 'bg-emerald-500' : 'bg-rose-500'
-                      }`}
-                      style={{ width: `${Math.min(100, Math.max(2, achievement.pct))}%` }}
-                    />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {achievement.isLower
-                      ? achievement.onTrack
-                        ? th
-                          ? '✓ อยู่ในเกณฑ์เป้าหมาย — ดีกว่าหรือเท่ากับเป้า'
-                          : '✓ Within target — at or below goal'
-                        : th
-                        ? `⚠️ เกินเป้า ${(achievement.pct - 100).toFixed(1)}% (ทิศทาง: ยิ่งต่ำยิ่งดี)`
-                        : `⚠️ Over target by ${(achievement.pct - 100).toFixed(1)}% (lower is better)`
-                      : achievement.onTrack
-                      ? th
-                        ? '✓ บรรลุเป้าหมาย — มากกว่าหรือเท่ากับเป้า'
-                        : '✓ Target met — at or above goal'
-                      : th
-                      ? `⚠️ ต่ำกว่าเป้า ${(100 - achievement.pct).toFixed(1)}% (ทิศทาง: ยิ่งสูงยิ่งดี)`
-                      : `⚠️ Below target by ${(100 - achievement.pct).toFixed(1)}% (higher is better)`}
-                  </p>
-                </div>
+                {/* Progress bar with target markers (Current + Long-Term) */}
+                {(() => {
+                  const actual = stats!.currentYearTotal;
+                  const ctVal = Number(currentTarget.target_value);
+                  const ltVal = longTermTarget ? Number(longTermTarget.target_value) : null;
+                  const maxVal = Math.max(actual, ctVal, ltVal ?? 0) * 1.08 || 1;
+                  const actualPct = Math.min(100, (actual / maxVal) * 100);
+                  const ctPct = Math.min(100, (ctVal / maxVal) * 100);
+                  const ltPct = ltVal !== null ? Math.min(100, (ltVal / maxVal) * 100) : null;
+
+                  // LT status (current actual vs LT target)
+                  const ltOnTrack =
+                    ltVal !== null
+                      ? achievement.isLower
+                        ? actual <= ltVal
+                        : actual >= ltVal
+                      : null;
+                  const ltDiffPct =
+                    ltVal !== null && ltVal !== 0
+                      ? Math.abs((actual / ltVal) * 100 - 100)
+                      : 0;
+
+                  return (
+                    <div className="space-y-2">
+                      {/* Marker labels above bar */}
+                      <div className="relative h-9">
+                        {/* Long-term marker — only if exists */}
+                        {ltPct !== null && longTermTarget && (
+                          <div
+                            className="absolute top-0"
+                            style={{
+                              left: `${Math.min(92, Math.max(6, ltPct))}%`,
+                              transform: 'translateX(-50%)',
+                            }}
+                          >
+                            <div className="flex flex-col items-center">
+                              <div className="flex items-center gap-1 rounded-full bg-amber-50 border-2 border-amber-400 px-1.5 py-0.5 shadow-sm whitespace-nowrap">
+                                <Sparkles className="h-2.5 w-2.5 text-amber-700" />
+                                <span className="text-[9px] font-bold text-amber-800">
+                                  {longTermYear} · {formatCompact(ltVal!)}
+                                </span>
+                              </div>
+                              <div
+                                className="w-0 h-0 mt-0.5"
+                                style={{
+                                  borderLeft: '4px solid transparent',
+                                  borderRight: '4px solid transparent',
+                                  borderTop: '5px solid #f59e0b',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {/* Current year target marker — always */}
+                        <div
+                          className="absolute top-0"
+                          style={{
+                            left: `${Math.min(92, Math.max(6, ctPct))}%`,
+                            transform: 'translateX(-50%)',
+                          }}
+                        >
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center gap-1 rounded-full bg-emerald-50 border-2 border-emerald-500 px-1.5 py-0.5 shadow-sm whitespace-nowrap">
+                              <Target className="h-2.5 w-2.5 text-emerald-700" />
+                              <span className="text-[9px] font-bold text-emerald-800">
+                                {currentYear} · {formatCompact(ctVal)}
+                              </span>
+                            </div>
+                            <div
+                              className="w-0 h-0 mt-0.5"
+                              style={{
+                                borderLeft: '4px solid transparent',
+                                borderRight: '4px solid transparent',
+                                borderTop: '5px solid #059669',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bar */}
+                      <div className="relative h-3 rounded-full bg-slate-100/80 ring-1 ring-border/40 overflow-visible">
+                        {/* Fill */}
+                        <div
+                          className={`absolute inset-y-0 left-0 rounded-full transition-all ${
+                            achievement.onTrack ? 'bg-emerald-500' : 'bg-rose-500'
+                          }`}
+                          style={{ width: `${Math.max(2, actualPct)}%` }}
+                        />
+                        {/* Vertical tick lines for both targets */}
+                        {ltPct !== null && (
+                          <div
+                            className="absolute top-0 h-full w-0.5 bg-amber-500"
+                            style={{ left: `${ltPct}%` }}
+                          />
+                        )}
+                        <div
+                          className="absolute top-0 h-full w-0.5 bg-emerald-700"
+                          style={{ left: `${ctPct}%` }}
+                        />
+                      </div>
+
+                      {/* Actual position indicator below bar */}
+                      <div className="relative h-4">
+                        <div
+                          className="absolute top-0"
+                          style={{
+                            left: `${Math.min(92, Math.max(6, actualPct))}%`,
+                            transform: 'translateX(-50%)',
+                          }}
+                        >
+                          <div className="flex flex-col items-center">
+                            <div
+                              className="w-0 h-0"
+                              style={{
+                                borderLeft: '4px solid transparent',
+                                borderRight: '4px solid transparent',
+                                borderBottom: `5px solid ${achievement.onTrack ? '#059669' : '#dc2626'}`,
+                              }}
+                            />
+                            <span
+                              className={`text-[10px] font-bold font-mono mt-0.5 px-1 rounded ${
+                                achievement.onTrack
+                                  ? 'text-emerald-700 bg-emerald-50'
+                                  : 'text-rose-700 bg-rose-50'
+                              }`}
+                            >
+                              {formatCompact(actual)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status messages */}
+                      <div className="space-y-0.5 pt-1 text-[11px]">
+                        {/* Current target status */}
+                        <p className="text-muted-foreground">
+                          <span className="font-semibold text-foreground">
+                            {th ? `เทียบเป้าหมาย ${currentYear}:` : `vs ${currentYear} Target:`}
+                          </span>{' '}
+                          {achievement.isLower
+                            ? achievement.onTrack
+                              ? th
+                                ? '✓ อยู่ในเกณฑ์ — ต่ำกว่าหรือเท่ากับเป้า'
+                                : '✓ Within target — at or below goal'
+                              : th
+                                ? `⚠️ เกินเป้า ${(achievement.pct - 100).toFixed(1)}%`
+                                : `⚠️ Over target by ${(achievement.pct - 100).toFixed(1)}%`
+                            : achievement.onTrack
+                              ? th
+                                ? '✓ บรรลุเป้าหมาย — สูงกว่าหรือเท่ากับเป้า'
+                                : '✓ Target met — at or above goal'
+                              : th
+                                ? `⚠️ ต่ำกว่าเป้า ${(100 - achievement.pct).toFixed(1)}%`
+                                : `⚠️ Below target by ${(100 - achievement.pct).toFixed(1)}%`}
+                        </p>
+
+                        {/* Long-term target status — only if exists */}
+                        {longTermTarget && ltOnTrack !== null && (
+                          <p className="text-muted-foreground">
+                            <span className="font-semibold text-amber-800">
+                              {th
+                                ? `เทียบเป้าหมายระยะยาว ${longTermYear}:`
+                                : `vs ${longTermYear} Long-Term:`}
+                            </span>{' '}
+                            {achievement.isLower
+                              ? ltOnTrack
+                                ? th
+                                  ? `✨ ผ่านเป้าระยะยาวแล้ว — ต่ำกว่า ${ltDiffPct.toFixed(1)}%`
+                                  : `✨ Already beating long-term goal — ${ltDiffPct.toFixed(1)}% buffer`
+                                : th
+                                  ? `⚠️ ยังเกินเป้าระยะยาว ${ltDiffPct.toFixed(1)}%`
+                                  : `⚠️ Still ${ltDiffPct.toFixed(1)}% over long-term goal`
+                              : ltOnTrack
+                                ? th
+                                  ? `✨ ผ่านเป้าระยะยาวแล้ว — เกิน ${ltDiffPct.toFixed(1)}%`
+                                  : `✨ Already exceeded long-term goal — ${ltDiffPct.toFixed(1)}% above`
+                                : th
+                                  ? `⚠️ ต่ำกว่าเป้าระยะยาว ${ltDiffPct.toFixed(1)}%`
+                                  : `⚠️ ${ltDiffPct.toFixed(1)}% below long-term goal`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {currentTarget.note && (
                   <p className="text-[11px] text-muted-foreground italic mt-2 pt-2 border-t border-border/30">
