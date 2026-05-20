@@ -50,8 +50,8 @@ interface UserProfile  { user_id: string; full_name: string | null }
 interface Site         { site_id: string; site_name: string }
 interface Company      { company_id: string; company_name: string }
 interface Period       { period_id: string; period_name: string; year: number; month: number }
-interface EsgMetric    { metric_id: string; metric_name: string; unit: string | null }
-interface EsgTheme     { theme_id: string; theme_name: string }
+interface EsgMetric    { metric_id: string; metric_name: string; unit: string | null; theme_id: string | null }
+interface EsgTheme     { theme_id: string; theme_name: string; dimension_id: string | null }
 interface EsgDimension { dimension_id: string; dimension_name: string }
 
 // ─── Field display config per entity_type ─────────────────────────────────────
@@ -124,8 +124,8 @@ export default function AuditLog() {
         supabase.from('site').select('site_id, site_name'),
         supabase.from('company').select('company_id, company_name'),
         supabase.from('reporting_period').select('period_id, period_name, year, month'),
-        supabase.from('esg_metric').select('metric_id, metric_name, unit'),
-        supabase.from('esg_theme').select('theme_id, theme_name'),
+        supabase.from('esg_metric').select('metric_id, metric_name, unit, theme_id'),
+        supabase.from('esg_theme').select('theme_id, theme_name, dimension_id'),
         supabase.from('esg_dimension').select('dimension_id, dimension_name'),
       ]);
       setLogs(logsData || []);
@@ -239,17 +239,29 @@ export default function AuditLog() {
     colorCls: string,
     compareTo?: Record<string, unknown> | null
   ) => {
-    const metric = metrics.find(m => m.metric_id === data.metric_id);
+    const metric    = metrics.find(m => m.metric_id === data.metric_id);
+    const themeId   = metric?.theme_id ?? (data.theme_id as string | null);
+    const theme     = themeId ? themes.find(t => t.theme_id === themeId) : undefined;
+    const dimId     = theme?.dimension_id ?? (data.dimension_id as string | null);
+    const dimension = dimId ? dimensions.find(d => d.dimension_id === dimId) : undefined;
+
     return (
       <div className={`rounded-xl border p-4 space-y-3 ${colorCls}`}>
         <p className="text-xs font-semibold uppercase tracking-wider opacity-70">{label}</p>
 
-        {/* Context (site / period / metric) — always from data */}
+        {/* Context (dimension / metric / site / period) — always from data */}
         <div className="grid grid-cols-1 gap-2 text-sm">
+          {/* Dimension — resolved via metric → theme → dimension */}
+          {dimension && (
+            <div className="flex items-start gap-2">
+              <span className="w-24 shrink-0 text-gray-500">{th ? 'มิติ' : 'Dimension'}:</span>
+              <span className="font-medium text-gray-800">{dimension.dimension_name}</span>
+            </div>
+          )}
           {[
-            { key: 'metric_id', labelTh: 'ตัวชี้วัด',   labelEn: 'Metric' },
-            { key: 'site_id',   labelTh: 'สถานที่',      labelEn: 'Site' },
-            { key: 'period_id', labelTh: 'รอบ',           labelEn: 'Period' },
+            { key: 'metric_id', labelTh: 'ตัวชี้วัด', labelEn: 'Metric' },
+            { key: 'site_id',   labelTh: 'สถานที่',    labelEn: 'Site' },
+            { key: 'period_id', labelTh: 'รอบ',         labelEn: 'Period' },
           ].map(({ key, labelTh, labelEn }) => (
             <div key={key} className="flex items-start gap-2">
               <span className="w-24 shrink-0 text-gray-500">{th ? labelTh : labelEn}:</span>
