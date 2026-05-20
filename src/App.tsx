@@ -43,6 +43,7 @@ const TargetManagement    = lazy(() => import("./pages/master/TargetManagement")
 const MenuPermission      = lazy(() => import("./pages/master/MenuPermission"));
 const TenantManagement    = lazy(() => import("./pages/super/TenantManagement"));
 const TenantMenuAccess    = lazy(() => import("./pages/super/TenantMenuAccess"));
+const PlanManagement      = lazy(() => import("./pages/super/PlanManagement"));
 const BackupData          = lazy(() => import("./pages/BackupData"));
 const HelpCenter          = lazy(() => import("./pages/HelpCenter"));
 
@@ -182,6 +183,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <TenantMenuAccess />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/super-admin/plan-management"
+                element={
+                  <ProtectedRoute>
+                    <PlanManagement />
                   </ProtectedRoute>
                 }
               />

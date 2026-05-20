@@ -38,6 +38,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { History, Eye, Search, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { th, enUS } from "date-fns/locale";
+import { PlanGate } from "@/components/plan/PlanGate";
 
 interface AuditLogEntry {
   log_id: string;
@@ -183,6 +184,7 @@ export default function AuditLog() {
   };
 
   return (
+    <PlanGate feature="audit_log">
     <div className="space-y-6">
         {/* Header */}
         <div>
@@ -420,5 +422,6 @@ export default function AuditLog() {
           </DialogContent>
         </Dialog>
     </div>
+    </PlanGate>
   );
 }

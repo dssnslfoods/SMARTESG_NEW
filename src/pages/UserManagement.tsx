@@ -46,6 +46,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Pencil, Search, UserPlus, Trash2, KeyRound, ShieldCheck, X as XIcon } from 'lucide-react';
 import { UserManagementLoadingSkeleton } from '@/components/ui/loading-skeleton';
+import { usePlanLimits } from '@/hooks/usePlanLimits';
+import { QuotaBar } from '@/components/plan/QuotaBar';
 
 type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest' | 'super_admin';
 
@@ -84,7 +86,8 @@ export default function UserManagement() {
   const { t, language } = useLanguage();
   const { role: currentUserRole, user: currentUser } = useAuth();
   const { toast } = useToast();
-  
+  const { isAtLimit } = usePlanLimits();
+
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
@@ -669,19 +672,38 @@ export default function UserManagement() {
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
       
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        <div className="space-y-1">
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('users')}</h1>
           <p className="text-sm sm:text-base text-muted-foreground">
-            {isSelfOnly 
+            {isSelfOnly
               ? (language === 'th' ? 'จัดการบัญชีของคุณ' : 'Manage your account')
               : (language === 'th' ? 'จัดการผู้ใช้และบทบาท' : 'Manage users and roles')}
           </p>
+          <QuotaBar resource="users" current={users.length} className="w-56" />
         </div>
         
         {isManager && (
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+            if (open && isAtLimit('users', users.length)) {
+              toast({
+                title: language === 'th' ? 'ถึงขีดจำกัดของแพ็กเกจ' : 'Plan limit reached',
+                description: language === 'th'
+                  ? 'จำนวนผู้ใช้เต็มแล้ว กรุณาอัพเกรดแพ็กเกจ'
+                  : 'User quota reached. Please upgrade your plan.',
+                variant: 'destructive',
+              });
+              return;
+            }
+            setIsAddDialogOpen(open);
+          }}>
             <DialogTrigger asChild>
-              <Button className="gap-2 w-full sm:w-auto">
+              <Button
+                className="gap-2 w-full sm:w-auto"
+                disabled={isAtLimit('users', users.length)}
+                title={isAtLimit('users', users.length)
+                  ? (language === 'th' ? 'ถึงขีดจำกัด — อัพเกรดแพ็กเกจ' : 'Limit reached — upgrade plan')
+                  : undefined}
+              >
                 <UserPlus className="h-4 w-4" />
                 {language === 'th' ? 'เพิ่มผู้ใช้' : 'Add User'}
               </Button>
