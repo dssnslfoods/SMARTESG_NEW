@@ -252,15 +252,7 @@ export default function Auth() {
             </span>
           </div>
           <div className="hidden sm:block">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-bold text-white leading-none">ESG Smart Performance</p>
-              <span
-                className="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded-md border border-amber-300/40 text-amber-200"
-                style={{ background: "linear-gradient(135deg, rgba(245,158,11,0.25), rgba(251,191,36,0.15))" }}
-              >
-                NEW HOST
-              </span>
-            </div>
+            <p className="text-sm font-bold text-white leading-none">ESG Smart Performance</p>
             <p className="text-xs text-white/50 mt-0.5">v2.6 — Climate Action Platform</p>
           </div>
         </div>
@@ -298,12 +290,6 @@ export default function Auth() {
 
         {/* Brand heading — desktop only */}
         <div className="hidden lg:block text-center mb-8 gl-fade-in" style={{ animationDelay: "0.1s" }}>
-          <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full border border-amber-300/30 bg-amber-500/10 backdrop-blur-md">
-            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-            <span className="text-xs font-semibold text-amber-200 tracking-wider">
-              {language === "th" ? "ระบบย้ายมาที่ Host ใหม่แล้ว" : "Migrated to New Host"}
-            </span>
-          </div>
           <h1 className="text-5xl xl:text-6xl font-black tracking-tight text-white leading-none">
             {language === "th" ? "ร่วมต่อสู้" : "Combat"}
           </h1>
