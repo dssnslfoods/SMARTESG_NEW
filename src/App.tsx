@@ -205,7 +205,7 @@ const App = () => (
               <Route
                 path="/reports"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
                     <Reports />
                   </ProtectedRoute>
                 }
@@ -213,7 +213,7 @@ const App = () => (
               <Route
                 path="/reports/environmental"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
                     <Environmental />
                   </ProtectedRoute>
                 }
@@ -221,7 +221,7 @@ const App = () => (
               <Route
                 path="/reports/social"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
                     <Social />
                   </ProtectedRoute>
                 }
@@ -229,7 +229,7 @@ const App = () => (
               <Route
                 path="/reports/governance"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
                     <Governance />
                   </ProtectedRoute>
                 }
@@ -237,7 +237,7 @@ const App = () => (
               <Route
                 path="/reports/esg-overview"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
                     <ESGOverview />
                   </ProtectedRoute>
                 }
