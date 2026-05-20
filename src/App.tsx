@@ -53,7 +53,25 @@ const RouteFallback = () => (
   </div>
 );
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Data is fresh for 5 minutes — prevents redundant refetches on
+      // component remount / tab switch (was 0ms = refetch every time)
+      staleTime: 5 * 60 * 1000,
+
+      // Keep unused query data in cache for 10 minutes
+      gcTime: 10 * 60 * 1000,
+
+      // Don't hammer the server when user alt-tabs back
+      refetchOnWindowFocus: false,
+
+      // Retry once on failure (default is 3 — too aggressive for 4xx errors)
+      retry: 1,
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

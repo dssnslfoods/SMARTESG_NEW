@@ -36,6 +36,59 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// ── Session-storage cache helpers ────────────────────────────────────────────
+// Cache profile + role in sessionStorage so page refreshes skip the 3-query
+// round-trip.  The cache is keyed by user ID and auto-invalidated on sign-out.
+// TTL: 30 minutes (JWT refresh happens every 60 min; 30 min is safe).
+const PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
+
+interface ProfileCache {
+  userId: string;
+  profile: UserProfile;
+  role: AppRole;
+  isSuperAdmin: boolean;
+  cachedAt: number;
+}
+
+function readProfileCache(userId: string): ProfileCache | null {
+  try {
+    const raw = sessionStorage.getItem(`auth_cache_${userId}`);
+    if (!raw) return null;
+    const parsed: ProfileCache = JSON.parse(raw);
+    if (Date.now() - parsed.cachedAt > PROFILE_CACHE_TTL_MS) {
+      sessionStorage.removeItem(`auth_cache_${userId}`);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeProfileCache(data: ProfileCache) {
+  try {
+    sessionStorage.setItem(`auth_cache_${data.userId}`, JSON.stringify(data));
+  } catch {
+    // sessionStorage not available (private mode, quota exceeded) — ignore
+  }
+}
+
+function clearProfileCache(userId?: string) {
+  try {
+    if (userId) {
+      sessionStorage.removeItem(`auth_cache_${userId}`);
+    } else {
+      // clear all auth_cache_* keys
+      Object.keys(sessionStorage)
+        .filter(k => k.startsWith('auth_cache_'))
+        .forEach(k => sessionStorage.removeItem(k));
+    }
+  } catch {
+    // ignore
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -45,10 +98,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [roleLoaded, setRoleLoaded] = useState(false);
 
-  const fetchUserData = async (userId: string): Promise<{ hasRole: boolean; isActive: boolean }> => {
+  const fetchUserData = async (
+    userId: string,
+    opts: { skipCache?: boolean } = {}
+  ): Promise<{ hasRole: boolean; isActive: boolean }> => {
     try {
       setRoleLoaded(false);
 
+      // ── Fast path: serve from sessionStorage on page refresh ──────────────
+      if (!opts.skipCache) {
+        const cached = readProfileCache(userId);
+        if (cached) {
+          setProfile(cached.profile);
+          setRole(cached.role);
+          setIsSuperAdmin(cached.isSuperAdmin);
+          setRoleLoaded(true);
+          return { hasRole: true, isActive: cached.profile.is_active };
+        }
+      }
+
+      // ── Slow path: fetch from Supabase (3 queries in parallel) ────────────
       // Run all 3 lookups in parallel — login latency cut ~3x (was serial)
       const [profileRes, roleRes, superAdminRes] = await Promise.all([
         supabase
@@ -76,8 +145,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const roleData = roleRes.data;
       const superAdminRow = superAdminRes.data;
 
+      let enhancedProfile: UserProfile | null = null;
+
       if (profileData) {
-        const enhancedProfile: UserProfile = {
+        enhancedProfile = {
           user_id: profileData.user_id,
           tenant_id: (profileData as any).tenant_id ?? null,
           full_name: profileData.full_name,
@@ -94,11 +165,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Super admin = either role='super_admin' OR an entry in super_admin
       // table (legacy / audit). Both sources checked in the parallel batch.
-      setIsSuperAdmin(roleData?.role === 'super_admin' || !!superAdminRow);
+      const superAdminFlag = roleData?.role === 'super_admin' || !!superAdminRow;
+      setIsSuperAdmin(superAdminFlag);
 
       if (roleData) {
-        setRole(roleData.role as AppRole);
+        const appRole = roleData.role as AppRole;
+        setRole(appRole);
         setRoleLoaded(true);
+
+        // ── Persist to sessionStorage for next page refresh ─────────────────
+        if (enhancedProfile) {
+          writeProfileCache({
+            userId,
+            profile: enhancedProfile,
+            role: appRole,
+            isSuperAdmin: superAdminFlag,
+            cachedAt: Date.now(),
+          });
+        }
+
         return { hasRole: true, isActive: profileData?.is_active ?? true };
       }
 
@@ -152,11 +237,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error as Error };
     }
     
-    // Check if user is active
+    // Check if user is active — always bypass cache on explicit sign-in
     if (data.user) {
-      const { isActive } = await fetchUserData(data.user.id);
-      
+      const { isActive } = await fetchUserData(data.user.id, { skipCache: true });
+
       if (!isActive) {
+        clearProfileCache(data.user.id);
         await supabase.auth.signOut();
         setUser(null);
         setSession(null);
@@ -186,6 +272,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear sessionStorage profile cache before signing out
+    if (user?.id) clearProfileCache(user.id);
+    else clearProfileCache(); // belt-and-suspenders: clear all
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
@@ -205,7 +294,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (user?.id) {
-      await fetchUserData(user.id);
+      // Always fetch fresh data and overwrite cache
+      await fetchUserData(user.id, { skipCache: true });
     }
   };
 

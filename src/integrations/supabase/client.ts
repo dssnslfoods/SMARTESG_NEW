@@ -13,5 +13,20 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+    // Detect session from URL hash only once (faster initial load)
+    detectSessionInUrl: true,
+  },
+  global: {
+    // Reuse Keep-Alive connections — reduces TCP handshake overhead
+    fetch: (url, options = {}) =>
+      fetch(url, { ...options, keepalive: true }),
+  },
+  db: {
+    // Use the pooler schema if available (reduces per-query connection cost)
+    schema: 'public',
+  },
+  realtime: {
+    // Increase heartbeat interval — reduces background traffic
+    params: { eventsPerSecond: 2 },
+  },
 });
