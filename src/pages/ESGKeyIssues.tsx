@@ -37,6 +37,7 @@ import {
   LayoutGrid,
   Download,
   Maximize2,
+  Flag,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -78,6 +79,12 @@ interface TargetRow {
   target_value: number;
   target_direction: 'lower_is_better' | 'higher_is_better';
   note: string | null;
+}
+interface MetricTargetInfo {
+  currentTarget: TargetRow | null;
+  longTermTarget: TargetRow | null;
+  currentYearActual: number;
+  hasData: boolean; // true if at least one approved/submitted value exists
 }
 
 // ─── Visual styles per dimension ──────────────────────────────────────────────
@@ -258,6 +265,84 @@ function FilterRow({
   );
 }
 
+// ─── Target mini progress bar ────────────────────────────────────────────────
+function fmtShort(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return n.toLocaleString(undefined, { maximumFractionDigits: 1 });
+}
+
+function TargetMiniBar({
+  info,
+  unit,
+  currentYear,
+  longTermYear,
+}: {
+  info: MetricTargetInfo;
+  unit: string | null;
+  currentYear: number;
+  longTermYear: number | null;
+}) {
+  const { currentTarget, longTermTarget, currentYearActual } = info;
+  if (!currentTarget) return null;
+
+  const dir = currentTarget.target_direction;
+  const tgt = currentTarget.target_value;
+
+  // Compute fill % and colour
+  const rawPct = tgt > 0 ? (currentYearActual / tgt) * 100 : 0;
+  const fillPct = Math.min(rawPct, 100);
+
+  let barColor: string;
+  let textColor: string;
+  if (dir === 'higher_is_better') {
+    if (rawPct >= 100)      { barColor = '#10b981'; textColor = 'text-emerald-600'; }
+    else if (rawPct >= 60)  { barColor = '#f59e0b'; textColor = 'text-amber-500'; }
+    else                    { barColor = '#ef4444'; textColor = 'text-red-500'; }
+  } else {
+    // lower_is_better: actual ≤ target is good
+    if (rawPct <= 90)       { barColor = '#10b981'; textColor = 'text-emerald-600'; }
+    else if (rawPct <= 100) { barColor = '#f59e0b'; textColor = 'text-amber-500'; }
+    else                    { barColor = '#ef4444'; textColor = 'text-red-500'; }
+  }
+
+  const unitSuffix = unit ? ` ${unit}` : '';
+
+  return (
+    <div className="mt-1.5 space-y-0.5">
+      {/* ── Progress track ─────────────────────────────────────────── */}
+      <div className="relative h-1.5 rounded-full bg-gray-100 overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${fillPct}%`, backgroundColor: barColor }}
+        />
+      </div>
+
+      {/* ── Target pins row ────────────────────────────────────────── */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {/* Current-year target pin */}
+        <span className="inline-flex items-center gap-0.5 text-[9px] text-slate-400 leading-none">
+          <Target className="h-2 w-2 shrink-0" />
+          <span className="font-mono">{currentYear}: {fmtShort(tgt)}{unitSuffix}</span>
+        </span>
+
+        {/* Long-term target pin */}
+        {longTermTarget && longTermYear && longTermYear !== currentYear && (
+          <span className="inline-flex items-center gap-0.5 text-[9px] text-purple-400 leading-none">
+            <Flag className="h-2 w-2 shrink-0" />
+            <span className="font-mono">{longTermYear}: {fmtShort(longTermTarget.target_value)}{unitSuffix}</span>
+          </span>
+        )}
+
+        {/* Actual value — right-aligned */}
+        <span className={`ml-auto font-mono text-[9px] font-bold leading-none ${textColor}`}>
+          {fmtShort(currentYearActual)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Theme column ─────────────────────────────────────────────────────────────
 function ThemeColumn({
   theme,
@@ -265,12 +350,18 @@ function ThemeColumn({
   th,
   onThemeClick,
   onMetricClick,
+  targetMap,
+  currentYear,
+  longTermYear,
 }: {
   theme: Theme;
   style: DimStyle;
   th: boolean;
   onThemeClick?: () => void;
   onMetricClick?: (metricId: string) => void;
+  targetMap?: Map<string, MetricTargetInfo>;
+  currentYear?: number;
+  longTermYear?: number | null;
 }) {
   const headerInner = (
     <>
@@ -310,17 +401,29 @@ function ThemeColumn({
           </p>
         ) : (
           theme.metrics.map((m) => {
+            const tInfo = targetMap?.get(m.metric_id);
+            const hasTarget = !!(tInfo?.currentTarget);
             const innerContent = (
-              <div className="flex items-start gap-2">
-                <span className={`mt-1 inline-block h-1.5 w-1.5 rounded-full ${style.accentDot} shrink-0`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-700 leading-snug">{m.metric_name}</p>
-                  {m.unit && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{m.unit}</p>
+              <div>
+                <div className="flex items-start gap-2">
+                  <span className={`mt-1 inline-block h-1.5 w-1.5 rounded-full ${style.accentDot} shrink-0`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-slate-700 leading-snug">{m.metric_name}</p>
+                    {m.unit && !hasTarget && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{m.unit}</p>
+                    )}
+                  </div>
+                  {onMetricClick && (
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all mt-0.5 shrink-0" />
                   )}
                 </div>
-                {onMetricClick && (
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all mt-0.5 shrink-0" />
+                {tInfo && hasTarget && currentYear !== undefined && (
+                  <TargetMiniBar
+                    info={tInfo}
+                    unit={m.unit}
+                    currentYear={currentYear}
+                    longTermYear={longTermYear ?? null}
+                  />
                 )}
               </div>
             );
@@ -356,11 +459,17 @@ function DimensionCard({
   themesOverride,
   th,
   onSelect,
+  targetMap,
+  currentYear,
+  longTermYear,
 }: {
   dim: Dimension;
   themesOverride?: Theme[];
   th: boolean;
   onSelect?: (dimId: string, themeId: string, metricId?: string) => void;
+  targetMap?: Map<string, MetricTargetInfo>;
+  currentYear?: number;
+  longTermYear?: number | null;
 }) {
   const style = getStyle(dim.dimension_name);
   const Icon = style.icon;
@@ -417,6 +526,9 @@ function DimensionCard({
                 onMetricClick={
                   onSelect ? (mid) => onSelect(dim.dimension_id, t.theme_id, mid) : undefined
                 }
+                targetMap={targetMap}
+                currentYear={currentYear}
+                longTermYear={longTermYear}
               />
             ))}
           </div>
@@ -1310,6 +1422,9 @@ export default function ESGKeyIssues() {
 
   const [data, setData] = useState<Dimension[]>([]);
   const [loading, setLoading] = useState(true);
+  const [targetMap, setTargetMap] = useState<Map<string, MetricTargetInfo>>(new Map());
+  const [longTermYear, setLongTermYear] = useState<number | null>(null);
+  const currentYear = new Date().getFullYear();
 
   const [filterDim, setFilterDim] = useState<string | null>(null);
   const [filterTheme, setFilterTheme] = useState<string | null>(null);
@@ -1345,6 +1460,67 @@ export default function ESGKeyIssues() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, metricParamId]);
 
+  // ── Batch-fetch targets + current-year actuals for all metrics ─────────────
+  const fetchTargetData = async (allMetricIds: string[], cy: number) => {
+    if (allMetricIds.length === 0) return;
+    try {
+      const [targetsRes, valuesRes, settingRes] = await Promise.all([
+        supabase
+          .from('metric_target')
+          .select('metric_id, year, target_value, target_direction, note')
+          .in('metric_id', allMetricIds),
+        supabase
+          .from('metric_value')
+          .select('metric_id, value, period:period_id(year)')
+          .in('metric_id', allMetricIds)
+          .in('status', ['approved', 'submitted']),
+        supabase
+          .from('app_setting')
+          .select('value')
+          .eq('key', 'long_term_target_year')
+          .maybeSingle(),
+      ]);
+
+      const ltYear = settingRes.data?.value
+        ? parseInt(settingRes.data.value, 10)
+        : cy + 5;
+      setLongTermYear(Number.isFinite(ltYear) ? ltYear : cy + 5);
+
+      // Sum current-year actuals per metric
+      const actualMap = new Map<string, number>();
+      (valuesRes.data ?? []).forEach((v: any) => {
+        if (v.period?.year === cy) {
+          actualMap.set(v.metric_id, (actualMap.get(v.metric_id) ?? 0) + Number(v.value));
+        }
+      });
+
+      // Group targets by metric
+      const tgByMetric = new Map<string, TargetRow[]>();
+      (targetsRes.data ?? []).forEach((t: any) => {
+        const arr = tgByMetric.get(t.metric_id) ?? [];
+        arr.push(t as TargetRow);
+        tgByMetric.set(t.metric_id, arr);
+      });
+
+      const result = new Map<string, MetricTargetInfo>();
+      allMetricIds.forEach((mid) => {
+        const tgts = tgByMetric.get(mid) ?? [];
+        const currentTarget = tgts.find((t) => t.year === cy) ?? null;
+        const ltTarget =
+          ltYear && ltYear !== cy ? (tgts.find((t) => t.year === ltYear) ?? null) : null;
+        result.set(mid, {
+          currentTarget,
+          longTermTarget: ltTarget,
+          currentYearActual: actualMap.get(mid) ?? 0,
+          hasData: actualMap.has(mid),
+        });
+      });
+      setTargetMap(result);
+    } catch (e) {
+      console.error('ESGKeyIssues target fetch error:', e);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -1378,6 +1554,11 @@ export default function ESGKeyIssues() {
           return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
         });
       setData(processed);
+      // Fire off batch target fetch once metric list is known
+      const allIds = processed.flatMap((d) =>
+        d.themes.flatMap((t) => t.metrics.map((m) => m.metric_id)),
+      );
+      fetchTargetData(allIds, currentYear);
     } catch (e) {
       console.error('ESGKeyIssues fetch error:', e);
     } finally {
@@ -1640,9 +1821,19 @@ export default function ESGKeyIssues() {
           themesOverride={[themeContext.theme]}
           th={th}
           onSelect={handleSelectFromCard}
+          targetMap={targetMap}
+          currentYear={currentYear}
+          longTermYear={longTermYear}
         />
       ) : dimContext ? (
-        <DimensionCard dim={dimContext} th={th} onSelect={handleSelectFromCard} />
+        <DimensionCard
+          dim={dimContext}
+          th={th}
+          onSelect={handleSelectFromCard}
+          targetMap={targetMap}
+          currentYear={currentYear}
+          longTermYear={longTermYear}
+        />
       ) : (
         <div className="space-y-5">
           {data.map((d) => (
@@ -1651,6 +1842,9 @@ export default function ESGKeyIssues() {
               dim={d}
               th={th}
               onSelect={handleSelectFromCard}
+              targetMap={targetMap}
+              currentYear={currentYear}
+              longTermYear={longTermYear}
             />
           ))}
         </div>
