@@ -11,6 +11,7 @@ import { ReportSectionsProvider } from "@/contexts/ReportSectionsContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { TVModeProvider } from "@/contexts/TVModeContext";
 import { MenuPermissionsProvider } from "@/contexts/MenuPermissionsContext";
+import { BrandingProvider } from "@/contexts/BrandingContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import PasswordChangeRequired from "@/components/PasswordChangeRequired";
 
@@ -56,6 +57,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <BrandingProvider>
       <MenuPermissionsProvider>
       <LanguageProvider>
         <TVModeProvider>
@@ -265,6 +267,7 @@ const App = () => (
         </TVModeProvider>
       </LanguageProvider>
       </MenuPermissionsProvider>
+      </BrandingProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

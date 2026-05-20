@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useMenuPermissions } from '@/contexts/MenuPermissionsContext';
+import { useBranding } from '@/contexts/BrandingContext';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -53,6 +54,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
   const { role, signOut, isSuperAdmin } = useAuth();
   const { t, language } = useLanguage();
   const { canSeeMenu } = useMenuPermissions();
+  const { tenantName, logoUrl, primaryColor } = useBranding();
   const [masterDataOpen, setMasterDataOpen] = useState(pathname.startsWith('/master'));
   const [reportSettingsOpen, setReportSettingsOpen] = useState(pathname === '/reports');
 
@@ -117,12 +119,30 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
         }}
       >
         <Link to="/dashboard" className="flex items-center gap-3 group" onClick={onNavigate}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25 transition-transform group-hover:scale-105">
-            <Leaf className="h-5 w-5 text-white" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-gray-900 tracking-tight">
-              {language === 'th' ? 'ESG Performance' : 'ESG Performance'}
+          {logoUrl ? (
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-lg overflow-hidden transition-transform group-hover:scale-105 ring-1 ring-black/5">
+              <img
+                src={logoUrl}
+                alt={tenantName ?? 'Logo'}
+                className="h-full w-full object-contain"
+              />
+            </div>
+          ) : (
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl shadow-lg transition-transform group-hover:scale-105"
+              style={{
+                background: primaryColor
+                  ? `linear-gradient(135deg, ${primaryColor}cc, ${primaryColor})`
+                  : 'linear-gradient(135deg, #34d399, #059669)',
+                boxShadow: `0 10px 15px -3px ${primaryColor ?? '#10b981'}40`,
+              }}
+            >
+              <Leaf className="h-5 w-5 text-white" />
+            </div>
+          )}
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold text-gray-900 tracking-tight truncate max-w-[150px]">
+              {tenantName ?? 'ESG Performance'}
             </span>
             <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">
               {language === 'th' ? 'ระบบจัดการความยั่งยืน' : 'Sustainability Platform'}
