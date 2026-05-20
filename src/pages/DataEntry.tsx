@@ -140,6 +140,10 @@ export default function DataEntry() {
   const [prefilledFromExisting, setPrefilledFromExisting] = useState(false);
   const latestLookupKeyRef = useRef<string | null>(null);
 
+  // Confirm-update dialog for supervisor/admin
+  const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+  const [pendingUpdateRecord, setPendingUpdateRecord] = useState<MetricValue | null>(null);
+
   const findExistingOnBackend = async (siteId: string, periodId: string, metricId: string) => {
     const { data, error } = await supabase
       .from('metric_value')
@@ -508,6 +512,48 @@ export default function DataEntry() {
     }
   };
 
+  // Called when supervisor/admin confirms updating an existing record
+  const executeConfirmedUpdate = async () => {
+    if (!pendingUpdateRecord || !user?.id) return;
+    setConfirmUpdateOpen(false);
+
+    const dataToUpdate = {
+      value: formData.value,
+      data_source: formData.data_source || null,
+      remark: formData.remark || null,
+      status: formData.status,
+      submitted_by: user.id,
+    };
+
+    const { error: updateError } = await supabase
+      .from('metric_value')
+      .update(dataToUpdate)
+      .eq('value_id', pendingUpdateRecord.value_id);
+
+    if (updateError) {
+      toast({
+        title: language === 'th' ? 'เกิดข้อผิดพลาด' : 'Error',
+        description: updateError.message,
+        variant: 'destructive',
+      });
+    } else {
+      await logActivity({
+        action: 'UPDATE',
+        entityType: 'metric_value',
+        entityId: pendingUpdateRecord.value_id,
+        beforeData: pendingUpdateRecord,
+        afterData: { ...pendingUpdateRecord, ...dataToUpdate },
+      });
+      toast({
+        title: language === 'th' ? 'อัปเดตสำเร็จ' : 'Updated',
+        description: language === 'th' ? 'อัปเดตข้อมูลเรียบร้อยแล้ว' : 'Record updated successfully',
+      });
+      setPendingUpdateRecord(null);
+      setIsDialogOpen(false);
+      fetchAllData();
+    }
+  };
+
 
   const handleSubmit = async () => {
     if (!formData.site_id || !formData.period_id || !formData.metric_id) {
@@ -539,91 +585,23 @@ export default function DataEntry() {
     }
 
     if (existingRecord && !editingValue) {
-      // If we already auto-loaded that record into the form, update without prompting.
-      if (prefilledFromExisting && existingMatch?.value_id === existingRecord.value_id) {
-        const dataToUpdate = {
-          value: formData.value,
-          data_source: formData.data_source || null,
-          remark: formData.remark || null,
-          status: formData.status,
-          submitted_by: user.id,
-        };
+      const canUpdate = role === 'admin' || role === 'supervisor' || role === 'super_admin';
 
-        const { error: updateError } = await supabase
-          .from('metric_value')
-          .update(dataToUpdate)
-          .eq('value_id', existingRecord.value_id);
-
-        if (updateError) {
-          toast({
-            title: language === 'th' ? 'เกิดข้อผิดพลาด' : 'Error',
-            description: updateError.message,
-            variant: 'destructive',
-          });
-        } else {
-          await logActivity({
-            action: 'UPDATE',
-            entityType: 'metric_value',
-            entityId: existingRecord.value_id,
-            beforeData: existingRecord,
-            afterData: { ...existingRecord, ...dataToUpdate },
-          });
-          toast({
-            title: language === 'th' ? 'สำเร็จ' : 'Success',
-            description: language === 'th' ? 'อัปเดตข้อมูลสำเร็จ' : 'Data updated successfully',
-          });
-          setIsDialogOpen(false);
-          fetchAllData();
-        }
-        return;
-      }
-
-      // Record exists - ask user if they want to update it
-      const confirmUpdate = confirm(
-        language === 'th' 
-          ? 'มีข้อมูลสำหรับ Metric, Site และ Period นี้อยู่แล้ว ต้องการอัปเดตข้อมูลเดิมหรือไม่?' 
-          : 'A record for this Metric, Site, and Period already exists. Do you want to update it?'
-      );
-      
-      if (!confirmUpdate) {
-        return;
-      }
-      
-      // Update existing record
-      const dataToUpdate = {
-        value: formData.value,
-        data_source: formData.data_source || null,
-        remark: formData.remark || null,
-        status: formData.status,
-        submitted_by: user.id,
-      };
-
-      const { error: updateError } = await supabase
-        .from('metric_value')
-        .update(dataToUpdate)
-        .eq('value_id', existingRecord.value_id);
-
-      if (updateError) {
+      if (!canUpdate) {
+        // staff / executive / guest → block entirely
         toast({
-          title: language === 'th' ? 'เกิดข้อผิดพลาด' : 'Error',
-          description: updateError.message,
+          title: language === 'th' ? 'มีข้อมูลนี้อยู่ในระบบแล้ว' : 'Record already exists',
+          description: language === 'th'
+            ? 'ข้อมูลของ Metric / Site / Period นี้ถูกบันทึกไว้แล้ว กรุณาติดต่อ Supervisor หรือ Admin หากต้องการแก้ไข'
+            : 'A record for this Metric / Site / Period already exists. Contact a Supervisor or Admin to update it.',
           variant: 'destructive',
         });
-      } else {
-        await logActivity({
-          action: 'UPDATE',
-          entityType: 'metric_value',
-          entityId: existingRecord.value_id,
-          beforeData: existingRecord,
-          afterData: { ...existingRecord, ...dataToUpdate },
-        });
-        toast({
-          title: language === 'th' ? 'สำเร็จ' : 'Success',
-          description: language === 'th' ? 'อัปเดตข้อมูลสำเร็จ' : 'Data updated successfully',
-        });
-        setIsDialogOpen(false);
-        fetchAllData();
+        return;
       }
+
+      // supervisor / admin → open confirmation dialog
+      setPendingUpdateRecord(existingRecord);
+      setConfirmUpdateOpen(true);
       return;
     }
 
@@ -1694,20 +1672,40 @@ export default function DataEntry() {
               </Select>
             </div>
 
-            {existingMatch && !editingValue && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 rounded-full">
-                    {language === 'th' ? 'พบข้อมูลเดิม' : 'Existing record found'}
-                  </Badge>
-                  <span className="text-sm text-emerald-800">
-                    {language === 'th'
-                      ? 'ระบบดึงค่าที่บันทึกไว้แล้วมาแสดงในฟอร์ม (กดบันทึกเพื่ออัปเดต)'
-                      : 'Loaded saved values into the form (Save to update).'}
-                  </span>
+            {existingMatch && !editingValue && (() => {
+              const canUpdate = role === 'admin' || role === 'supervisor' || role === 'super_admin';
+              return canUpdate ? (
+                // supervisor / admin — warn but allow update after confirm
+                <div className="rounded-xl border border-amber-300 bg-amber-50/70 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="bg-amber-100 text-amber-700 border-amber-300 rounded-full">
+                      <AlertTriangle className="mr-1 h-3 w-3" />
+                      {language === 'th' ? 'มีข้อมูลนี้แล้ว' : 'Record exists'}
+                    </Badge>
+                    <span className="text-sm text-amber-800">
+                      {language === 'th'
+                        ? 'มีข้อมูลของ Metric / Site / Period นี้อยู่แล้ว กดบันทึกเพื่อยืนยันการอัปเดต'
+                        : 'A record for this combination already exists. Press Save to confirm update.'}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                // staff / others — blocked
+                <div className="rounded-xl border border-red-300 bg-red-50/70 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="bg-red-100 text-red-700 border-red-300 rounded-full">
+                      <AlertTriangle className="mr-1 h-3 w-3" />
+                      {language === 'th' ? 'มีข้อมูลนี้แล้ว' : 'Record already exists'}
+                    </Badge>
+                    <span className="text-sm text-red-800">
+                      {language === 'th'
+                        ? 'ไม่สามารถบันทึกซ้ำได้ กรุณาติดต่อ Supervisor หรือ Admin หากต้องการแก้ไข'
+                        : 'Cannot save duplicate. Contact a Supervisor or Admin to update this record.'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {editingValue && (
               <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
@@ -1780,9 +1778,14 @@ export default function DataEntry() {
             >
               {language === 'th' ? 'ยกเลิก' : 'Cancel'}
             </Button>
-            <Button 
-              onClick={handleSubmit} 
-              className="gap-2 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 rounded-xl border-0"
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                // Block staff when an existing record is detected
+                !!(existingMatch && !editingValue &&
+                  role !== 'admin' && role !== 'supervisor' && role !== 'super_admin')
+              }
+              className="gap-2 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 rounded-xl border-0 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Save className="h-4 w-4" />
               {language === 'th' ? 'บันทึก' : 'Save'}
@@ -1790,6 +1793,62 @@ export default function DataEntry() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm Update Dialog — supervisor / admin only */}
+      <AlertDialog open={confirmUpdateOpen} onOpenChange={setConfirmUpdateOpen}>
+        <AlertDialogContent className="glass-card-solid rounded-2xl max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="h-5 w-5" />
+              {language === 'th' ? 'มีข้อมูลนี้อยู่แล้ว' : 'Record Already Exists'}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-gray-600">
+                <p>
+                  {language === 'th'
+                    ? 'พบข้อมูลของ Metric / Site / Period นี้อยู่ในระบบแล้ว'
+                    : 'A record for this Metric / Site / Period already exists in the system.'}
+                </p>
+                {pendingUpdateRecord && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">{language === 'th' ? 'ค่าเดิม:' : 'Current value:'}</span>
+                      <span className="font-semibold text-gray-800">{pendingUpdateRecord.value}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">{language === 'th' ? 'ค่าใหม่:' : 'New value:'}</span>
+                      <span className="font-semibold text-emerald-700">{formData.value}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Status:</span>
+                      <span className="font-semibold text-gray-800">{pendingUpdateRecord.status} → {formData.status}</span>
+                    </div>
+                  </div>
+                )}
+                <p className="font-medium text-amber-700">
+                  {language === 'th'
+                    ? 'ต้องการอัปเดตข้อมูลเดิมด้วยค่าใหม่นี้หรือไม่?'
+                    : 'Do you want to overwrite the existing record with the new values?'}
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="rounded-xl border-gray-200 hover:bg-gray-100"
+              onClick={() => { setConfirmUpdateOpen(false); setPendingUpdateRecord(null); }}
+            >
+              {language === 'th' ? 'ยกเลิก' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeConfirmedUpdate}
+              className="bg-amber-500 text-white hover:bg-amber-600 rounded-xl shadow-lg"
+            >
+              {language === 'th' ? 'ยืนยัน อัปเดต' : 'Confirm Update'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Bulk Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
