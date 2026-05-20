@@ -258,6 +258,13 @@ export default function AuditLog() {
               <span className="font-medium text-gray-800">{dimension.dimension_name}</span>
             </div>
           )}
+          {/* Theme — resolved via metric → theme */}
+          {theme && (
+            <div className="flex items-start gap-2">
+              <span className="w-24 shrink-0 text-gray-500">{th ? 'หัวข้อ' : 'Theme'}:</span>
+              <span className="font-medium text-gray-800">{theme.theme_name}</span>
+            </div>
+          )}
           {[
             { key: 'metric_id', labelTh: 'ตัวชี้วัด', labelEn: 'Metric' },
             { key: 'site_id',   labelTh: 'สถานที่',    labelEn: 'Site' },
