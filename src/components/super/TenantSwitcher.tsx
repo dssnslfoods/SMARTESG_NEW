@@ -78,6 +78,10 @@ export default function TenantSwitcher() {
         .update({ tenant_id: tenantId })
         .eq('user_id', user.id);
       if (error) throw error;
+      // ── Bust sessionStorage profile cache so AuthContext fetches fresh
+      // data (including the new tenant_id) instead of serving the stale
+      // cached profile on the next page load. ───────────────────────────
+      try { sessionStorage.removeItem(`auth_cache_${user.id}`); } catch { /* ignore */ }
       // Full reload to refresh AuthContext + every query / state
       window.location.reload();
     } catch (e: any) {
