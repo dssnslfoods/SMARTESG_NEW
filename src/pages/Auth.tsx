@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -71,6 +71,20 @@ export default function Auth() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+
+  // Prefill the remembered email on mount (set when the user ticked
+  // "Remember me" on a previous successful login).
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("remember_email");
+      if (saved) {
+        setLoginForm((f) => ({ ...f, email: saved }));
+        setRememberMe(true);
+      }
+    } catch {
+      /* localStorage unavailable — ignore */
+    }
+  }, []);
 
   // Forgot password dialog state
   const [forgotOpen, setForgotOpen] = useState(false);
@@ -165,7 +179,16 @@ export default function Auth() {
     setIsLoading(false);
     if (error) {
       toast({ variant: "destructive", title: t("error"), description: error.message });
-    } else if (inactive) {
+    } else if (!inactive) {
+      // Successful login — honour the "Remember me" choice for the email.
+      try {
+        if (rememberMe) localStorage.setItem("remember_email", loginForm.email.trim());
+        else localStorage.removeItem("remember_email");
+      } catch {
+        /* ignore */
+      }
+    }
+    if (inactive) {
       toast({
         variant: "destructive",
         title: language === "th" ? "บัญชีถูกระงับ" : "Account Inactive",
