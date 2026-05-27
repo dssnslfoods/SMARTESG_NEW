@@ -49,12 +49,10 @@ export default function TenantSwitcher() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
 
-  // Only render for super_admin
-  if (!isSuperAdmin) return null;
-
-  // Fetch tenants when popover opens
+  // Fetch tenants on mount (small table) so the trigger button can resolve the
+  // current tenant's name/colour immediately — not only after the popover opens.
   useEffect(() => {
-    if (!open || tenants.length > 0) return;
+    if (!isSuperAdmin || tenants.length > 0) return;
     setLoading(true);
     supabase
       .from('tenant')
@@ -64,7 +62,8 @@ export default function TenantSwitcher() {
         setTenants((data ?? []) as TenantOption[]);
         setLoading(false);
       });
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin]);
 
   const currentTenantId = profile?.tenant_id ?? null;
   const currentTenant = tenants.find((t) => t.tenant_id === currentTenantId);
@@ -96,6 +95,9 @@ export default function TenantSwitcher() {
       t.name.toLowerCase().includes(search.toLowerCase()) ||
       t.slug.toLowerCase().includes(search.toLowerCase()),
   );
+
+  // Only render for super_admin (placed after all hooks to satisfy Rules of Hooks)
+  if (!isSuperAdmin) return null;
 
   return (
     <div className="mb-3 px-3">
