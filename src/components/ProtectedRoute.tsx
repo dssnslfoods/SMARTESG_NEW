@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MainLayout } from './layout/MainLayout';
 import { Loader2 } from 'lucide-react';
 
-type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest';
+type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest' | 'super_admin';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -27,8 +27,9 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/auth" replace />;
   }
 
-  // Check if user has required role
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
+  // Check if user has required role — super_admin bypasses every route guard
+  // (so they can browse any tenant's pages while "viewing as" that tenant).
+  if (allowedRoles && role && role !== 'super_admin' && !allowedRoles.includes(role)) {
     return <Navigate to="/dashboard" replace />;
   }
 
