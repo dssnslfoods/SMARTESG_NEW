@@ -46,15 +46,43 @@ serve(async (req) => {
       .select("role")
       .eq("user_id", caller.id)
       .maybeSingle();
-    
+
+    // Also check the super_admin table (belt-and-suspenders).
+    const { data: superAdminRow } = await supabaseAdmin
+      .from("super_admin")
+      .select("user_id")
+      .eq("user_id", caller.id)
+      .maybeSingle();
+
     const isAdmin = roleData?.role === "admin";
     const isSupervisor = roleData?.role === "supervisor";
-    
-    if (!roleData || (!isAdmin && !isSupervisor)) {
-      console.log("User is not admin or supervisor:", caller.id, roleData);
+    const isSuperAdmin = roleData?.role === "super_admin" || !!superAdminRow;
+
+    if (!isAdmin && !isSupervisor && !isSuperAdmin) {
+      console.log("Caller not allowed to create users:", caller.id, roleData);
       return new Response(
-        JSON.stringify({ error: "Forbidden - Only admins and supervisors can create users" }),
+        JSON.stringify({ error: "Forbidden - Only admins, supervisors and super admins can create users" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Determine which tenant the new user belongs to:
+    //   • admin / supervisor → their own tenant
+    //   • super_admin        → the tenant they're currently "viewing"
+    // Both are simply the caller's app_user_profile.tenant_id.
+    const { data: callerProfile } = await supabaseAdmin
+      .from("app_user_profile")
+      .select("tenant_id")
+      .eq("user_id", caller.id)
+      .maybeSingle();
+
+    const targetTenantId = callerProfile?.tenant_id ?? null;
+
+    if (!targetTenantId) {
+      console.log("Caller has no tenant_id:", caller.id);
+      return new Response(
+        JSON.stringify({ error: "Cannot determine target tenant for the new user" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -83,17 +111,19 @@ serve(async (req) => {
       );
     }
 
-    // Update profile with full name
+    // Update profile with full name + assign to the target tenant.
+    // (The signup trigger defaults tenant_id to NSL because there's no auth
+    // context inside the trigger, so we must overwrite it explicitly here.)
     await supabaseAdmin
       .from("app_user_profile")
-      .update({ full_name: fullName, is_active: true })
+      .update({ full_name: fullName, is_active: true, tenant_id: targetTenantId })
       .eq("user_id", userData.user.id);
 
-    // Assign role (use upsert since trigger may have already created a guest role)
+    // Assign role + same tenant (upsert since the trigger created a guest row).
     const { error: roleError } = await supabaseAdmin
       .from("user_roles")
       .upsert(
-        { user_id: userData.user.id, role },
+        { user_id: userData.user.id, role, tenant_id: targetTenantId },
         { onConflict: "user_id" }
       );
 
