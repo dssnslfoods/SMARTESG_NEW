@@ -89,6 +89,7 @@ export default function UserManagement() {
   const { isAtLimit } = usePlanLimits();
 
   const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [superAdminIds, setSuperAdminIds] = useState<Set<string>>(new Set());
   const [companies, setCompanies] = useState<Company[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,15 +156,19 @@ export default function UserManagement() {
 
   const fetchData = async () => {
     try {
-      const [profilesRes, rolesRes, companiesRes, sitesRes] = await Promise.all([
+      const [profilesRes, rolesRes, companiesRes, sitesRes, superAdminRes] = await Promise.all([
         supabase.from('app_user_profile').select('*'),
         supabase.from('user_roles').select('*'),
         supabase.from('company').select('company_id, company_name'),
         supabase.from('site').select('site_id, site_name, company_id'),
+        supabase.from('super_admin').select('user_id'),
       ]);
 
       const profiles = profilesRes.data || [];
       const roles = rolesRes.data || [];
+      // Platform-level super admins — always hidden from the per-tenant list,
+      // regardless of whether their user_roles row resolves under this tenant.
+      setSuperAdminIds(new Set((superAdminRes.data ?? []).map((r: any) => r.user_id)));
       
       // Fetch emails from auth users via edge function or admin API
       // For now, we'll need to get emails when editing
@@ -645,7 +650,11 @@ export default function UserManagement() {
       : currentUserRole === 'supervisor'
         ? users.filter(u => u.role !== 'admin')
         : users
-  ).filter(u => u.role !== 'super_admin');
+  )
+    // Hide platform-level super admins by BOTH signals: their resolved role
+    // and membership in the super_admin table (robust even if the role join
+    // doesn't resolve under the currently-viewed tenant).
+    .filter(u => u.role !== 'super_admin' && !superAdminIds.has(u.user_id));
 
   const filteredUsers = visibleUsers.filter((user) =>
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
