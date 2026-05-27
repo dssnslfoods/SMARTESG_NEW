@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { MainLayout as Layout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,17 +94,14 @@ export default function PlanManagement() {
 
   if (isLoading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center py-20 text-gray-400">
-          {th ? 'กำลังโหลด...' : 'Loading...'}
-        </div>
-      </Layout>
+      <div className="flex items-center justify-center py-20 text-gray-400">
+        {th ? 'กำลังโหลด...' : 'Loading...'}
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="mx-auto max-w-5xl space-y-6">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -257,8 +253,7 @@ export default function PlanManagement() {
 
         {/* Tenant plan overview table */}
         <TenantPlanOverview th={th} />
-      </div>
-    </Layout>
+    </div>
   );
 }
 
