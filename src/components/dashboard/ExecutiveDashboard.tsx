@@ -324,7 +324,15 @@ function MetricCard({ m, th }: { m: HeadlineMetric; th: boolean }) {
   const barColor = m.on_track === true ? '#10b981' : m.on_track === false ? '#ef4444' : '#94a3b8';
 
   return (
-    <div className="rounded-xl border border-border p-3.5 hover:shadow-md transition bg-white">
+    <Link
+      to={`/esg-key-issues?metric=${encodeURIComponent(m.metric_id)}`}
+      title={th ? 'ดูรายละเอียดตัวชี้วัด' : 'View metric details'}
+      className="group relative block rounded-xl border border-border p-3.5 bg-white transition-all
+                 hover:shadow-md hover:border-blue-300 hover:-translate-y-0.5 cursor-pointer"
+    >
+      {/* Click hint chevron — fades in on hover */}
+      <ArrowRight className="absolute bottom-2.5 right-2.5 h-3.5 w-3.5 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className={`rounded-lg bg-gradient-to-br ${style.bg} p-1.5 shrink-0`}>
@@ -332,7 +340,9 @@ function MetricCard({ m, th }: { m: HeadlineMetric; th: boolean }) {
           </div>
           <div className="min-w-0">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{m.dim_name}</p>
-            <p className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2">{m.name}</p>
+            <p className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2 group-hover:text-blue-700 transition-colors">
+              {m.name}
+            </p>
           </div>
         </div>
         {m.on_track !== null && (
@@ -381,6 +391,6 @@ function MetricCard({ m, th }: { m: HeadlineMetric; th: boolean }) {
           </div>
         </div>
       )}
-    </div>
+    </Link>
   );
 }
