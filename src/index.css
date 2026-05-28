@@ -298,6 +298,18 @@
     }
   }
 
+  /* ── Marquee (horizontal ticker for Auth feature highlights) ── */
+  .animate-marquee {
+    animation: marquee 50s linear infinite;
+  }
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
   /* Loading skeleton shimmer */
   .skeleton-shimmer {
     background: linear-gradient(

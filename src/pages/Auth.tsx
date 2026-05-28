@@ -21,6 +21,18 @@ import {
   Wind,
   Sparkles,
   Earth,
+  BarChart3,
+  Target,
+  Briefcase,
+  Shield,
+  FileDown,
+  Zap,
+  Users,
+  History,
+  Building2,
+  TrendingUp,
+  Layers,
+  Globe2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -236,6 +248,41 @@ export default function Auth() {
     { icon: TreePine, value: "Net 0", label: language === "th" ? "คาร์บอน" : "Carbon" },
     { icon: Wind, value: "ESG", label: language === "th" ? "ความยั่งยืน" : "Sustain." },
   ];
+
+  // ── Feature highlights (static — sales pitch ticker, no DB lookup) ─────────
+  const HIGHLIGHTS = language === "th"
+    ? [
+        { icon: Globe2,     text: "Multi-Tenant SaaS — แยกข้อมูลแต่ละบริษัทอย่างสมบูรณ์ ปลอดภัยระดับองค์กร" },
+        { icon: BarChart3,  text: "ติดตามผล ESG แบบ Real-time ครอบคลุม Environmental · Social · Governance" },
+        { icon: Target,     text: "ระบบ Smart Target — เป้ารายปี + ระยะยาว 5 ปี พร้อมตัวบ่งชี้ On-Track อัตโนมัติ" },
+        { icon: Briefcase,  text: "Executive Dashboard แบบ One-Page สำหรับ CEO / CFO ดูครบในหน้าเดียว" },
+        { icon: Shield,     text: "Row-Level Security ระดับ Database — ป้องกันข้อมูลรั่วระหว่าง tenant 100%" },
+        { icon: FileDown,   text: "สร้างรายงานอัตโนมัติ + ส่งออก PDF / Excel พร้อมนำเสนอ Board" },
+        { icon: Zap,        text: "ประสิทธิภาพสูง — Query รวดเร็วระดับ Sub-second แม้ข้อมูลมหาศาล" },
+        { icon: Leaf,       text: "สอดคล้องมาตรฐาน MSCI ESG Score + GRI Standards ระดับสากล" },
+        { icon: Users,      text: "ทำงานร่วมกันหลายบทบาท — Admin · Supervisor · Staff · Executive · Guest" },
+        { icon: History,    text: "Audit Trail ครบทุกการเปลี่ยนแปลง พร้อม Restore ย้อนกลับได้ในคลิกเดียว" },
+        { icon: Building2,  text: "รองรับหลายบริษัท · หลายสถานที่ · หลายช่วงเวลา ภายใต้ Tenant เดียว" },
+        { icon: TrendingUp, text: "วิเคราะห์แนวโน้ม YoY · เปรียบเทียบรายปี · คาดการณ์ End-of-Year อัตโนมัติ" },
+        { icon: Layers,     text: "โครงสร้าง Dimension → Theme → Metric ปรับแต่งเองได้ทั้งหมด" },
+        { icon: Sparkles,   text: "Branding ปรับ Logo / สี / ชื่อ ต่อ Tenant พร้อม White-label ได้" },
+      ]
+    : [
+        { icon: Globe2,     text: "Multi-Tenant SaaS — Each company's data fully isolated, enterprise-grade security" },
+        { icon: BarChart3,  text: "Real-time ESG performance tracking across Environmental · Social · Governance" },
+        { icon: Target,     text: "Smart Target tracking — Annual + 5-year long-term goals with on-track indicators" },
+        { icon: Briefcase,  text: "Executive One-Page Dashboard — CEO / CFO snapshot at a glance" },
+        { icon: Shield,     text: "Row-Level Security at the database — 100% data isolation between tenants" },
+        { icon: FileDown,   text: "Auto reports + board-ready PDF & Excel export" },
+        { icon: Zap,        text: "Lightning-fast performance — Sub-second queries even at scale" },
+        { icon: Leaf,       text: "Aligned with MSCI ESG Score + GRI Standards — globally recognized framework" },
+        { icon: Users,      text: "Multi-role collaboration — Admin · Supervisor · Staff · Executive · Guest" },
+        { icon: History,    text: "Full audit trail with one-click restore on every change" },
+        { icon: Building2,  text: "Multi-company · multi-site · multi-period within a single tenant" },
+        { icon: TrendingUp, text: "YoY trend analysis · year-over-year comparison · end-of-year forecasting" },
+        { icon: Layers,     text: "Fully customizable Dimension → Theme → Metric hierarchy" },
+        { icon: Sparkles,   text: "Per-tenant branding — Logo / colors / name with white-label support" },
+      ];
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
@@ -627,6 +674,41 @@ export default function Auth() {
         <p className="mt-8 text-xs text-white/30 text-center gl-fade-in" style={{ animationDelay: "0.6s" }}>
           © 2026 D2Infinite Co.,Ltd. All rights reserved. ESG Smart Performance Application
         </p>
+      </div>
+
+      {/* ===== FEATURE HIGHLIGHTS MARQUEE (static, no DB) ============= */}
+      <div
+        className="absolute bottom-0 left-0 right-0 z-20 overflow-hidden border-t border-white/10 backdrop-blur-md"
+        style={{ background: "rgba(15,25,20,0.55)" }}
+      >
+        {/* Edge fade masks on left/right */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-24 z-10 bg-gradient-to-r from-[rgba(15,25,20,0.95)] to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-24 z-10 bg-gradient-to-l from-[rgba(15,25,20,0.95)] to-transparent" />
+
+        {/* Label pill */}
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1 shadow-md">
+          <Sparkles className="h-3 w-3 text-white" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white">
+            {language === "th" ? "ไฮไลต์ระบบ" : "Highlights"}
+          </span>
+        </div>
+
+        <div className="flex animate-marquee whitespace-nowrap py-2.5 sm:py-3 will-change-transform">
+          {/* Render the highlights TWICE so the loop is seamless */}
+          {[...HIGHLIGHTS, ...HIGHLIGHTS].map((h, i) => {
+            const Icon = h.icon;
+            return (
+              <span
+                key={i}
+                className="inline-flex items-center gap-2 px-5 sm:px-7 text-xs sm:text-sm text-white/85"
+              >
+                <Icon className="h-3.5 w-3.5 text-emerald-300 shrink-0" />
+                <span>{h.text}</span>
+                <span className="text-white/20 ml-1">●</span>
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       {/* ===== FORGOT PASSWORD DIALOG ===== */}
