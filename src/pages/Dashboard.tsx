@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import SuperAdminPanel from '@/components/dashboard/SuperAdminPanel';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,7 +70,7 @@ interface UserRole {
 }
 
 export default function Dashboard() {
-  const { role, user } = useAuth();
+  const { role, user, isSuperAdmin } = useAuth();
   const { t, language } = useLanguage();
   
   // Use optimized hook for metric values
@@ -428,7 +429,10 @@ export default function Dashboard() {
       className="space-y-4 sm:space-y-6 h-full overflow-y-auto min-h-full p-1"
     >
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
-      
+
+      {/* ── Super-admin only: cross-tenant platform overview ─────────────── */}
+      {isSuperAdmin && <SuperAdminPanel />}
+
       {/* Page Header */}
       <div className="px-1">
         <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('dashboard')}</h1>
