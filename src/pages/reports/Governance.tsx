@@ -62,19 +62,18 @@ const GOVERNANCE_CODES = [
   "GOVERNANCE_INCIDENTS","EMERGING_RISK","CORRUPTION_INCIDENTS","TAX_TRAINING",
 ] as const;
 
-// ─── Theme Mapping ───
-const THEME_MAP: Record<string, { th: string; en: string; color: string }> = {
-  THM007: { th: "Corporate Governance", en: "Corporate Governance", color: "hsl(262 83% 58%)" },
-  THM013: { th: "Anti-Corruption", en: "Anti-Corruption", color: "hsl(0 84% 60%)" },
-  THM008: { th: "Risk Management", en: "Risk Management", color: "hsl(45 93% 47%)" },
-  THM010: { th: "Tax Strategy", en: "Tax Strategy", color: "hsl(199 89% 48%)" },
-};
+// Theme palette — assigned by index from esg_theme query (tenant-portable)
+const THEME_COLORS = [
+  "hsl(262 83% 58%)", "hsl(0 84% 60%)", "hsl(45 93% 47%)", "hsl(199 89% 48%)",
+  "hsl(160 84% 39%)", "hsl(20 90% 55%)", "hsl(280 75% 60%)", "hsl(200 85% 55%)",
+];
 
 // ─── Interfaces ───
 interface Company { company_id: string; company_name: string; }
 interface Site { site_id: string; site_name: string; company_id: string; }
 interface ReportingPeriod { period_id: string; year: number; month: number; month_name: string; }
 interface EsgMetric { metric_id: string; metric_name: string; theme_id: string; unit: string | null; code: string | null; }
+interface EsgTheme  { theme_id: string; theme_name: string; dimension_id: string | null; }
 interface MetricValue {
   value_id: string; metric_id: string; site_id: string; period_id: string;
   value: number; status: string; last_updated: string | null;
@@ -198,6 +197,7 @@ export default function Governance() {
   const [sites, setSites] = useState<Site[]>([]);
   const [periods, setPeriods] = useState<ReportingPeriod[]>([]);
   const [metrics, setMetrics] = useState<EsgMetric[]>([]);
+  const [themes, setThemes] = useState<EsgTheme[]>([]);
   const [metricValues, setMetricValues] = useState<MetricValue[]>([]);
   const [METRIC, setMETRIC] = useState<Record<string, string>>({}); // code → metric_id
   const [loading, setLoading] = useState(true);
@@ -219,6 +219,7 @@ export default function Governance() {
         { data: sitesData },
         { data: periodsData },
         { data: metricsData },
+        { data: themesData },
       ] = await Promise.all([
         supabase.from("company").select("*").order("company_name"),
         supabase.from("site").select("*").order("site_name"),
@@ -226,6 +227,7 @@ export default function Governance() {
         supabase.from("esg_metric")
           .select("metric_id, metric_name, theme_id, unit, code")
           .in("code", GOVERNANCE_CODES as unknown as string[]),
+        supabase.from("esg_theme").select("theme_id, theme_name, dimension_id"),
       ]);
 
       const codeMap: Record<string, string> = {};
@@ -236,6 +238,7 @@ export default function Governance() {
       setSites(sitesData || []);
       setPeriods(periodsData || []);
       setMetrics(metricsData || []);
+      setThemes(themesData || []);
       setMETRIC(codeMap);
       setMetricValues(govValues);
 
@@ -414,27 +417,27 @@ export default function Governance() {
   }, [filteredValues, sites]);
 
   // ─── Chart 3: Governance Theme Distribution (Pie) ───
+  // Theme labels come from esg_theme (Supabase) — tenant-portable, no hardcode.
   const themeDistribution = useMemo(() => {
+    const themesById = new Map(themes.map(t => [t.theme_id, t.theme_name]));
     const themeMap = new Map<string, { count: number; value: number }>();
     filteredValues.forEach(v => {
       const metric = metrics.find(m => m.metric_id === v.metric_id);
       if (!metric) return;
-      const theme = THEME_MAP[metric.theme_id];
-      if (!theme) return;
-      const label = language === "th" ? theme.th : theme.en;
+      const label = themesById.get(metric.theme_id);
+      if (!label) return;
       const current = themeMap.get(label) || { count: 0, value: 0 };
       current.count += 1;
       current.value += v.value;
       themeMap.set(label, current);
     });
-    const colors = ["hsl(262 83% 58%)", "hsl(0 84% 60%)", "hsl(45 93% 47%)", "hsl(199 89% 48%)"];
     return Array.from(themeMap.entries()).map(([name, data], i) => ({
       name,
       records: data.count,
       totalValue: data.value,
-      color: colors[i % colors.length],
+      color: THEME_COLORS[i % THEME_COLORS.length],
     }));
-  }, [filteredValues, metrics, language]);
+  }, [filteredValues, metrics, themes]);
 
   // ─── Chart 4: Cumulative Incidents Over Months ───
   const cumulativeData = useMemo(() => {
