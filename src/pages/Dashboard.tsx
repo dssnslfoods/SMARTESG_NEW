@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import SuperAdminPanel from '@/components/dashboard/SuperAdminPanel';
+import ExecutiveDashboard from '@/components/dashboard/ExecutiveDashboard';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -432,6 +433,9 @@ export default function Dashboard() {
 
       {/* ── Super-admin only: cross-tenant platform overview ─────────────── */}
       {isSuperAdmin && <SuperAdminPanel />}
+
+      {/* ── Executive only: CEO/CFO one-page summary (tenant-scoped) ─────── */}
+      {role === 'executive' && <ExecutiveDashboard />}
 
       {/* Page Header */}
       <div className="px-1">
