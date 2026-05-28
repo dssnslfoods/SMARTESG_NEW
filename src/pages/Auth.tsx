@@ -306,8 +306,8 @@ export default function Auth() {
       <div className="absolute top-1/2 left-1/4 w-48 h-48 rounded-full bg-amber-400/10 blur-2xl animate-pulse" style={{ animationDuration: "5s" }} />
       <div className="absolute top-1/3 right-1/4 w-64 h-64 rounded-full bg-teal-300/10 blur-3xl animate-pulse" style={{ animationDuration: "7s" }} />
 
-      {/* ===== TOP BAR ===== */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-4 sm:px-8 sm:py-6">
+      {/* ===== TOP BAR ===== (shifted below the marquee strip) */}
+      <div className="absolute top-[44px] sm:top-[48px] left-0 right-0 z-30 flex items-center justify-between px-4 py-4 sm:px-8 sm:py-6">
         {/* Logo */}
         <div className="flex items-center gap-3 gl-fade-in">
           <div
@@ -677,9 +677,10 @@ export default function Auth() {
       </div>
 
       {/* ===== FEATURE HIGHLIGHTS MARQUEE (static, no DB) ============= */}
+      {/* Pinned to the TOP of the viewport — always visible regardless of screen size. */}
       <div
-        className="absolute bottom-0 left-0 right-0 z-20 overflow-hidden border-t border-white/10 backdrop-blur-md"
-        style={{ background: "rgba(15,25,20,0.55)" }}
+        className="absolute top-0 left-0 right-0 z-40 overflow-hidden border-b border-white/10 backdrop-blur-md"
+        style={{ background: "rgba(15,25,20,0.75)" }}
       >
         {/* Edge fade masks on left/right */}
         <div className="pointer-events-none absolute inset-y-0 left-0 w-24 z-10 bg-gradient-to-r from-[rgba(15,25,20,0.95)] to-transparent" />
