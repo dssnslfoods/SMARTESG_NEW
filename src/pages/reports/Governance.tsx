@@ -57,15 +57,10 @@ import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 import { FullscreenButton, useFullscreen } from "@/components/reports/FullscreenButton";
 import { TVNavBar } from "@/components/reports/TVNavBar";
 
-// ─── Metric ID Constants ───
-const METRIC = {
-  GOVERNANCE_INCIDENTS: "MET012",   // จำนวนเหตุการณ์ด้านการกำกับดูแลและการเลือกปฏิบัติ
-  EMERGING_RISK: "MET013",          // การประเมินความเสี่ยงเกิดใหม่
-  CORRUPTION_INCIDENTS: "MET014",   // จำนวนเหตุการณ์ทุจริตและคอรัปชั่น
-  TAX_TRAINING: "MET015",           // จำนวนผู้ได้รับการอบรมเรื่องการบริหารภาษี
-};
-
-const GOVERNANCE_METRIC_IDS = Object.values(METRIC);
+// ─── Semantic codes (tenant-agnostic). Resolved to metric_id per tenant. ───
+const GOVERNANCE_CODES = [
+  "GOVERNANCE_INCIDENTS","EMERGING_RISK","CORRUPTION_INCIDENTS","TAX_TRAINING",
+] as const;
 
 // ─── Theme Mapping ───
 const THEME_MAP: Record<string, { th: string; en: string; color: string }> = {
@@ -79,7 +74,7 @@ const THEME_MAP: Record<string, { th: string; en: string; color: string }> = {
 interface Company { company_id: string; company_name: string; }
 interface Site { site_id: string; site_name: string; company_id: string; }
 interface ReportingPeriod { period_id: string; year: number; month: number; month_name: string; }
-interface EsgMetric { metric_id: string; metric_name: string; theme_id: string; unit: string | null; }
+interface EsgMetric { metric_id: string; metric_name: string; theme_id: string; unit: string | null; code: string | null; }
 interface MetricValue {
   value_id: string; metric_id: string; site_id: string; period_id: string;
   value: number; status: string; last_updated: string | null;
@@ -162,7 +157,8 @@ const GovKPICard = ({
 };
 
 // ─── Paginated Fetch ───
-async function fetchGovernanceMetricValues(): Promise<MetricValue[]> {
+async function fetchGovernanceMetricValues(metricIds: string[]): Promise<MetricValue[]> {
+  if (metricIds.length === 0) return [];
   const PAGE_SIZE = 2000;
   const allValues: MetricValue[] = [];
   let from = 0;
@@ -172,7 +168,7 @@ async function fetchGovernanceMetricValues(): Promise<MetricValue[]> {
     const { data, error } = await supabase
       .from("metric_value")
       .select("value_id, metric_id, site_id, period_id, value, status, last_updated")
-      .in("metric_id", GOVERNANCE_METRIC_IDS)
+      .in("metric_id", metricIds)
       .in("status", ["submitted", "approved", "draft"])
       .range(from, from + PAGE_SIZE - 1);
 
@@ -203,6 +199,7 @@ export default function Governance() {
   const [periods, setPeriods] = useState<ReportingPeriod[]>([]);
   const [metrics, setMetrics] = useState<EsgMetric[]>([]);
   const [metricValues, setMetricValues] = useState<MetricValue[]>([]);
+  const [METRIC, setMETRIC] = useState<Record<string, string>>({}); // code → metric_id
   const [loading, setLoading] = useState(true);
 
   const [filterCompany, setFilterCompany] = useState<string>("");
@@ -222,19 +219,24 @@ export default function Governance() {
         { data: sitesData },
         { data: periodsData },
         { data: metricsData },
-        govValues,
       ] = await Promise.all([
         supabase.from("company").select("*").order("company_name"),
         supabase.from("site").select("*").order("site_name"),
         supabase.from("reporting_period").select("*").order("year", { ascending: false }),
-        supabase.from("esg_metric").select("*").in("metric_id", GOVERNANCE_METRIC_IDS),
-        fetchGovernanceMetricValues(),
+        supabase.from("esg_metric")
+          .select("metric_id, metric_name, theme_id, unit, code")
+          .in("code", GOVERNANCE_CODES as unknown as string[]),
       ]);
+
+      const codeMap: Record<string, string> = {};
+      (metricsData ?? []).forEach((m: any) => { if (m.code) codeMap[m.code] = m.metric_id; });
+      const govValues = await fetchGovernanceMetricValues(Object.values(codeMap));
 
       setCompanies(companiesData || []);
       setSites(sitesData || []);
       setPeriods(periodsData || []);
       setMetrics(metricsData || []);
+      setMETRIC(codeMap);
       setMetricValues(govValues);
 
     } catch (error) {

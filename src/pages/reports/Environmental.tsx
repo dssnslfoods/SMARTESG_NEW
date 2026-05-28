@@ -47,34 +47,21 @@ import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 import { FullscreenButton, useFullscreen } from "@/components/reports/FullscreenButton";
 import { TVNavBar } from "@/components/reports/TVNavBar";
 
-// ─── Metric ID Constants ───
-const METRIC = {
-  GRID_ELECTRICITY: "MET001",
-  RENEWABLE_ENERGY: "MET002",
-  GHG_SCOPE1: "MET003",
-  GHG_SCOPE2: "MET004",
-  WATER_WITHDRAWAL: "MET005",
-  WATER_RECYCLING: "MET006",
-  LPG: "MET007",
-  TOTAL_WASTE: "MET018",
-  WASTE_RECYCLED: "MET021",
-  WATER_DISCHARGE: "MET034",
-  DIESEL_FLEET: "MET029",
-  DIESEL_FORKLIFT: "MET030",
-  GASOHOL_91: "MET032",
-  GASOHOL_95: "MET031",
-  GASOHOL_E20: "MET033",
-  DIESEL_FIREPUMP: "MET027",
-  DIESEL_GENERATOR: "MET028",
-};
-
-const ENV_METRIC_IDS = Object.values(METRIC);
+// ─── Semantic codes (tenant-agnostic) ───
+// The `code` column on esg_metric maps each tenant's metric_id to one of
+// these stable codes. The report resolves code → id per-tenant at runtime.
+const ENV_CODES = [
+  "GRID_ELECTRICITY","RENEWABLE_ENERGY","GHG_SCOPE1","GHG_SCOPE2",
+  "WATER_WITHDRAWAL","WATER_RECYCLING","LPG","TOTAL_WASTE","WASTE_RECYCLED",
+  "WATER_DISCHARGE","DIESEL_FLEET","DIESEL_FORKLIFT","GASOHOL_91","GASOHOL_95",
+  "GASOHOL_E20","DIESEL_FIREPUMP","DIESEL_GENERATOR",
+] as const;
 
 // ─── Interfaces ───
 interface Company { company_id: string; company_name: string; }
 interface Site { site_id: string; site_name: string; company_id: string; }
 interface ReportingPeriod { period_id: string; year: number; month: number; month_name: string; }
-interface EsgMetric { metric_id: string; metric_name: string; theme_id: string; unit: string | null; }
+interface EsgMetric { metric_id: string; metric_name: string; theme_id: string; unit: string | null; code: string | null; }
 interface MetricValue {
   value_id: string; metric_id: string; site_id: string; period_id: string;
   value: number; status: string; last_updated: string | null;
@@ -150,7 +137,8 @@ const EnvKPICard = ({
 };
 
 // ─── Paginated Fetch ───
-async function fetchEnvMetricValues(): Promise<MetricValue[]> {
+async function fetchEnvMetricValues(metricIds: string[]): Promise<MetricValue[]> {
+  if (metricIds.length === 0) return [];
   const PAGE_SIZE = 2000;
   const allValues: MetricValue[] = [];
   let from = 0;
@@ -160,7 +148,7 @@ async function fetchEnvMetricValues(): Promise<MetricValue[]> {
     const { data, error } = await supabase
       .from("metric_value")
       .select("value_id, metric_id, site_id, period_id, value, status, last_updated")
-      .in("metric_id", ENV_METRIC_IDS)
+      .in("metric_id", metricIds)
       .in("status", ["submitted", "approved", "draft"])
       .range(from, from + PAGE_SIZE - 1);
 
@@ -195,6 +183,7 @@ export default function Environmental() {
   const [periods, setPeriods] = useState<ReportingPeriod[]>([]);
   const [metrics, setMetrics] = useState<EsgMetric[]>([]);
   const [metricValues, setMetricValues] = useState<MetricValue[]>([]);
+  const [METRIC, setMETRIC] = useState<Record<string, string>>({}); // code → metric_id
   const [loading, setLoading] = useState(true);
 
   const [filterCompany, setFilterCompany] = useState<string>("");
@@ -209,24 +198,34 @@ export default function Environmental() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // Step 1 — master tables in parallel (esg_metric filtered by semantic codes)
       const [
         { data: companiesData },
         { data: sitesData },
         { data: periodsData },
         { data: metricsData },
-        envValues,
       ] = await Promise.all([
         supabase.from("company").select("*").order("company_name"),
         supabase.from("site").select("*").order("site_name"),
         supabase.from("reporting_period").select("*").order("year", { ascending: false }),
-        supabase.from("esg_metric").select("*").in("metric_id", ENV_METRIC_IDS),
-        fetchEnvMetricValues(),
+        supabase.from("esg_metric")
+          .select("metric_id, metric_name, theme_id, unit, code")
+          .in("code", ENV_CODES as unknown as string[]),
       ]);
+
+      // Step 2 — build code → metric_id map (tenant-specific)
+      const codeMap: Record<string, string> = {};
+      (metricsData ?? []).forEach((m: any) => { if (m.code) codeMap[m.code] = m.metric_id; });
+      const envMetricIds = Object.values(codeMap);
+
+      // Step 3 — fetch metric values for those IDs
+      const envValues = await fetchEnvMetricValues(envMetricIds);
 
       setCompanies(companiesData || []);
       setSites(sitesData || []);
       setPeriods(periodsData || []);
       setMetrics(metricsData || []);
+      setMETRIC(codeMap);
       setMetricValues(envValues);
 
     } catch (error) {

@@ -53,24 +53,17 @@ import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 import { FullscreenButton, useFullscreen } from "@/components/reports/FullscreenButton";
 import { TVNavBar } from "@/components/reports/TVNavBar";
 
-// ─── Metric ID Constants ───
-const METRIC = {
-  TRAINING_HOURS: "MET008",       // ชั่วโมงอบรมรวม
-  LTI: "MET009",                   // Lost Time Injury
-  WELLBEING_ACCESS: "MET010",      // พนักงานเข้าถึง Well-being
-  NPD_HEALTH: "MET016",           // NPD กลุ่มสุขภาพ
-  HUMAN_RIGHTS_VIOLATIONS: "MET017", // ละเมิดสิทธิมนุษยชน
-  FOOD_DONATION: "MET020",         // บริจาคอาหาร
-  WORKING_HOURS: "MET035",         // ชั่วโมงทำงาน
-};
-
-const SOCIAL_METRIC_IDS = Object.values(METRIC);
+// ─── Semantic codes (tenant-agnostic). Resolved to metric_id per tenant. ───
+const SOCIAL_CODES = [
+  "TRAINING_HOURS","LTI","WELLBEING_ACCESS","NPD_HEALTH",
+  "HUMAN_RIGHTS_VIOLATIONS","FOOD_DONATION","WORKING_HOURS",
+] as const;
 
 // ─── Interfaces ───
 interface Company { company_id: string; company_name: string; }
 interface Site { site_id: string; site_name: string; company_id: string; }
 interface ReportingPeriod { period_id: string; year: number; month: number; month_name: string; }
-interface EsgMetric { metric_id: string; metric_name: string; theme_id: string; unit: string | null; }
+interface EsgMetric { metric_id: string; metric_name: string; theme_id: string; unit: string | null; code: string | null; }
 interface MetricValue {
   value_id: string; metric_id: string; site_id: string; period_id: string;
   value: number; status: string; last_updated: string | null;
@@ -153,7 +146,8 @@ const SocialKPICard = ({
 };
 
 // ─── Paginated Fetch ───
-async function fetchSocialMetricValues(): Promise<MetricValue[]> {
+async function fetchSocialMetricValues(metricIds: string[]): Promise<MetricValue[]> {
+  if (metricIds.length === 0) return [];
   const PAGE_SIZE = 2000;
   const allValues: MetricValue[] = [];
   let from = 0;
@@ -163,7 +157,7 @@ async function fetchSocialMetricValues(): Promise<MetricValue[]> {
     const { data, error } = await supabase
       .from("metric_value")
       .select("value_id, metric_id, site_id, period_id, value, status, last_updated")
-      .in("metric_id", SOCIAL_METRIC_IDS)
+      .in("metric_id", metricIds)
       .in("status", ["submitted", "approved", "draft"])
       .range(from, from + PAGE_SIZE - 1);
 
@@ -197,6 +191,7 @@ export default function Social() {
   const [periods, setPeriods] = useState<ReportingPeriod[]>([]);
   const [metrics, setMetrics] = useState<EsgMetric[]>([]);
   const [metricValues, setMetricValues] = useState<MetricValue[]>([]);
+  const [METRIC, setMETRIC] = useState<Record<string, string>>({}); // code → metric_id
   const [loading, setLoading] = useState(true);
 
   const [filterCompany, setFilterCompany] = useState<string>("");
@@ -216,19 +211,24 @@ export default function Social() {
         { data: sitesData },
         { data: periodsData },
         { data: metricsData },
-        socialValues,
       ] = await Promise.all([
         supabase.from("company").select("*").order("company_name"),
         supabase.from("site").select("*").order("site_name"),
         supabase.from("reporting_period").select("*").order("year", { ascending: false }),
-        supabase.from("esg_metric").select("*").in("metric_id", SOCIAL_METRIC_IDS),
-        fetchSocialMetricValues(),
+        supabase.from("esg_metric")
+          .select("metric_id, metric_name, theme_id, unit, code")
+          .in("code", SOCIAL_CODES as unknown as string[]),
       ]);
+
+      const codeMap: Record<string, string> = {};
+      (metricsData ?? []).forEach((m: any) => { if (m.code) codeMap[m.code] = m.metric_id; });
+      const socialValues = await fetchSocialMetricValues(Object.values(codeMap));
 
       setCompanies(companiesData || []);
       setSites(sitesData || []);
       setPeriods(periodsData || []);
       setMetrics(metricsData || []);
+      setMETRIC(codeMap);
       setMetricValues(socialValues);
 
     } catch (error) {

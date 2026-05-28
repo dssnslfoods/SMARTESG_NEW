@@ -62,39 +62,19 @@ import { ChartScrollWrapper } from "@/components/reports/ChartScrollWrapper";
 import { FullscreenButton, useFullscreen } from "@/components/reports/FullscreenButton";
 import { TVNavBar } from "@/components/reports/TVNavBar";
 
-// ─── All Key Metric IDs across E, S, G ───
-const ENV_METRICS = {
-  GHG_SCOPE1: "MET003",
-  GHG_SCOPE2: "MET004",
-  GRID_ELECTRICITY: "MET001",
-  RENEWABLE_ENERGY: "MET002",
-  WATER_WITHDRAWAL: "MET005",
-  WATER_RECYCLING: "MET006",
-  TOTAL_WASTE: "MET018",
-  WASTE_RECYCLED: "MET021",
-};
-
-const SOCIAL_METRICS = {
-  TRAINING_HOURS: "MET008",
-  LTI: "MET009",
-  WELLBEING_ACCESS: "MET010",
-  HUMAN_RIGHTS_VIOLATIONS: "MET017",
-  FOOD_DONATION: "MET020",
-  WORKING_HOURS: "MET035",
-};
-
-const GOV_METRICS = {
-  GOVERNANCE_INCIDENTS: "MET012",
-  CORRUPTION_INCIDENTS: "MET014",
-  EMERGING_RISK: "MET013",
-  TAX_TRAINING: "MET015",
-};
-
-const ALL_METRIC_IDS = [
-  ...Object.values(ENV_METRICS),
-  ...Object.values(SOCIAL_METRICS),
-  ...Object.values(GOV_METRICS),
-];
+// ─── Semantic codes across E, S, G (tenant-agnostic). Resolved per tenant. ──
+const ENV_CODES_OV = [
+  "GHG_SCOPE1","GHG_SCOPE2","GRID_ELECTRICITY","RENEWABLE_ENERGY",
+  "WATER_WITHDRAWAL","WATER_RECYCLING","TOTAL_WASTE","WASTE_RECYCLED",
+] as const;
+const SOCIAL_CODES_OV = [
+  "TRAINING_HOURS","LTI","WELLBEING_ACCESS",
+  "HUMAN_RIGHTS_VIOLATIONS","FOOD_DONATION","WORKING_HOURS",
+] as const;
+const GOV_CODES_OV = [
+  "GOVERNANCE_INCIDENTS","CORRUPTION_INCIDENTS","EMERGING_RISK","TAX_TRAINING",
+] as const;
+const ALL_CODES_OV = [...ENV_CODES_OV, ...SOCIAL_CODES_OV, ...GOV_CODES_OV];
 
 // ─── Interfaces ───
 interface Company { company_id: string; company_name: string; }
@@ -122,7 +102,8 @@ const EmptyState = ({ message }: { message: string }) => (
 );
 
 // ─── Paginated Fetch ───
-async function fetchAllMetricValues(): Promise<MetricValue[]> {
+async function fetchAllMetricValues(metricIds: string[]): Promise<MetricValue[]> {
+  if (metricIds.length === 0) return [];
   const PAGE_SIZE = 2000;
   const allValues: MetricValue[] = [];
   let from = 0;
@@ -132,7 +113,7 @@ async function fetchAllMetricValues(): Promise<MetricValue[]> {
     const { data, error } = await supabase
       .from("metric_value")
       .select("value_id, metric_id, site_id, period_id, value, status, last_updated")
-      .in("metric_id", ALL_METRIC_IDS)
+      .in("metric_id", metricIds)
       .in("status", ["submitted", "approved", "draft"])
       .range(from, from + PAGE_SIZE - 1);
 
@@ -232,6 +213,10 @@ export default function ESGOverview() {
   const [sites, setSites] = useState<Site[]>([]);
   const [periods, setPeriods] = useState<ReportingPeriod[]>([]);
   const [metricValues, setMetricValues] = useState<MetricValue[]>([]);
+  // code → metric_id maps populated from esg_metric.code (tenant-portable)
+  const [ENV_METRICS, setENV_METRICS]       = useState<Record<string, string>>({});
+  const [SOCIAL_METRICS, setSOCIAL_METRICS] = useState<Record<string, string>>({});
+  const [GOV_METRICS, setGOV_METRICS]       = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const [filterCompany, setFilterCompany] = useState<string>("");
@@ -250,13 +235,32 @@ export default function ESGOverview() {
         { data: companiesData },
         { data: sitesData },
         { data: periodsData },
-        allValues,
+        { data: metricsData },
       ] = await Promise.all([
         supabase.from("company").select("*").order("company_name"),
         supabase.from("site").select("*").order("site_name"),
         supabase.from("reporting_period").select("*").order("year", { ascending: false }),
-        fetchAllMetricValues(),
+        supabase.from("esg_metric")
+          .select("metric_id, code")
+          .in("code", ALL_CODES_OV as unknown as string[]),
       ]);
+
+      // Build per-dimension code → id maps
+      const envMap: Record<string, string> = {};
+      const socMap: Record<string, string> = {};
+      const govMap: Record<string, string> = {};
+      (metricsData ?? []).forEach((m: any) => {
+        if (!m.code) return;
+        if ((ENV_CODES_OV as readonly string[]).includes(m.code))    envMap[m.code] = m.metric_id;
+        if ((SOCIAL_CODES_OV as readonly string[]).includes(m.code)) socMap[m.code] = m.metric_id;
+        if ((GOV_CODES_OV as readonly string[]).includes(m.code))    govMap[m.code] = m.metric_id;
+      });
+      setENV_METRICS(envMap);
+      setSOCIAL_METRICS(socMap);
+      setGOV_METRICS(govMap);
+
+      const allIds = [...Object.values(envMap), ...Object.values(socMap), ...Object.values(govMap)];
+      const allValues = await fetchAllMetricValues(allIds);
 
       setCompanies(companiesData || []);
       setSites(sitesData || []);
