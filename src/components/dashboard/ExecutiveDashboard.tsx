@@ -4,6 +4,7 @@
  * All data scoped to the caller's tenant via get_executive_summary() RPC.
  */
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,10 +24,11 @@ import {
   Heart,
   Scale,
   FileText,
+  ArrowRight,
+  Globe,
 } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, ResponsiveContainer,
-  CartesianGrid, PieChart, Pie, Cell,
+  Tooltip as ReTooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -171,6 +173,33 @@ export default function ExecutiveDashboard() {
         </div>
       </div>
 
+      {/* ── Quick navigation shortcuts ────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+        {DIMENSION_SHORTCUTS.map(s => {
+          const Icon = s.icon;
+          return (
+            <Link
+              key={s.key}
+              to={s.href}
+              className="group rounded-xl border border-border bg-white hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden"
+            >
+              <div className={`bg-gradient-to-r ${s.bg} px-3 py-2 flex items-center justify-between text-white`}>
+                <Icon className="h-4 w-4" />
+                <ArrowRight className="h-3.5 w-3.5 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+              </div>
+              <div className="px-3 py-2.5">
+                <p className="text-xs font-semibold text-slate-800">
+                  {th ? s.label_th : s.label_en}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {th ? 'ดูรายงาน' : 'View report'} →
+                </p>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
       {/* ── Top row: Overall donut + Dimension summary ─────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Overall achievement donut */}
@@ -274,34 +303,17 @@ export default function ExecutiveDashboard() {
         </CardContent>
       </Card>
 
-      {/* ── Monthly entries trend ───────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="pb-1">
-          <CardTitle className="text-sm flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5 text-blue-500" />
-            {th ? 'การบันทึกข้อมูล (12 เดือนล่าสุด)' : 'Data Entries (Last 12 Months)'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-2 pb-4">
-          <div style={{ width: '100%', height: 200 }}>
-            <ResponsiveContainer>
-              <BarChart data={data.monthly_trend} margin={{ top: 5, right: 8, left: -8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} tickFormatter={(s: string) => s?.slice(2)} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => fmtNum(v)} />
-                <ReTooltip
-                  contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 12 }}
-                  formatter={(v: number) => [fmtNum(v), th ? 'รายการ' : 'records']}
-                />
-                <Bar dataKey="records" fill="#3b82f6" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
     </section>
   );
 }
+
+// ─── Dimension shortcut buttons (used inside the header) ─────────────────────
+const DIMENSION_SHORTCUTS = [
+  { key: 'environmental', label_en: 'Environmental', label_th: 'สิ่งแวดล้อม', icon: Leaf,    href: '/reports/environmental', bg: 'from-emerald-500 to-teal-600' },
+  { key: 'social',        label_en: 'Social',        label_th: 'สังคม',       icon: Heart,   href: '/reports/social',        bg: 'from-blue-500 to-cyan-600' },
+  { key: 'governance',    label_en: 'Governance',    label_th: 'ธรรมาภิบาล',   icon: Scale,   href: '/reports/governance',    bg: 'from-purple-500 to-fuchsia-600' },
+  { key: 'overview',      label_en: 'ESG Overview',  label_th: 'ภาพรวม ESG',  icon: Globe,   href: '/reports/esg-overview',  bg: 'from-slate-600 to-slate-800' },
+] as const;
 
 // ─── Single metric card ──────────────────────────────────────────────────────
 function MetricCard({ m, th }: { m: HeadlineMetric; th: boolean }) {
