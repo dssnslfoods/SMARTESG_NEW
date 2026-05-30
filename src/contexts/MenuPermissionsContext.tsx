@@ -8,7 +8,6 @@ import {
 } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { DEFAULT_PERMISSIONS, type AppRole } from '@/lib/menuConfig';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // permMap[menuKey][role] = is_active
@@ -61,11 +60,12 @@ export function MenuPermissionsProvider({ children }: { children: ReactNode }) {
         aMap[row.menu_key] = row.is_allowed;
       });
       setAllowMap(aMap);
-
-      setLoaded(true);
     } catch (e) {
       console.error('MenuPermissions fetch error:', e);
     } finally {
+      // Mark loaded deterministically (even on error) so menu visibility is
+      // resolved from the DB result — never left hanging on a code default.
+      setLoaded(true);
       setLoading(false);
     }
   }, []);
@@ -91,19 +91,16 @@ export function MenuPermissionsProvider({ children }: { children: ReactNode }) {
       //    Missing row defaults to allowed=true (new tenants get everything).
       if (loaded && allowMap[menuKey] === false) return false;
 
-      // 3. Admin within tenant sees everything that's tenant-allowed.
+      // 3. Admin within tenant is the configurator → sees every tenant-allowed menu.
       if (role === 'admin') return true;
 
-      // 4. Tier-2 check: role-level menu_permission set by tenant admin.
-      if (loaded) {
-        const roleMap = permMap[menuKey];
-        if (roleMap !== undefined) {
-          return roleMap[role] ?? false;
-        }
-      }
-
-      // Fallback for pre-DB-load render
-      return (DEFAULT_PERMISSIONS[menuKey] ?? []).includes(role as AppRole);
+      // 4. Non-admin roles: visibility is decided SOLELY by what the tenant
+      //    admin configured in the Menu Permissions page (menu_permission table).
+      //    No hardcoded defaults are ever consulted for the decision — a missing
+      //    or false entry means "not granted". Before the DB result is in
+      //    (loaded === false) we deny by default rather than assume from code.
+      if (!loaded) return false;
+      return permMap[menuKey]?.[role] ?? false;
     },
     [role, permMap, allowMap, loaded],
   );
