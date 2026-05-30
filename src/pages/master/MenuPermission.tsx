@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useMenuPermissions } from '@/contexts/MenuPermissionsContext';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -13,7 +14,19 @@ import {
   ShieldCheck,
   Eye,
   RefreshCw,
+  RotateCcw,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { MENU_ITEMS, NON_ADMIN_ROLES, DEFAULT_PERMISSIONS, type AppRole } from '@/lib/menuConfig';
 
@@ -38,6 +51,7 @@ const SECTION_META = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function MenuPermission() {
   const { language } = useLanguage();
+  const { profile } = useAuth();
   const { toast } = useToast();
   const {
     allPermissions,
@@ -45,6 +59,10 @@ export default function MenuPermission() {
     refresh: refreshContext,
     loading: ctxLoading,
   } = useMenuPermissions();
+
+  // The admin's own tenant — every write is scoped to this id explicitly so a
+  // tenant can never modify another tenant's menu permissions.
+  const tenantId = profile?.tenant_id ?? null;
 
   // Only show menus the super_admin has allowed for this tenant.
   // A menu missing from tenantAllowlist defaults to allowed (true).
@@ -81,6 +99,7 @@ export default function MenuPermission() {
   // ── Toggle handler ──────────────────────────────────────────────────────────
   const handleToggle = async (menuKey: string, role: AppRole, newValue: boolean) => {
     const cellId = `${menuKey}:${role}`;
+    if (!tenantId) return;
 
     // Optimistic update
     setPerms((prev) => ({
@@ -90,9 +109,17 @@ export default function MenuPermission() {
     setSaving((prev) => new Set(prev).add(cellId));
 
     try {
+      // tenant_id is set EXPLICITLY and onConflict matches the real PK
+      // (tenant_id, menu_key, role) — so writes never collide across tenants.
       const { error } = await supabase.from('menu_permission').upsert(
-        { menu_key: menuKey, role, is_active: newValue, updated_at: new Date().toISOString() },
-        { onConflict: 'menu_key,role' },
+        {
+          tenant_id: tenantId,
+          menu_key: menuKey,
+          role,
+          is_active: newValue,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'tenant_id,menu_key,role' },
       );
       if (error) throw error;
 
@@ -115,6 +142,56 @@ export default function MenuPermission() {
         next.delete(cellId);
         return next;
       });
+    }
+  };
+
+  // ── Reset all permissions to the system defaults (this tenant only) ─────────
+  const [resetting, setResetting] = useState(false);
+  const handleResetDefaults = async () => {
+    if (!tenantId) return;
+    setResetting(true);
+    try {
+      // Build one row per (visible menu × non-admin role) from DEFAULT_PERMISSIONS.
+      const rows = visibleMenuItems.flatMap((item) =>
+        NON_ADMIN_ROLES.map((role) => ({
+          tenant_id: tenantId,
+          menu_key: item.key,
+          role,
+          is_active: (DEFAULT_PERMISSIONS[item.key] ?? []).includes(role),
+          updated_at: new Date().toISOString(),
+        })),
+      );
+
+      const { error } = await supabase
+        .from('menu_permission')
+        .upsert(rows, { onConflict: 'tenant_id,menu_key,role' });
+      if (error) throw error;
+
+      // Reflect immediately in local state + Sidebar
+      const next: PermState = {};
+      visibleMenuItems.forEach((item) => {
+        next[item.key] = {};
+        NON_ADMIN_ROLES.forEach((role) => {
+          next[item.key][role] = (DEFAULT_PERMISSIONS[item.key] ?? []).includes(role);
+        });
+      });
+      setPerms(next);
+      await refreshContext();
+
+      toast({
+        title: th ? 'คืนค่าสำเร็จ' : 'Reset complete',
+        description: th
+          ? 'สิทธิ์เมนูทั้งหมดถูกตั้งกลับเป็นค่าเริ่มต้นของระบบแล้ว'
+          : 'All menu permissions restored to system defaults.',
+      });
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: th ? 'ข้อผิดพลาด' : 'Error',
+        description: e.message,
+      });
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -145,16 +222,46 @@ export default function MenuPermission() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-          <LayoutGrid className="h-5 w-5 text-emerald-600" />
-          {th ? 'กำหนดสิทธิ์เมนู' : 'Menu Permissions'}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {th
-            ? 'กำหนดว่า Role ไหนสามารถเห็นเมนูใดใน Sidebar ได้บ้าง — มีผลทันทีเมื่อสลับ'
-            : 'Control which roles can see which sidebar menu items — changes apply instantly'}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+            <LayoutGrid className="h-5 w-5 text-emerald-600" />
+            {th ? 'กำหนดสิทธิ์เมนู' : 'Menu Permissions'}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {th
+              ? 'กำหนดว่า Role ไหนสามารถเห็นเมนูใดใน Sidebar ได้บ้าง — มีผลทันที เฉพาะ tenant ของคุณเท่านั้น'
+              : 'Control which roles can see which sidebar menu items — applies instantly, your tenant only'}
+          </p>
+        </div>
+
+        {/* Reset to system defaults */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" size="sm" disabled={resetting || !initialized} className="gap-1.5 shrink-0">
+              {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+              {th ? 'คืนค่าเริ่มต้นของระบบ' : 'Reset to System Defaults'}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {th ? 'คืนค่าสิทธิ์เมนูเป็นค่าเริ่มต้น?' : 'Reset menu permissions to defaults?'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {th
+                  ? 'การตั้งค่าสิทธิ์เมนูทั้งหมดของ tenant นี้จะถูกเปลี่ยนกลับเป็นค่าเริ่มต้นที่ระบบกำหนด การกระทำนี้มีผลเฉพาะ tenant ของคุณ และไม่กระทบ tenant อื่น'
+                  : 'All menu permission settings for this tenant will revert to the system-defined defaults. This affects only your tenant and cannot be undone.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{th ? 'ยกเลิก' : 'Cancel'}</AlertDialogCancel>
+              <AlertDialogAction onClick={handleResetDefaults}>
+                {th ? 'คืนค่าเริ่มต้น' : 'Reset to Defaults'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Notice + Stats */}
