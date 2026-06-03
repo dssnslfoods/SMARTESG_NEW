@@ -1464,16 +1464,18 @@ export default function ESGKeyIssues() {
   const fetchTargetData = async (allMetricIds: string[], cy: number) => {
     if (allMetricIds.length === 0) return;
     try {
-      const [targetsRes, valuesRes, settingRes] = await Promise.all([
+      // Resolve current-year period IDs + targets + long-term setting in parallel.
+      // Restricting the actuals query to this year's periods keeps the result
+      // small and lets us paginate safely past PostgREST's 1000-row cap.
+      const [targetsRes, periodsRes, settingRes] = await Promise.all([
         supabase
           .from('metric_target')
           .select('metric_id, year, target_value, target_direction, note')
           .in('metric_id', allMetricIds),
         supabase
-          .from('metric_value')
-          .select('metric_id, value, period:period_id(year)')
-          .in('metric_id', allMetricIds)
-          .in('status', ['approved', 'submitted']),
+          .from('reporting_period')
+          .select('period_id')
+          .eq('year', cy),
         supabase
           .from('app_setting')
           .select('value')
@@ -1486,13 +1488,31 @@ export default function ESGKeyIssues() {
         : cy + 5;
       setLongTermYear(Number.isFinite(ltYear) ? ltYear : cy + 5);
 
-      // Sum current-year actuals per metric
+      const cyPeriodIds = (periodsRes.data ?? []).map((p: any) => p.period_id);
+
+      // Sum current-year actuals per metric — paginated so no row is dropped
+      // even when a tenant has thousands of metric_value records.
       const actualMap = new Map<string, number>();
-      (valuesRes.data ?? []).forEach((v: any) => {
-        if (v.period?.year === cy) {
-          actualMap.set(v.metric_id, (actualMap.get(v.metric_id) ?? 0) + Number(v.value));
+      if (cyPeriodIds.length > 0) {
+        const PAGE = 1000;
+        let from = 0;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { data, error } = await supabase
+            .from('metric_value')
+            .select('metric_id, value')
+            .in('metric_id', allMetricIds)
+            .in('period_id', cyPeriodIds)
+            .in('status', ['approved', 'submitted'])
+            .range(from, from + PAGE - 1);
+          if (error) throw error;
+          (data ?? []).forEach((v: any) => {
+            actualMap.set(v.metric_id, (actualMap.get(v.metric_id) ?? 0) + Number(v.value));
+          });
+          if (!data || data.length < PAGE) break;
+          from += PAGE;
         }
-      });
+      }
 
       // Group targets by metric
       const tgByMetric = new Map<string, TargetRow[]>();
