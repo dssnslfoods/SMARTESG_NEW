@@ -424,18 +424,29 @@ export default function Dashboard() {
     );
   }
 
+  // ── Executive: show ONLY the one-page CEO/CFO summary (no generic stat
+  // cards / Quick Actions — those are redundant for this role). ───────────────
+  if (role === 'executive') {
+    return (
+      <div
+        ref={containerRef}
+        className="space-y-4 sm:space-y-6 h-full overflow-y-auto min-h-full p-1"
+      >
+        <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+        <ExecutiveDashboard />
+      </div>
+    );
+  }
+
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className="space-y-4 sm:space-y-6 h-full overflow-y-auto min-h-full p-1"
     >
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
       {/* ── Super-admin only: cross-tenant platform overview ─────────────── */}
       {isSuperAdmin && <SuperAdminPanel />}
-
-      {/* ── Executive only: CEO/CFO one-page summary (tenant-scoped) ─────── */}
-      {role === 'executive' && <ExecutiveDashboard />}
 
       {/* Page Header */}
       <div className="px-1">
