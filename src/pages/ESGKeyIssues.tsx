@@ -32,6 +32,7 @@ import {
   Activity,
   Database,
   Inbox,
+  Info,
   AlertTriangle,
   CheckCircle2,
   LayoutGrid,
@@ -284,6 +285,8 @@ function TargetMiniBar({
   currentYear: number;
   longTermYear: number | null;
 }) {
+  const { language } = useLanguage();
+  const th = language === 'th';
   const { currentTarget, longTermTarget, currentYearActual } = info;
   if (!currentTarget) return null;
 
@@ -296,23 +299,30 @@ function TargetMiniBar({
 
   let barColor: string;
   let textColor: string;
+  let status: string; // localized one-line meaning for the tooltip
   if (dir === 'higher_is_better') {
-    if (rawPct >= 100)      { barColor = '#10b981'; textColor = 'text-emerald-600'; }
-    else if (rawPct >= 60)  { barColor = '#f59e0b'; textColor = 'text-amber-500'; }
-    else                    { barColor = '#ef4444'; textColor = 'text-red-500'; }
+    if (rawPct >= 100)      { barColor = '#10b981'; textColor = 'text-emerald-600'; status = th ? 'บรรลุเป้าหมาย (≥100% ของเป้า)' : 'On target (≥100% of goal)'; }
+    else if (rawPct >= 60)  { barColor = '#f59e0b'; textColor = 'text-amber-500'; status = th ? 'ใกล้เป้าหมาย (60–99% ของเป้า)' : 'Approaching (60–99% of goal)'; }
+    else                    { barColor = '#ef4444'; textColor = 'text-red-500';   status = th ? 'ต่ำกว่าเป้ามาก (<60% ของเป้า)' : 'Far below (<60% of goal)'; }
   } else {
     // lower_is_better: actual ≤ target is good
-    if (rawPct <= 90)       { barColor = '#10b981'; textColor = 'text-emerald-600'; }
-    else if (rawPct <= 100) { barColor = '#f59e0b'; textColor = 'text-amber-500'; }
-    else                    { barColor = '#ef4444'; textColor = 'text-red-500'; }
+    if (rawPct <= 90)       { barColor = '#10b981'; textColor = 'text-emerald-600'; status = th ? 'อยู่ในเกณฑ์ดี (≤90% ของเพดาน)' : 'Well within limit (≤90% of cap)'; }
+    else if (rawPct <= 100) { barColor = '#f59e0b'; textColor = 'text-amber-500'; status = th ? 'ใกล้เพดาน (90–100% ของเพดาน)' : 'Near limit (90–100% of cap)'; }
+    else                    { barColor = '#ef4444'; textColor = 'text-red-500';   status = th ? 'เกินเพดาน (>100% ของเพดาน)' : 'Over limit (>100% of cap)'; }
   }
 
   const unitSuffix = unit ? ` ${unit}` : '';
+  const dirLabel = dir === 'higher_is_better' ? (th ? 'ยิ่งสูงยิ่งดี' : 'Higher is better') : (th ? 'ยิ่งต่ำยิ่งดี' : 'Lower is better');
+  // Native tooltip — appears on hover, explains this bar's status + colour key
+  const tooltip =
+    `${dirLabel}\n` +
+    `${th ? 'ทำได้' : 'Actual'}: ${fmtShort(currentYearActual)}${unitSuffix} / ${th ? 'เป้า' : 'Target'}: ${fmtShort(tgt)}${unitSuffix} (${rawPct.toFixed(0)}%)\n` +
+    `${th ? 'สถานะ' : 'Status'}: ${status}`;
 
   return (
-    <div className="mt-1.5 space-y-0.5">
+    <div className="mt-1.5 space-y-0.5" title={tooltip}>
       {/* ── Progress track ─────────────────────────────────────────── */}
-      <div className="relative h-1.5 rounded-full bg-gray-100 overflow-hidden">
+      <div className="relative h-1.5 rounded-full bg-gray-100 overflow-hidden cursor-help">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${fillPct}%`, backgroundColor: barColor }}
@@ -1860,6 +1870,29 @@ export default function ESGKeyIssues() {
               )}
             </div>
           )}
+
+          {/* ── Progress-bar colour legend ───────────────────────────── */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 mt-2 border-t border-border/30">
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+              <Info className="h-3 w-3" />
+              {th ? 'ความหมายแถบสี:' : 'Bar colour guide:'}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] text-slate-600" title={th ? 'ยิ่งสูงยิ่งดี: ทำได้ ≥100% ของเป้า / ยิ่งต่ำยิ่งดี: ใช้ ≤90% ของเพดาน' : 'Higher-is-better: ≥100% of goal / Lower-is-better: ≤90% of cap'}>
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0" />
+              {th ? 'เขียว = บรรลุ/อยู่ในเกณฑ์ดี' : 'Green = on target'}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] text-slate-600" title={th ? 'ยิ่งสูงยิ่งดี: ทำได้ 60–99% ของเป้า / ยิ่งต่ำยิ่งดี: ใช้ 90–100% ของเพดาน' : 'Higher-is-better: 60–99% of goal / Lower-is-better: 90–100% of cap'}>
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" />
+              {th ? 'เหลือง = ใกล้เป้า/ใกล้เพดาน' : 'Amber = approaching'}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] text-slate-600" title={th ? 'ยิ่งสูงยิ่งดี: ทำได้ <60% ของเป้า / ยิ่งต่ำยิ่งดี: เกินเพดาน (>100%)' : 'Higher-is-better: <60% of goal / Lower-is-better: over the cap (>100%)'}>
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500 shrink-0" />
+              {th ? 'แดง = ต่ำกว่าเป้ามาก/เกินเพดาน' : 'Red = off target'}
+            </span>
+            <span className="text-[10px] text-muted-foreground/60 italic">
+              {th ? '(เลื่อนเมาส์บนแถบเพื่อดูรายละเอียด)' : '(hover a bar for details)'}
+            </span>
+          </div>
         </CardContent>
       </Card>
 
