@@ -213,7 +213,15 @@ export default function ExecutiveDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="relative" style={{ height: 180 }}>
+            <div
+              className="relative cursor-help"
+              style={{ height: 180 }}
+              title={
+                th
+                  ? `สัดส่วนตัวชี้วัดที่บรรลุเป้าหมายปี ${data.year}\nบรรลุ ${data.overall.on_track} จาก ${data.overall.total} ตัวชี้วัดที่ตั้งเป้าไว้ (${onTrackPct}%)\n"บรรลุ" = ทำได้ตามเกณฑ์เป้าหมาย (มี tolerance ±10%)`
+                  : `Share of targeted metrics on track for ${data.year}\n${data.overall.on_track} of ${data.overall.total} targeted metrics on track (${onTrackPct}%)\n"On track" = meeting the target within a ±10% tolerance`
+              }
+            >
               <ResponsiveContainer>
                 <PieChart>
                   <Pie data={donutData} dataKey="value" innerRadius={50} outerRadius={75} paddingAngle={2}>
@@ -256,8 +264,17 @@ export default function ExecutiveDashboard() {
                 const style = DIM_STYLES[d.name] ?? DIM_STYLES['General Information'];
                 const Icon = style.icon;
                 const pct = d.with_target > 0 ? Math.round((d.on_track / d.with_target) * 100) : null;
+                const dimTip = th
+                  ? `${d.name}\nตัวชี้วัดทั้งหมด ${d.metrics} ตัว · ตั้งเป้า ${d.with_target} ตัว\nบรรลุเป้า ${d.on_track} · ต่ำกว่าเป้า ${d.off_track}` +
+                    (pct !== null ? `\nอัตราบรรลุ ${pct}% (ของตัวที่ตั้งเป้า)` : '\nยังไม่ได้ตั้งเป้าหมาย')
+                  : `${d.name}\n${d.metrics} metrics total · ${d.with_target} with a target\nOn track ${d.on_track} · Off track ${d.off_track}` +
+                    (pct !== null ? `\nOn-track rate ${pct}% (of targeted)` : '\nNo targets set yet');
                 return (
-                  <div key={d.dimension_id} className="rounded-xl border border-border bg-white p-3 hover:shadow-sm transition">
+                  <div
+                    key={d.dimension_id}
+                    title={dimTip}
+                    className="rounded-xl border border-border bg-white p-3 hover:shadow-sm transition cursor-help"
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div className={`rounded-lg bg-gradient-to-br ${style.bg} p-1.5`}>
                         <Icon className="h-3.5 w-3.5 text-white" />
@@ -382,10 +399,28 @@ function MetricCard({ m, th }: { m: HeadlineMetric; th: boolean }) {
   const achievement = m.achievement_pct ?? 0;
   const barColor = m.on_track === true ? '#10b981' : m.on_track === false ? '#ef4444' : '#94a3b8';
 
+  // Rich hover tooltip explaining every number on the card.
+  const unitTxt = m.unit ?? '';
+  const dirTxt = m.direction === 'higher_is_better'
+    ? (th ? 'ยิ่งสูงยิ่งดี' : 'Higher is better')
+    : m.direction === 'lower_is_better'
+      ? (th ? 'ยิ่งต่ำยิ่งดี' : 'Lower is better')
+      : '';
+  const statusTxt = m.on_track === true ? (th ? 'บรรลุเป้า' : 'On track')
+    : m.on_track === false ? (th ? 'ต่ำกว่าเป้า' : 'Off track') : '—';
+  const tooltip =
+    `${m.name}\n` +
+    `${th ? 'มิติ' : 'Dimension'}: ${m.dim_name}${dirTxt ? ` · ${dirTxt}` : ''}\n` +
+    `${th ? 'ค่าปีนี้ (YTD)' : 'This year (YTD)'}: ${fmtNum(m.current_ytd, 1)} ${unitTxt}\n` +
+    (m.target != null ? `${th ? 'เป้าหมาย' : 'Target'}: ${fmtNum(m.target, 1)} ${unitTxt} (${achievement.toFixed(0)}%)\n` : '') +
+    (m.yoy_pct != null ? `${th ? 'เทียบปีก่อน (YoY)' : 'Year-over-year'}: ${m.yoy_pct > 0 ? '+' : ''}${m.yoy_pct.toFixed(1)}%\n` : '') +
+    `${th ? 'สถานะ' : 'Status'}: ${statusTxt}\n` +
+    `${th ? '(คลิกเพื่อดูรายละเอียด)' : '(click for details)'}`;
+
   return (
     <Link
       to={`/esg-key-issues?metric=${encodeURIComponent(m.metric_id)}`}
-      title={th ? 'ดูรายละเอียดตัวชี้วัด' : 'View metric details'}
+      title={tooltip}
       className="group relative block rounded-xl border border-border p-3.5 bg-white transition-all
                  hover:shadow-md hover:border-blue-300 hover:-translate-y-0.5 cursor-pointer"
     >
