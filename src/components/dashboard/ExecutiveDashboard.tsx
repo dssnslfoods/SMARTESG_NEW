@@ -10,6 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Briefcase,
   TrendingUp,
@@ -26,6 +27,7 @@ import {
   FileText,
   ArrowRight,
   Globe,
+  Info,
 } from 'lucide-react';
 import {
   Tooltip as ReTooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -210,18 +212,22 @@ export default function ExecutiveDashboard() {
               <Target className="h-3.5 w-3.5 text-emerald-500" />
               {th ? 'ผลการบรรลุเป้าหมาย ' : 'Target Achievement '}
               ({data.year})
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="ml-auto text-muted-foreground hover:text-foreground">
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs whitespace-pre-line text-xs">
+                  {th
+                    ? `สัดส่วนตัวชี้วัดที่บรรลุเป้าหมายปี ${data.year}\nบรรลุ ${data.overall.on_track} จาก ${data.overall.total} ตัวชี้วัดที่ตั้งเป้าไว้ (${onTrackPct}%)\n"บรรลุ" = ทำได้ตามเกณฑ์เป้าหมาย (มี tolerance ±10%)`
+                    : `Share of targeted metrics on track for ${data.year}\n${data.overall.on_track} of ${data.overall.total} targeted metrics on track (${onTrackPct}%)\n"On track" = meeting the target within a ±10% tolerance`}
+                </TooltipContent>
+              </Tooltip>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div
-              className="relative cursor-help"
-              style={{ height: 180 }}
-              title={
-                th
-                  ? `สัดส่วนตัวชี้วัดที่บรรลุเป้าหมายปี ${data.year}\nบรรลุ ${data.overall.on_track} จาก ${data.overall.total} ตัวชี้วัดที่ตั้งเป้าไว้ (${onTrackPct}%)\n"บรรลุ" = ทำได้ตามเกณฑ์เป้าหมาย (มี tolerance ±10%)`
-                  : `Share of targeted metrics on track for ${data.year}\n${data.overall.on_track} of ${data.overall.total} targeted metrics on track (${onTrackPct}%)\n"On track" = meeting the target within a ±10% tolerance`
-              }
-            >
+            <div className="relative" style={{ height: 180 }}>
               <ResponsiveContainer>
                 <PieChart>
                   <Pie data={donutData} dataKey="value" innerRadius={50} outerRadius={75} paddingAngle={2}>
@@ -270,9 +276,9 @@ export default function ExecutiveDashboard() {
                   : `${d.name}\n${d.metrics} metrics total · ${d.with_target} with a target\nOn track ${d.on_track} · Off track ${d.off_track}` +
                     (pct !== null ? `\nOn-track rate ${pct}% (of targeted)` : '\nNo targets set yet');
                 return (
+                  <Tooltip key={d.dimension_id}>
+                  <TooltipTrigger asChild>
                   <div
-                    key={d.dimension_id}
-                    title={dimTip}
                     className="rounded-xl border border-border bg-white p-3 hover:shadow-sm transition cursor-help"
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -299,6 +305,11 @@ export default function ExecutiveDashboard() {
                       </div>
                     )}
                   </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs whitespace-pre-line text-xs">
+                    {dimTip}
+                  </TooltipContent>
+                  </Tooltip>
                 );
               })}
             </div>
@@ -418,9 +429,10 @@ function MetricCard({ m, th }: { m: HeadlineMetric; th: boolean }) {
     `${th ? '(คลิกเพื่อดูรายละเอียด)' : '(click for details)'}`;
 
   return (
+    <Tooltip>
+    <TooltipTrigger asChild>
     <Link
       to={`/esg-key-issues?metric=${encodeURIComponent(m.metric_id)}`}
-      title={tooltip}
       className="group relative block rounded-xl border border-border p-3.5 bg-white transition-all
                  hover:shadow-md hover:border-blue-300 hover:-translate-y-0.5 cursor-pointer"
     >
@@ -486,5 +498,10 @@ function MetricCard({ m, th }: { m: HeadlineMetric; th: boolean }) {
         </div>
       )}
     </Link>
+    </TooltipTrigger>
+    <TooltipContent side="top" className="max-w-xs whitespace-pre-line text-xs">
+      {tooltip}
+    </TooltipContent>
+    </Tooltip>
   );
 }
