@@ -806,11 +806,23 @@ function MetricHero({
     const actual = stats.currentYearTotal;
     const pct = tv === 0 ? 0 : (actual / tv) * 100;
     const isLower = currentTarget.target_direction === 'lower_is_better';
-    // ±10% tolerance so a metric essentially at target (e.g. 99.8%) reads as
-    // on-track rather than a hard red. Matches the executive dashboard logic.
-    const onTrack = isLower ? actual <= tv * 1.1 : actual >= tv * 0.9;
-    return { pct, onTrack, isLower, actual };
+    // 3-tier level, identical thresholds to the metric-card mini bars so the
+    // detail view and the cards always agree:
+    //   higher-is-better → good ≥100% · warn 60–99% · bad <60%
+    //   lower-is-better  → good ≤90%  · warn 90–100% · bad >100%
+    let level: 'good' | 'warn' | 'bad';
+    if (isLower) level = pct <= 90 ? 'good' : pct <= 100 ? 'warn' : 'bad';
+    else         level = pct >= 100 ? 'good' : pct >= 60 ? 'warn' : 'bad';
+    const onTrack = level !== 'bad';
+    return { pct, onTrack, level, isLower, actual };
   }, [currentTarget, stats]);
+
+  // Maps the achievement level → the colours used across the achievement card.
+  const LEVEL_COLORS = {
+    good: { bar: 'bg-emerald-500', chipText: 'text-emerald-700', chipBg: 'bg-emerald-50', arrow: '#059669', icon: 'text-emerald-600' },
+    warn: { bar: 'bg-amber-500',   chipText: 'text-amber-700',   chipBg: 'bg-amber-50',   arrow: '#d97706', icon: 'text-amber-600' },
+    bad:  { bar: 'bg-rose-500',    chipText: 'text-rose-700',    chipBg: 'bg-rose-50',    arrow: '#dc2626', icon: 'text-rose-600' },
+  } as const;
 
   // Aggregated values per year — last 3 years (or fewer if not available).
   // Each year is compared to its OWN target (not the current year's target),
@@ -1046,14 +1058,16 @@ function MetricHero({
             {currentTarget && achievement && (
               <div
                 className={`rounded-2xl border-2 p-4 ${
-                  achievement.onTrack
+                  achievement.level === 'good'
                     ? 'bg-emerald-50/70 border-emerald-200'
-                    : 'bg-rose-50/70 border-rose-200'
+                    : achievement.level === 'warn'
+                      ? 'bg-amber-50/70 border-amber-200'
+                      : 'bg-rose-50/70 border-rose-200'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
-                    <Target className={`h-4 w-4 ${achievement.onTrack ? 'text-emerald-600' : 'text-rose-600'}`} />
+                    <Target className={`h-4 w-4 ${LEVEL_COLORS[achievement.level].icon}`} />
                     <h3 className="text-sm font-bold text-foreground">
                       {th ? 'ความคืบหน้าตามเป้าหมาย' : 'Target Achievement'}
                     </h3>
@@ -1079,13 +1093,15 @@ function MetricHero({
                     </Badge>
                   </div>
                   <Badge
-                    className={`text-sm font-bold px-3 py-1 ${
-                      achievement.onTrack
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                        : 'bg-rose-600 hover:bg-rose-700 text-white'
+                    className={`text-sm font-bold px-3 py-1 text-white ${
+                      achievement.level === 'good'
+                        ? 'bg-emerald-600 hover:bg-emerald-700'
+                        : achievement.level === 'warn'
+                          ? 'bg-amber-500 hover:bg-amber-600'
+                          : 'bg-rose-600 hover:bg-rose-700'
                     }`}
                   >
-                    {achievement.onTrack ? (
+                    {achievement.level === 'good' ? (
                       <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                     ) : (
                       <AlertTriangle className="h-3.5 w-3.5 mr-1" />
@@ -1309,9 +1325,7 @@ function MetricHero({
                       <div className="relative h-3 rounded-full bg-slate-100/80 ring-1 ring-border/40 overflow-visible">
                         {/* Fill */}
                         <div
-                          className={`absolute inset-y-0 left-0 rounded-full transition-all ${
-                            achievement.onTrack ? 'bg-emerald-500' : 'bg-rose-500'
-                          }`}
+                          className={`absolute inset-y-0 left-0 rounded-full transition-all ${LEVEL_COLORS[achievement.level].bar}`}
                           style={{ width: `${Math.max(2, actualPct)}%` }}
                         />
                         {/* Vertical tick lines for both targets */}
@@ -1342,15 +1356,11 @@ function MetricHero({
                               style={{
                                 borderLeft: '4px solid transparent',
                                 borderRight: '4px solid transparent',
-                                borderBottom: `5px solid ${achievement.onTrack ? '#059669' : '#dc2626'}`,
+                                borderBottom: `5px solid ${LEVEL_COLORS[achievement.level].arrow}`,
                               }}
                             />
                             <span
-                              className={`text-[10px] font-bold font-mono mt-0.5 px-1 rounded ${
-                                achievement.onTrack
-                                  ? 'text-emerald-700 bg-emerald-50'
-                                  : 'text-rose-700 bg-rose-50'
-                              }`}
+                              className={`text-[10px] font-bold font-mono mt-0.5 px-1 rounded ${LEVEL_COLORS[achievement.level].chipText} ${LEVEL_COLORS[achievement.level].chipBg}`}
                             >
                               {formatCompact(actual)}
                             </span>
@@ -1366,20 +1376,22 @@ function MetricHero({
                             {th ? `เทียบเป้าหมาย ${currentYear}:` : `vs ${currentYear} Target:`}
                           </span>{' '}
                           {achievement.isLower
-                            ? achievement.onTrack
-                              ? th
-                                ? '✓ อยู่ในเกณฑ์ — ต่ำกว่าหรือเท่ากับเป้า'
-                                : '✓ Within target — at or below goal'
-                              : th
-                                ? `⚠️ เกินเป้า ${(achievement.pct - 100).toFixed(1)}%`
-                                : `⚠️ Over target by ${(achievement.pct - 100).toFixed(1)}%`
-                            : achievement.onTrack
-                              ? th
-                                ? '✓ บรรลุเป้าหมาย — สูงกว่าหรือเท่ากับเป้า'
-                                : '✓ Target met — at or above goal'
-                              : th
-                                ? `⚠️ ต่ำกว่าเป้า ${(100 - achievement.pct).toFixed(1)}%`
-                                : `⚠️ Below target by ${(100 - achievement.pct).toFixed(1)}%`}
+                            ? achievement.level === 'good'
+                              ? th ? '✓ อยู่ในเกณฑ์ดี — ต่ำกว่าเพดาน' : '✓ Well within target'
+                              : achievement.level === 'warn'
+                                ? th ? '⚠ ใกล้เพดาน — เกือบเต็มโควต้า' : '⚠ Near limit — close to the cap'
+                                : th
+                                  ? `✕ เกินเพดาน ${(achievement.pct - 100).toFixed(1)}%`
+                                  : `✕ Over target by ${(achievement.pct - 100).toFixed(1)}%`
+                            : achievement.level === 'good'
+                              ? th ? '✓ บรรลุเป้าหมาย — สูงกว่าหรือเท่ากับเป้า' : '✓ Target met — at or above goal'
+                              : achievement.level === 'warn'
+                                ? th
+                                  ? `⚠ ใกล้เป้า — ต่ำกว่าเป้า ${(100 - achievement.pct).toFixed(1)}%`
+                                  : `⚠ Approaching — ${(100 - achievement.pct).toFixed(1)}% below target`
+                                : th
+                                  ? `✕ ต่ำกว่าเป้ามาก ${(100 - achievement.pct).toFixed(1)}%`
+                                  : `✕ Far below target by ${(100 - achievement.pct).toFixed(1)}%`}
                         </p>
 
                         {/* Long-term target status — only if exists */}
