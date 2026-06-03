@@ -796,7 +796,9 @@ function MetricHero({
     const actual = stats.currentYearTotal;
     const pct = tv === 0 ? 0 : (actual / tv) * 100;
     const isLower = currentTarget.target_direction === 'lower_is_better';
-    const onTrack = isLower ? actual <= tv : actual >= tv;
+    // ±10% tolerance so a metric essentially at target (e.g. 99.8%) reads as
+    // on-track rather than a hard red. Matches the executive dashboard logic.
+    const onTrack = isLower ? actual <= tv * 1.1 : actual >= tv * 0.9;
     return { pct, onTrack, isLower, actual };
   }, [currentTarget, stats]);
 
@@ -804,22 +806,29 @@ function MetricHero({
   // Each year is compared to its OWN target (not the current year's target),
   // because a 2024 bar should reflect whether 2024 hit its 2024 goal.
   const yearlyData = useMemo(() => {
-    const yearMap = new Map<number, number>();
+    const isAvg = metric.aggregation === 'avg';
+    const sumMap = new Map<number, number>();
+    const cntMap = new Map<number, number>();
     values.forEach((v) => {
       const year = v.period?.year;
       if (!year) return;
-      yearMap.set(year, (yearMap.get(year) ?? 0) + Number(v.value));
+      sumMap.set(year, (sumMap.get(year) ?? 0) + Number(v.value));
+      cntMap.set(year, (cntMap.get(year) ?? 0) + 1);
     });
-    const sortedYears = Array.from(yearMap.keys()).sort((a, b) => a - b);
+    const sortedYears = Array.from(sumMap.keys()).sort((a, b) => a - b);
     const recentYears = sortedYears.length > 3 ? sortedYears.slice(-3) : sortedYears;
     return recentYears.map((year) => {
-      const actual = yearMap.get(year) ?? 0;
+      const cnt = cntMap.get(year) ?? 0;
+      // Average for rate/percentage metrics, sum for flow metrics — so the bar
+      // is comparable to the target line (e.g. ~92% vs target 92, not 1,100%).
+      const actual = isAvg && cnt > 0 ? (sumMap.get(year) ?? 0) / cnt : (sumMap.get(year) ?? 0);
       const t = targetByYear.get(year);
       let status: 'on-track' | 'off-track' | 'no-target' = 'no-target';
       if (t) {
         const tv = Number(t.target_value);
         const isLower = t.target_direction === 'lower_is_better';
-        status = (isLower ? actual <= tv : actual >= tv) ? 'on-track' : 'off-track';
+        // ±10% tolerance, consistent with the achievement card
+        status = (isLower ? actual <= tv * 1.1 : actual >= tv * 0.9) ? 'on-track' : 'off-track';
       }
       return {
         year: String(year),
@@ -828,7 +837,7 @@ function MetricHero({
         yearTarget: t ? Number(t.target_value) : null,
       };
     });
-  }, [values, targetByYear]);
+  }, [values, targetByYear, metric.aggregation]);
 
   const hasData = values.length > 0;
   const unit = metric.unit ?? '';
@@ -909,8 +918,18 @@ function MetricHero({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <StatCard
                 icon={Database}
-                label={th ? 'ยอดรวมสะสม' : 'Total'}
-                value={formatCompact(stats!.total)}
+                // Summing a rate/percentage is meaningless — show the average
+                // (and relabel) for avg-aggregation metrics.
+                label={
+                  metric.aggregation === 'avg'
+                    ? (th ? 'ค่าเฉลี่ย' : 'Average')
+                    : (th ? 'ยอดรวมสะสม' : 'Total')
+                }
+                value={
+                  metric.aggregation === 'avg'
+                    ? formatCompact(stats!.avg)
+                    : formatCompact(stats!.total)
+                }
                 sublabel={unit}
                 color={style.heroAccent}
               />
@@ -1206,12 +1225,12 @@ function MetricHero({
                   const ctPct = Math.min(100, (ctVal / maxVal) * 100);
                   const ltPct = ltVal !== null ? Math.min(100, (ltVal / maxVal) * 100) : null;
 
-                  // LT status (current actual vs LT target)
+                  // LT status (current actual vs LT target) — same ±10% tolerance
                   const ltOnTrack =
                     ltVal !== null
                       ? achievement.isLower
-                        ? actual <= ltVal
-                        : actual >= ltVal
+                        ? actual <= ltVal * 1.1
+                        : actual >= ltVal * 0.9
                       : null;
                   const ltDiffPct =
                     ltVal !== null && ltVal !== 0
