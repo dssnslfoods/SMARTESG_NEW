@@ -98,6 +98,7 @@ export default function ExecutiveDashboard() {
   const [data, setData] = useState<ExecutiveSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [dimFilter, setDimFilter] = useState<string | null>(null); // null = all dimensions
 
   const load = async () => {
     setRefreshing(true);
@@ -290,16 +291,74 @@ export default function ExecutiveDashboard() {
 
       {/* ── Headline metrics grid ───────────────────────────────────────── */}
       <Card>
-        <CardHeader className="pb-1">
-          <CardTitle className="text-sm flex items-center gap-1.5">
-            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-            {th ? 'ตัวชี้วัดหลัก (YTD ' + reportingPeriod + ')' : `Headline Metrics (YTD ${reportingPeriod})`}
-          </CardTitle>
+        <CardHeader className="pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+              {th ? 'ตัวชี้วัดหลัก (YTD ' + reportingPeriod + ')' : `Headline Metrics (YTD ${reportingPeriod})`}
+            </CardTitle>
+
+            {/* Dimension filter chips */}
+            {(() => {
+              const dims = Array.from(new Set(data.headline_metrics.map(m => m.dim_name)));
+              const ORDER = ['Environment', 'Social', 'Governance', 'General Information'];
+              dims.sort((a, b) => (ORDER.indexOf(a) + 1 || 99) - (ORDER.indexOf(b) + 1 || 99));
+              return (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setDimFilter(null)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors ${
+                      dimFilter === null
+                        ? 'bg-slate-800 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {th ? 'ทั้งหมด' : 'All'}
+                  </button>
+                  {dims.map(d => {
+                    const active = dimFilter === d;
+                    const st = DIM_STYLES[d] ?? DIM_STYLES['General Information'];
+                    const Icon = st.icon;
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setDimFilter(active ? null : d)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                          active
+                            ? `bg-gradient-to-r ${st.bg} text-white shadow-sm`
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        <Icon className="h-3 w-3" />
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {data.headline_metrics.map(m => <MetricCard key={m.metric_id} m={m} th={th} />)}
-          </div>
+          {(() => {
+            const shown = dimFilter
+              ? data.headline_metrics.filter(m => m.dim_name === dimFilter)
+              : data.headline_metrics;
+            if (shown.length === 0) {
+              return (
+                <p className="text-xs text-muted-foreground text-center py-8 italic">
+                  {th ? 'ไม่มีตัวชี้วัดในมิตินี้' : 'No metrics in this dimension'}
+                </p>
+              );
+            }
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {shown.map(m => <MetricCard key={m.metric_id} m={m} th={th} />)}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
