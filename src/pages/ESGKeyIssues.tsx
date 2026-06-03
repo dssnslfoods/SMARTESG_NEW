@@ -57,6 +57,7 @@ interface Metric {
   metric_id: string;
   metric_name: string;
   unit: string | null;
+  aggregation?: string; // 'sum' (default) | 'avg' — how YTD actual is rolled up vs target
 }
 interface Theme {
   theme_id: string;
@@ -724,10 +725,14 @@ function MetricHero({
     });
     const latest = Number(sorted[sorted.length - 1]?.value ?? 0);
     const uniqueSites = new Set(values.map((v) => v.site?.site_id).filter(Boolean));
-    // Current-year only sum — used for per-year target achievement
-    const currentYearTotal = values
-      .filter((v) => v.period?.year === currentYear)
-      .reduce((s, v) => s + Number(v.value), 0);
+    // Current-year rollup — used for per-year target achievement. Average for
+    // rate/percentage metrics (aggregation='avg'), sum for flow metrics.
+    const cyValues = values.filter((v) => v.period?.year === currentYear);
+    const cySum = cyValues.reduce((s, v) => s + Number(v.value), 0);
+    const currentYearTotal =
+      metric.aggregation === 'avg' && cyValues.length > 0
+        ? cySum / cyValues.length
+        : cySum;
     return {
       total,
       avg,
@@ -736,7 +741,7 @@ function MetricHero({
       siteCount: uniqueSites.size,
       currentYearTotal,
     };
-  }, [values, currentYear]);
+  }, [values, currentYear, metric.aggregation]);
 
   const timeSeries = useMemo(() => {
     const map = new Map<string, { key: string; label: string; year: number; month: number; total: number }>();
@@ -1461,7 +1466,11 @@ export default function ESGKeyIssues() {
   }, [data, metricParamId]);
 
   // ── Batch-fetch targets + current-year actuals for all metrics ─────────────
-  const fetchTargetData = async (allMetricIds: string[], cy: number) => {
+  const fetchTargetData = async (
+    allMetricIds: string[],
+    cy: number,
+    aggMap: Map<string, string>,
+  ) => {
     if (allMetricIds.length === 0) return;
     try {
       // Resolve current-year period IDs + targets + long-term setting in parallel.
@@ -1490,9 +1499,11 @@ export default function ESGKeyIssues() {
 
       const cyPeriodIds = (periodsRes.data ?? []).map((p: any) => p.period_id);
 
-      // Sum current-year actuals per metric — paginated so no row is dropped
-      // even when a tenant has thousands of metric_value records.
-      const actualMap = new Map<string, number>();
+      // Roll up current-year actuals per metric — paginated so no row is
+      // dropped even with thousands of records. Accumulate sum + count, then
+      // resolve to sum or average per the metric's aggregation type.
+      const sumMap = new Map<string, number>();
+      const cntMap = new Map<string, number>();
       if (cyPeriodIds.length > 0) {
         const PAGE = 1000;
         let from = 0;
@@ -1507,12 +1518,20 @@ export default function ESGKeyIssues() {
             .range(from, from + PAGE - 1);
           if (error) throw error;
           (data ?? []).forEach((v: any) => {
-            actualMap.set(v.metric_id, (actualMap.get(v.metric_id) ?? 0) + Number(v.value));
+            sumMap.set(v.metric_id, (sumMap.get(v.metric_id) ?? 0) + Number(v.value));
+            cntMap.set(v.metric_id, (cntMap.get(v.metric_id) ?? 0) + 1);
           });
           if (!data || data.length < PAGE) break;
           from += PAGE;
         }
       }
+
+      const actualMap = new Map<string, number>();
+      sumMap.forEach((sum, mid) => {
+        const isAvg = (aggMap.get(mid) ?? 'sum') === 'avg';
+        const cnt = cntMap.get(mid) ?? 0;
+        actualMap.set(mid, isAvg && cnt > 0 ? sum / cnt : sum);
+      });
 
       // Group targets by metric
       const tgByMetric = new Map<string, TargetRow[]>();
@@ -1550,7 +1569,7 @@ export default function ESGKeyIssues() {
           dimension_id, dimension_name,
           themes:esg_theme(
             theme_id, theme_name,
-            metrics:esg_metric(metric_id, metric_name, unit)
+            metrics:esg_metric(metric_id, metric_name, unit, aggregation)
           )
         `);
       if (error) throw error;
@@ -1574,11 +1593,17 @@ export default function ESGKeyIssues() {
           return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
         });
       setData(processed);
-      // Fire off batch target fetch once metric list is known
-      const allIds = processed.flatMap((d) =>
-        d.themes.flatMap((t) => t.metrics.map((m) => m.metric_id)),
+      // Fire off batch target fetch once metric list is known.
+      // Build a metric_id → aggregation map so per-metric actuals roll up
+      // correctly (sum for flow metrics, avg for rate/percentage metrics).
+      const aggMap = new Map<string, string>();
+      processed.forEach((d) =>
+        d.themes.forEach((t) =>
+          t.metrics.forEach((m) => aggMap.set(m.metric_id, m.aggregation ?? 'sum')),
+        ),
       );
-      fetchTargetData(allIds, currentYear);
+      const allIds = Array.from(aggMap.keys());
+      fetchTargetData(allIds, currentYear, aggMap);
     } catch (e) {
       console.error('ESGKeyIssues fetch error:', e);
     } finally {
