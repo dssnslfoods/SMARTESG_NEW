@@ -556,9 +556,34 @@ export default function DataEntry() {
 
 
   const handleSubmit = async () => {
-    if (!formData.site_id || !formData.period_id || !formData.metric_id) {
+    // The Month + Year dropdowns are independent, so the chosen combination may
+    // not have a reporting_period row yet (e.g. the current month). Resolve —
+    // and create on demand — the period_id before validating.
+    let periodId = formData.period_id;
+    if (!periodId && formMonth && formYear) {
+      try {
+        const { data: pid, error } = await supabase.rpc('get_or_create_period', {
+          p_year: Number(formYear),
+          p_month: Number(formMonth),
+        });
+        if (error) throw error;
+        if (pid) {
+          periodId = pid as string;
+          setFormData(prev => ({ ...prev, period_id: pid as string }));
+          // refresh the period list so it shows up in tables/filters
+          fetchData();
+        }
+      } catch (e) {
+        console.error('get_or_create_period error:', e);
+      }
+    }
+
+    if (!formData.site_id || !periodId || !formData.metric_id) {
       toast({
         title: language === 'th' ? 'กรุณากรอกข้อมูลให้ครบ' : 'Please fill all required fields',
+        description: language === 'th'
+          ? 'ต้องเลือก: บริษัท · สถานที่ · เดือน/ปี · ตัวชี้วัด'
+          : 'Required: Company · Site · Month/Year · Metric',
         variant: 'destructive',
       });
       return;
@@ -579,7 +604,7 @@ export default function DataEntry() {
     // Check from backend to avoid stale state and guarantee uniqueness behavior
     let existingRecord: MetricValue | null = null;
     try {
-      existingRecord = await findExistingOnBackend(formData.site_id, formData.period_id, formData.metric_id);
+      existingRecord = await findExistingOnBackend(formData.site_id, periodId, formData.metric_id);
     } catch {
       existingRecord = null;
     }
@@ -608,7 +633,7 @@ export default function DataEntry() {
     const dataToSave = {
       value_id: formData.value_id,
       site_id: formData.site_id,
-      period_id: formData.period_id,
+      period_id: periodId,
       metric_id: formData.metric_id,
       value: formData.value,
       data_source: formData.data_source || null,
