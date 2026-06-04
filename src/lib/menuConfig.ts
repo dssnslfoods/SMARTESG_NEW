@@ -21,6 +21,7 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { key: 'reports/environmental', label: 'Environmental',   labelTh: 'สิ่งแวดล้อม',       section: 'main' },
   { key: 'reports/social',        label: 'Social',          labelTh: 'สังคม',             section: 'main' },
   { key: 'reports/governance',    label: 'Governance',      labelTh: 'ธรรมาภิบาล',        section: 'main' },
+  { key: 'reports/ghg',           label: 'GHG Emissions',   labelTh: 'การปล่อย GHG',      section: 'main' },
   { key: 'reports/esg-overview',  label: 'ESG Overview',    labelTh: 'ESG Overview',      section: 'main' },
 
   // ── Master Data ────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ export const DEFAULT_PERMISSIONS: Record<string, AppRole[]> = {
   'reports/environmental':  ['executive'],
   'reports/social':         ['executive'],
   'reports/governance':     ['executive'],
+  'reports/ghg':            ['executive'],
   'reports/esg-overview':   ['executive'],
   'master/companies':       ['supervisor'],
   'master/sites':           ['supervisor'],

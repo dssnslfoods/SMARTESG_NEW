@@ -74,6 +74,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
     { label: language === 'th' ? 'สิ่งแวดล้อม' : 'Environmental', href: '/reports/environmental', icon: Leaf },
     { label: language === 'th' ? 'สังคม' : 'Social',           href: '/reports/social',         icon: Heart },
     { label: language === 'th' ? 'ธรรมาภิบาล' : 'Governance',  href: '/reports/governance',     icon: Scale },
+    { label: language === 'th' ? 'การปล่อย GHG' : 'GHG Emissions', href: '/reports/ghg',        icon: Cloud },
     { label: 'ESG Overview',                                    href: '/reports/esg-overview',   icon: Globe },
   ];
   const navItems = allNavItems.filter((item) => canSeeMenu(item.href.slice(1)));

@@ -32,6 +32,7 @@ const Environmental       = lazy(() => import("./pages/reports/Environmental"));
 const Governance          = lazy(() => import("./pages/reports/Governance"));
 const Social              = lazy(() => import("./pages/reports/Social"));
 const ESGOverview         = lazy(() => import("./pages/reports/ESGOverview"));
+const GhgDashboard        = lazy(() => import("./pages/reports/GhgDashboard"));
 const CompanyManagement   = lazy(() => import("./pages/master/CompanyManagement"));
 const SiteManagement      = lazy(() => import("./pages/master/SiteManagement"));
 const PeriodManagement    = lazy(() => import("./pages/master/PeriodManagement"));
@@ -266,6 +267,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
                     <ESGOverview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reports/ghg"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
+                    <GhgDashboard />
                   </ProtectedRoute>
                 }
               />
