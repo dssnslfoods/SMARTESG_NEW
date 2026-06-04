@@ -11,6 +11,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Loader2,
   Leaf,
   Heart,
@@ -87,6 +94,15 @@ interface MetricTargetInfo {
   longTermTarget: TargetRow | null;
   currentYearActual: number;
   hasData: boolean; // true if at least one approved/submitted value exists
+}
+interface CompanyRow {
+  company_id: string;
+  company_name: string;
+}
+interface SiteRow {
+  site_id: string;
+  site_name: string;
+  company_id: string | null;
 }
 
 // ─── Visual styles per dimension ──────────────────────────────────────────────
@@ -632,11 +648,16 @@ function MetricHero({
   theme,
   metric,
   th,
+  selectedYear,
+  siteIds,
 }: {
   dim: Dimension;
   theme: Theme;
   metric: Metric;
   th: boolean;
+  selectedYear?: number;
+  // Restrict the infographic to these site_ids (Company/Site filter). null = all.
+  siteIds?: string[] | null;
 }) {
   const style = getStyle(dim.dimension_name);
   const Icon = style.icon;
@@ -646,7 +667,11 @@ function MetricHero({
   const [longTermYear, setLongTermYear] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const currentYear = new Date().getFullYear();
+  // The "current year" reference is driven by the page-level Year filter so the
+  // Target Achievement card reflects the year the user is looking at.
+  const currentYear = selectedYear ?? new Date().getFullYear();
+  // Stable key for the site filter so the effect re-fetches when it changes.
+  const siteKey = siteIds && siteIds.length > 0 ? [...siteIds].sort().join(',') : '';
 
   // Fetch the configured long-term target year once
   useEffect(() => {
@@ -677,16 +702,21 @@ function MetricHero({
     const load = async () => {
       setLoading(true);
       try {
+        let valuesQuery = supabase
+          .from('metric_value')
+          .select(`
+            value, status,
+            period:period_id(year, month),
+            site:site_id(site_id, site_name)
+          `)
+          .eq('metric_id', metric.metric_id)
+          .in('status', ['approved', 'submitted']);
+        // Company/Site scope filter — only the selected sites.
+        if (siteIds) {
+          valuesQuery = valuesQuery.in('site_id', siteIds);
+        }
         const [valuesRes, targetsRes] = await Promise.all([
-          supabase
-            .from('metric_value')
-            .select(`
-              value, status,
-              period:period_id(year, month),
-              site:site_id(site_id, site_name)
-            `)
-            .eq('metric_id', metric.metric_id)
-            .in('status', ['approved', 'submitted']),
+          valuesQuery,
           // Fetch ALL targets for this metric — not just current year — so we
           // can compare each year's actual against its own target.
           supabase
@@ -707,7 +737,7 @@ function MetricHero({
     return () => {
       cancelled = true;
     };
-  }, [metric.metric_id]);
+  }, [metric.metric_id, siteKey]);
 
   // Current year target — drives the Target Achievement card
   const currentTarget = useMemo(
@@ -1470,12 +1500,38 @@ export default function ESGKeyIssues() {
   const [loading, setLoading] = useState(true);
   const [targetMap, setTargetMap] = useState<Map<string, MetricTargetInfo>>(new Map());
   const [longTermYear, setLongTermYear] = useState<number | null>(null);
-  const currentYear = new Date().getFullYear();
 
   const [filterDim, setFilterDim] = useState<string | null>(null);
   const [filterTheme, setFilterTheme] = useState<string | null>(null);
   const [filterMetric, setFilterMetric] = useState<string | null>(null);
   const [bigPictureOpen, setBigPictureOpen] = useState(false);
+
+  // ── Scope filters: Company / Site / Year ───────────────────────────────────
+  const [companies, setCompanies] = useState<CompanyRow[]>([]);
+  const [sites, setSites] = useState<SiteRow[]>([]);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [filterCompany, setFilterCompany] = useState<string | null>(null);
+  const [filterSite, setFilterSite] = useState<string | null>(null);
+  const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
+  // `currentYear` follows the Year filter — drives the target/actual rollups.
+  const currentYear = filterYear;
+
+  // metric_id-keyed list of metric_ids stays in sync after data load.
+  const [metricAggRef, setMetricAggRef] = useState<Map<string, string>>(new Map());
+
+  // Resolve the selected scope to a concrete list of site_ids (null = all sites).
+  const siteIds = useMemo<string[] | null>(() => {
+    if (filterSite) return [filterSite];
+    if (filterCompany) return sites.filter((s) => s.company_id === filterCompany).map((s) => s.site_id);
+    return null;
+  }, [filterSite, filterCompany, sites]);
+  const siteKey = siteIds ? [...siteIds].sort().join(',') : '';
+
+  // Sites available for the Site dropdown — narrowed by the Company filter.
+  const scopedSites = useMemo(
+    () => (filterCompany ? sites.filter((s) => s.company_id === filterCompany) : sites),
+    [sites, filterCompany],
+  );
 
   // ── Deep-link: arrive via ?metric=ID and auto-select that metric ───────────
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1483,7 +1539,52 @@ export default function ESGKeyIssues() {
 
   useEffect(() => {
     fetchData();
+    fetchScopeOptions();
   }, []);
+
+  // Load Company / Site / Year options from master data (no hardcoding).
+  const fetchScopeOptions = async () => {
+    try {
+      const [compRes, siteRes, periodRes] = await Promise.all([
+        supabase.from('company').select('company_id, company_name').order('company_name'),
+        supabase.from('site').select('site_id, site_name, company_id').order('site_name'),
+        supabase.from('reporting_period').select('year'),
+      ]);
+      setCompanies((compRes.data ?? []) as CompanyRow[]);
+      setSites((siteRes.data ?? []) as SiteRow[]);
+      const years = Array.from(
+        new Set((periodRes.data ?? []).map((p: any) => Number(p.year)).filter(Boolean)),
+      ).sort((a, b) => b - a);
+      setAvailableYears(years);
+      // Default the Year filter to the most recent year that actually has periods.
+      if (years.length > 0 && !years.includes(new Date().getFullYear())) {
+        setFilterYear(years[0]);
+      }
+    } catch (e) {
+      console.error('ESGKeyIssues scope options error:', e);
+    }
+  };
+
+  // Re-roll target/actual data whenever the Year or Company/Site scope changes.
+  // (Skipped on the very first render — fetchData() does the initial load.)
+  const didMountScope = useRef(false);
+  useEffect(() => {
+    if (!didMountScope.current) {
+      didMountScope.current = true;
+      return;
+    }
+    if (metricAggRef.size === 0) return;
+    fetchTargetData(Array.from(metricAggRef.keys()), filterYear, metricAggRef, siteIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterYear, siteKey]);
+
+  // Keep the Site filter valid when the Company filter changes.
+  useEffect(() => {
+    if (filterSite && !scopedSites.some((s) => s.site_id === filterSite)) {
+      setFilterSite(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterCompany]);
 
   // After data loads, if a ?metric=ID is present, locate it and set all
   // three filter levels so MetricHero shows. Then strip the URL param.
@@ -1511,6 +1612,7 @@ export default function ESGKeyIssues() {
     allMetricIds: string[],
     cy: number,
     aggMap: Map<string, string>,
+    siteIds: string[] | null,
   ) => {
     if (allMetricIds.length === 0) return;
     try {
@@ -1550,13 +1652,16 @@ export default function ESGKeyIssues() {
         let from = 0;
         // eslint-disable-next-line no-constant-condition
         while (true) {
-          const { data, error } = await supabase
+          let q = supabase
             .from('metric_value')
             .select('metric_id, value')
             .in('metric_id', allMetricIds)
             .in('period_id', cyPeriodIds)
-            .in('status', ['approved', 'submitted'])
-            .range(from, from + PAGE - 1);
+            .in('status', ['approved', 'submitted']);
+          // Company/Site scope filter — only the selected sites. An empty array
+          // (scope selected but no matching sites) correctly yields no rows.
+          if (siteIds) q = q.in('site_id', siteIds);
+          const { data, error } = await q.range(from, from + PAGE - 1);
           if (error) throw error;
           (data ?? []).forEach((v: any) => {
             sumMap.set(v.metric_id, (sumMap.get(v.metric_id) ?? 0) + Number(v.value));
@@ -1643,8 +1748,9 @@ export default function ESGKeyIssues() {
           t.metrics.forEach((m) => aggMap.set(m.metric_id, m.aggregation ?? 'sum')),
         ),
       );
+      setMetricAggRef(aggMap);
       const allIds = Array.from(aggMap.keys());
-      fetchTargetData(allIds, currentYear, aggMap);
+      fetchTargetData(allIds, filterYear, aggMap, siteIds);
     } catch (e) {
       console.error('ESGKeyIssues fetch error:', e);
     } finally {
@@ -1787,6 +1893,103 @@ export default function ESGKeyIssues() {
       {/* Filter card */}
       <Card className="glass-card-solid border-emerald-100">
         <CardContent className="py-4 px-4 space-y-3">
+          {/* ── Scope filters: Company / Site / Year ─────────────────── */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5" />
+              {th ? 'กรองตามขอบเขต' : 'Filter by Scope'}
+            </span>
+            {(filterCompany || filterSite || filterYear !== new Date().getFullYear()) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setFilterCompany(null);
+                  setFilterSite(null);
+                  setFilterYear(availableYears[0] ?? new Date().getFullYear());
+                }}
+                className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+                {th ? 'รีเซ็ตขอบเขต' : 'Reset scope'}
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* Company */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Building2 className="h-3 w-3 text-emerald-600" />
+                {th ? 'บริษัท' : 'Company'}
+              </label>
+              <Select
+                value={filterCompany ?? '__all__'}
+                onValueChange={(v) => setFilterCompany(v === '__all__' ? null : v)}
+              >
+                <SelectTrigger className="h-9 bg-white/70 border-gray-200 rounded-xl text-xs">
+                  <SelectValue placeholder={th ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">{th ? 'ทุกบริษัท' : 'All companies'}</SelectItem>
+                  {companies.map((c) => (
+                    <SelectItem key={c.company_id} value={c.company_id}>
+                      {c.company_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Site */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Building2 className="h-3 w-3 text-blue-600" />
+                {th ? 'สถานที่' : 'Site'}
+              </label>
+              <Select
+                value={filterSite ?? '__all__'}
+                onValueChange={(v) => setFilterSite(v === '__all__' ? null : v)}
+              >
+                <SelectTrigger className="h-9 bg-white/70 border-gray-200 rounded-xl text-xs">
+                  <SelectValue placeholder={th ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">{th ? 'ทุกสถานที่' : 'All sites'}</SelectItem>
+                  {scopedSites.map((s) => (
+                    <SelectItem key={s.site_id} value={s.site_id}>
+                      {s.site_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Year */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Calendar className="h-3 w-3 text-amber-600" />
+                {th ? 'ปี' : 'Year'}
+              </label>
+              <Select
+                value={String(filterYear)}
+                onValueChange={(v) => setFilterYear(Number(v))}
+              >
+                <SelectTrigger className="h-9 bg-white/70 border-gray-200 rounded-xl text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(availableYears.length > 0 ? availableYears : [new Date().getFullYear()]).map(
+                    (y) => (
+                      <SelectItem key={y} value={String(y)}>
+                        {y}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="border-t border-border/40" />
+
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <FilterIcon className="h-3.5 w-3.5" />
@@ -1923,6 +2126,8 @@ export default function ESGKeyIssues() {
           theme={metricContext.theme}
           metric={metricContext.metric}
           th={th}
+          selectedYear={filterYear}
+          siteIds={siteIds}
         />
       ) : themeContext ? (
         <DimensionCard
