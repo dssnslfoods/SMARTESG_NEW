@@ -47,8 +47,11 @@ serve(async (req) => {
       .eq("user_id", caller.id)
       .maybeSingle();
     
+    const { data: superAdminRow } = await supabaseAdmin
+      .from("super_admin").select("user_id").eq("user_id", caller.id).maybeSingle();
     const isAdmin = roleData?.role === "admin";
     const isSupervisor = roleData?.role === "supervisor";
+    const isSuperAdmin = roleData?.role === "super_admin" || !!superAdminRow;
 
     const { userId } = await req.json();
 
@@ -62,8 +65,8 @@ serve(async (req) => {
     // Allow users to fetch their own email, or admin/supervisor to fetch any email
     const isSelf = caller.id === userId;
     
-    if (!isSelf && !isAdmin && !isSupervisor) {
-      console.log("User is not admin or supervisor and trying to access other user:", caller.id, roleData);
+    if (!isSelf && !isAdmin && !isSupervisor && !isSuperAdmin) {
+      console.log("Caller not allowed to access other user's email:", caller.id, roleData);
       return new Response(
         JSON.stringify({ error: "Forbidden - You can only view your own email" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

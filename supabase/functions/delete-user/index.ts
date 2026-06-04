@@ -44,15 +44,16 @@ serve(async (req) => {
 
     // Check if the user has admin or supervisor role
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-    const { data: roleData, error: roleError } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", authUserId)
-      .single();
+    const { data: roleData } = await supabaseAdmin
+      .from("user_roles").select("role").eq("user_id", authUserId).maybeSingle();
+    const { data: superAdminRow } = await supabaseAdmin
+      .from("super_admin").select("user_id").eq("user_id", authUserId).maybeSingle();
 
-    if (roleError || !roleData || !["admin", "supervisor"].includes(roleData.role)) {
+    const allowed =
+      (roleData && ["admin", "supervisor", "super_admin"].includes(roleData.role)) || !!superAdminRow;
+    if (!allowed) {
       return new Response(
-        JSON.stringify({ success: false, error: "Forbidden: Only admin and supervisor can delete users" }),
+        JSON.stringify({ success: false, error: "Forbidden: Only admin, supervisor and super admin can delete users" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

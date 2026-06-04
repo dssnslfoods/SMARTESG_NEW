@@ -47,13 +47,16 @@ serve(async (req) => {
       .eq("user_id", caller.id)
       .maybeSingle();
     
+    const { data: superAdminRow } = await supabaseAdmin
+      .from("super_admin").select("user_id").eq("user_id", caller.id).maybeSingle();
     const isAdmin = roleData?.role === "admin";
     const isSupervisor = roleData?.role === "supervisor";
-    
-    if (!roleData || (!isAdmin && !isSupervisor)) {
-      console.log("User is not admin or supervisor:", caller.id, roleData);
+    const isSuperAdmin = roleData?.role === "super_admin" || !!superAdminRow;
+
+    if (!isAdmin && !isSupervisor && !isSuperAdmin) {
+      console.log("Caller not allowed:", caller.id, roleData);
       return new Response(
-        JSON.stringify({ error: "Forbidden - Only admins and supervisors can update user emails" }),
+        JSON.stringify({ error: "Forbidden - Only admins, supervisors and super admins can update user emails" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

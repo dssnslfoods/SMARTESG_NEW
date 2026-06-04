@@ -99,13 +99,16 @@ serve(async (req) => {
     // - admin can reset anyone
     // - supervisor can reset non-admin users
     // - everyone else: forbidden
+    const { data: superAdminRow } = await supabaseAdmin
+      .from("super_admin").select("user_id").eq("user_id", caller.id).maybeSingle();
     const isAdmin = callerRole === "admin";
     const isSupervisor = callerRole === "supervisor";
+    const isSuperAdmin = callerRole === "super_admin" || !!superAdminRow;
 
     let allowed = false;
     if (isSelf) {
       allowed = true;
-    } else if (isAdmin) {
+    } else if (isAdmin || isSuperAdmin) {
       allowed = true;
     } else if (isSupervisor && targetRole !== "admin") {
       allowed = true;
