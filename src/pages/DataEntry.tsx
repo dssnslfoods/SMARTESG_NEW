@@ -92,8 +92,11 @@ interface EsgMetric {
   metric_name: string;
   theme_id: string;
   unit: string | null;
+  code?: string | null;
   calc_mode?: string; // 'manual' (default) | 'auto' (GHG computed from activity data)
 }
+interface EmissionFactor { source_code: string; scope: number; factor_value: number; factor_unit: string | null; }
+interface GhgMapping { target_code: string; source_code: string; }
 
 interface MetricValue {
   value_id: string;
@@ -132,6 +135,8 @@ export default function DataEntry() {
   const [dimensions, setDimensions] = useState<EsgDimension[]>([]);
   const [themes, setThemes] = useState<EsgTheme[]>([]);
   const [metrics, setMetrics] = useState<EsgMetric[]>([]);
+  const [factors, setFactors] = useState<EmissionFactor[]>([]);
+  const [ghgMappings, setGhgMappings] = useState<GhgMapping[]>([]);
   const [totalDbCount, setTotalDbCount] = useState<number>(0); // Actual count in database
   const [loading, setLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number | null }>({ loaded: 0, total: null });
@@ -248,6 +253,8 @@ export default function DataEntry() {
         { data: dimensionsData },
         { data: themesData },
         { data: metricsData },
+        { data: factorsData },
+        { data: ghgMapData },
         valuesData,
       ] = await Promise.all([
         supabase.from('site').select('*').order('site_name'),
@@ -256,7 +263,9 @@ export default function DataEntry() {
         supabase.from('esg_dimension').select('*').order('dimension_name'),
         supabase.from('esg_theme').select('*').order('theme_name'),
         supabase.from('esg_metric').select('*').order('metric_name'),
-        fetchMetricValuesFull({ 
+        supabase.from('emission_factor').select('source_code, scope, factor_value, factor_unit'),
+        supabase.from('ghg_calc_mapping').select('target_code, source_code'),
+        fetchMetricValuesFull({
           pageSize: FETCH_CONFIG.PAGE_SIZE,
           onProgress: (loaded) => setLoadProgress(prev => ({ ...prev, loaded })),
         }),
@@ -268,6 +277,8 @@ export default function DataEntry() {
       setDimensions(dimensionsData || []);
       setThemes(themesData || []);
       setMetrics(metricsData || []);
+      setFactors((factorsData || []) as EmissionFactor[]);
+      setGhgMappings((ghgMapData || []) as GhgMapping[]);
       setMetricValues(valuesData.map(v => ({
         value_id: v.value_id,
         metric_id: v.metric_id,
@@ -1742,6 +1753,20 @@ export default function DataEntry() {
             {(() => {
               const selMetric = metrics.find(m => m.metric_id === formData.metric_id);
               const isAutoMetric = selMetric?.calc_mode === 'auto';
+              // Live GHG preview: if the selected metric is an emission-generating
+              // ACTIVITY (its code has an emission factor), show the tCO₂e it adds.
+              const code = selMetric?.code ?? '';
+              const ef = factors.find(f => f.source_code === code);
+              const feedsTargets = ghgMappings.filter(g => g.source_code === code).map(g => g.target_code);
+              const ghgPreview = ef && feedsTargets.length > 0
+                ? {
+                    tco2e: (Number(formData.value) * ef.factor_value) / 1000,
+                    factor: ef.factor_value,
+                    scope: ef.scope,
+                    targets: feedsTargets
+                      .map(tc => metrics.find(m => m.code === tc)?.metric_name ?? tc),
+                  }
+                : null;
               return (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1759,6 +1784,23 @@ export default function DataEntry() {
                       ? 'คำนวณอัตโนมัติจากข้อมูลกิจกรรม (GHG) — กรุณากรอก "ค่ากิจกรรม" เช่น ปริมาณดีเซล / ไฟฟ้า ระบบจะคำนวณการปล่อยก๊าซให้เอง'
                       : 'Auto-calculated from activity data (GHG). Enter the activity values (e.g. diesel / electricity) instead — the system computes emissions for you.'}
                   </p>
+                )}
+                {/* Live GHG preview for activity metrics */}
+                {ghgPreview && !isAutoMetric && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 mt-1">
+                    <p className="text-[10px] uppercase tracking-wider text-emerald-700/70 font-semibold flex items-center gap-1">
+                      <span>🌱</span>{language === 'th' ? 'ประมาณการ GHG' : 'Estimated GHG'} · Scope {ghgPreview.scope}
+                    </p>
+                    <p className="text-sm font-bold text-emerald-700 mt-0.5">
+                      ≈ {ghgPreview.tco2e.toLocaleString(undefined, { maximumFractionDigits: 3 })} tCO₂e
+                    </p>
+                    <p className="text-[10px] text-emerald-700/70 font-mono mt-0.5">
+                      {Number(formData.value || 0).toLocaleString()} × {ghgPreview.factor} ÷ 1000
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {language === 'th' ? 'รวมเข้า: ' : 'Feeds into: '}{ghgPreview.targets.join(', ')}
+                    </p>
+                  </div>
                 )}
               </div>
               <div className="space-y-2">
