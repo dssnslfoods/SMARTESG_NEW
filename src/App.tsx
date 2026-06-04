@@ -36,6 +36,7 @@ const CompanyManagement   = lazy(() => import("./pages/master/CompanyManagement"
 const SiteManagement      = lazy(() => import("./pages/master/SiteManagement"));
 const PeriodManagement    = lazy(() => import("./pages/master/PeriodManagement"));
 const DimensionManagement = lazy(() => import("./pages/master/DimensionManagement"));
+const GhgSettings         = lazy(() => import("./pages/master/GhgSettings"));
 const ThemeManagement     = lazy(() => import("./pages/master/ThemeManagement"));
 const MetricManagement    = lazy(() => import("./pages/master/MetricManagement"));
 const SystemSettings      = lazy(() => import("./pages/master/SystemSettings"));
@@ -153,6 +154,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
                     <DimensionManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/master/ghg-settings"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <GhgSettings />
                   </ProtectedRoute>
                 }
               />

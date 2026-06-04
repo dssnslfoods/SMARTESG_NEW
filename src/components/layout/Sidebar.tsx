@@ -29,6 +29,7 @@ import {
   BookOpen,
   Target,
   LayoutGrid,
+  Cloud,
   Network,
   Crown,
   Layers2,
@@ -85,6 +86,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
     { label: t('themes'),                                               href: '/master/themes',             icon: Tag },
     { label: t('metrics'),                                              href: '/master/metrics',            icon: Activity },
     { label: language === 'th' ? 'เป้าหมาย KPI' : 'KPI Targets',      href: '/master/targets',            icon: Target },
+    { label: language === 'th' ? 'ตั้งค่า GHG' : 'GHG Settings',       href: '/master/ghg-settings',       icon: Cloud },
     { label: language === 'th' ? 'สิทธิ์เมนู' : 'Menu Permissions',   href: '/master/menu-permissions',   icon: LayoutGrid },
     { label: language === 'th' ? 'ตั้งค่าระบบ' : 'System Settings',   href: '/master/settings',           icon: Settings },
   ];

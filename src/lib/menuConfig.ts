@@ -31,6 +31,7 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { key: 'master/themes',           label: 'Themes',          labelTh: 'หัวข้อหลัก',        section: 'master' },
   { key: 'master/metrics',          label: 'Metrics',         labelTh: 'ตัวชี้วัด',         section: 'master' },
   { key: 'master/targets',          label: 'KPI Targets',     labelTh: 'เป้าหมาย KPI',     section: 'master' },
+  { key: 'master/ghg-settings',     label: 'GHG Settings',    labelTh: 'ตั้งค่า GHG',       section: 'master' },
   { key: 'master/menu-permissions', label: 'Menu Permissions',labelTh: 'สิทธิ์เมนู',        section: 'master' },
   { key: 'master/settings',         label: 'System Settings', labelTh: 'ตั้งค่าระบบ',       section: 'master' },
 
@@ -59,6 +60,7 @@ export const DEFAULT_PERMISSIONS: Record<string, AppRole[]> = {
   'master/themes':          ['supervisor'],
   'master/metrics':         ['supervisor'],
   'master/targets':         ['supervisor', 'executive', 'staff'],
+  'master/ghg-settings':    [],
   'master/menu-permissions':[],
   'master/settings':        [],
   'users':                  ['supervisor', 'executive', 'staff', 'guest'],
