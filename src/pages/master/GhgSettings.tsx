@@ -19,7 +19,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Cloud, Plus, Trash2, Loader2, Calculator, Factory, Save } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface Metric { metric_id: string; metric_name: string; unit: string | null; code: string | null; calc_mode: string; }
+interface Metric { metric_id: string; metric_name: string; unit: string | null; code: string | null; calc_mode: string; theme_id: string; }
+interface Theme { theme_id: string; dimension_id: string | null; }
+interface Dimension { dimension_id: string; dimension_name: string; }
+
+// A metric whose unit looks like a CO₂-equivalent is a GHG OUTPUT (a target),
+// not an emission-generating activity.
+const isCO2e = (unit: string | null) => !!unit && /co2e/i.test(unit);
 interface EmissionFactor { factor_id: string; source_code: string; scope: number; factor_value: number; factor_unit: string | null; source: string | null; }
 interface Mapping { mapping_id: string; target_code: string; source_code: string; }
 
@@ -31,6 +37,8 @@ export default function GhgSettings() {
   const tenantId = profile?.tenant_id ?? null;
 
   const [metrics, setMetrics] = useState<Metric[]>([]);
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [dimensions, setDimensions] = useState<Dimension[]>([]);
   const [factors, setFactors] = useState<EmissionFactor[]>([]);
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,12 +50,16 @@ export default function GhgSettings() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [mRes, fRes, gRes] = await Promise.all([
-        supabase.from('esg_metric').select('metric_id, metric_name, unit, code, calc_mode').order('metric_name'),
+      const [mRes, thRes, dRes, fRes, gRes] = await Promise.all([
+        supabase.from('esg_metric').select('metric_id, metric_name, unit, code, calc_mode, theme_id').order('metric_name'),
+        supabase.from('esg_theme').select('theme_id, dimension_id'),
+        supabase.from('esg_dimension').select('dimension_id, dimension_name'),
         supabase.from('emission_factor').select('*').order('scope'),
         supabase.from('ghg_calc_mapping').select('*'),
       ]);
       setMetrics((mRes.data ?? []) as Metric[]);
+      setThemes((thRes.data ?? []) as Theme[]);
+      setDimensions((dRes.data ?? []) as Dimension[]);
       setFactors((fRes.data ?? []) as EmissionFactor[]);
       setMappings((gRes.data ?? []) as Mapping[]);
     } catch (e) {
@@ -58,11 +70,33 @@ export default function GhgSettings() {
   };
   useEffect(() => { fetchAll(); }, []);
 
-  // metrics that have a code (only coded metrics can be sources/targets)
-  const codedMetrics = useMemo(() => metrics.filter(m => m.code), [metrics]);
+  // metric → dimension name (via theme)
+  const dimNameByMetric = useMemo(() => {
+    const themeDim = new Map(themes.map(t => [t.theme_id, t.dimension_id]));
+    const dimName = new Map(dimensions.map(d => [d.dimension_id, d.dimension_name]));
+    const map = new Map<string, string>();
+    metrics.forEach(m => {
+      const did = themeDim.get(m.theme_id) ?? null;
+      map.set(m.metric_id, did ? (dimName.get(did) ?? '') : '');
+    });
+    return map;
+  }, [metrics, themes, dimensions]);
+
   const metricByCode = useMemo(() => new Map(metrics.map(m => [m.code ?? '', m])), [metrics]);
-  // sources = metrics that have an emission factor
   const factorCodes = useMemo(() => new Set(factors.map(f => f.source_code)), [factors]);
+
+  // Emission-generating ACTIVITIES (sources): Environment-dimension metrics that
+  // have a code and aren't themselves a GHG output (CO₂e) metric.
+  const activityMetrics = useMemo(
+    () => metrics.filter(m =>
+      m.code && !isCO2e(m.unit) && dimNameByMetric.get(m.metric_id) === 'Environment'),
+    [metrics, dimNameByMetric],
+  );
+  // GHG OUTPUT metrics (targets): unit is a CO₂-equivalent.
+  const targetMetrics = useMemo(
+    () => metrics.filter(m => m.code && isCO2e(m.unit)),
+    [metrics],
+  );
 
   const nameForCode = (code: string) => {
     const m = metricByCode.get(code);
@@ -149,9 +183,6 @@ export default function GhgSettings() {
     return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
-  // metrics flagged auto (the GHG targets)
-  const autoMetrics = metrics.filter(m => m.calc_mode === 'auto' && m.code);
-
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -224,7 +255,10 @@ export default function GhgSettings() {
               }}>
                 <SelectTrigger className="h-9 text-xs"><SelectValue placeholder={th ? 'เลือกกิจกรรม' : 'Select activity'} /></SelectTrigger>
                 <SelectContent>
-                  {codedMetrics.filter(m => m.calc_mode !== 'auto').map(m => (
+                  {activityMetrics.length === 0 && (
+                    <div className="px-2 py-3 text-xs text-muted-foreground italic">{th ? 'ไม่มีกิจกรรมด้านสิ่งแวดล้อม' : 'No environmental activities'}</div>
+                  )}
+                  {activityMetrics.map(m => (
                     <SelectItem key={m.metric_id} value={m.code!}>{m.metric_name}{m.unit ? ` (${m.unit})` : ''}</SelectItem>
                   ))}
                 </SelectContent>
@@ -271,7 +305,10 @@ export default function GhgSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {codedMetrics.map(target => {
+          {targetMetrics.length === 0 && (
+            <p className="text-xs text-muted-foreground italic py-2">{th ? 'ไม่พบตัวชี้วัด GHG (หน่วย tCO₂e)' : 'No GHG output metrics (tCO₂e unit) found'}</p>
+          )}
+          {targetMetrics.map(target => {
             const isAuto = target.calc_mode === 'auto';
             const targetSources = mappings.filter(m => m.target_code === target.code).map(m => m.source_code);
             return (
