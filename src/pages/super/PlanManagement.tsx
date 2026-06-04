@@ -253,7 +253,118 @@ export default function PlanManagement() {
 
         {/* Tenant plan overview table */}
         <TenantPlanOverview th={th} />
+
+        {/* Per-tenant feature access */}
+        <TenantFeatureAccess th={th} />
     </div>
+  );
+}
+
+// ── Feature access (super-admin per-tenant feature flags) ─────────────────────
+
+const FEATURES: { key: string; labelEn: string; labelTh: string; descEn: string; descTh: string }[] = [
+  {
+    key: 'ghg_auto_calc',
+    labelEn: 'GHG Auto-Calculation',
+    labelTh: 'คำนวณ GHG อัตโนมัติ',
+    descEn: 'Emission-factor setup + auto-computed GHG + the GHG dashboard',
+    descTh: 'ตั้งค่า Emission Factor + คำนวณ GHG อัตโนมัติ + แดชบอร์ด GHG',
+  },
+];
+
+interface FeatureTenantRow { tenant_id: string; name: string; plan: string; }
+
+function TenantFeatureAccess({ th }: { th: boolean }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: tenants = [] } = useQuery<FeatureTenantRow[]>({
+    queryKey: ['tenants-feature-access'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('tenant').select('tenant_id, name, plan').order('name');
+      if (error) throw error;
+      return (data ?? []) as FeatureTenantRow[];
+    },
+  });
+
+  const { data: flags = [] } = useQuery({
+    queryKey: ['tenant-features'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('tenant_feature').select('tenant_id, feature_key, enabled');
+      if (error) throw error;
+      return (data ?? []) as { tenant_id: string; feature_key: string; enabled: boolean }[];
+    },
+  });
+
+  const isOn = (tenant_id: string, key: string) =>
+    flags.some(f => f.tenant_id === tenant_id && f.feature_key === key && f.enabled);
+
+  const toggle = useMutation({
+    mutationFn: async ({ tenant_id, key, enabled }: { tenant_id: string; key: string; enabled: boolean }) => {
+      const { error } = await supabase.from('tenant_feature').upsert(
+        { tenant_id, feature_key: key, enabled, updated_at: new Date().toISOString() },
+        { onConflict: 'tenant_id,feature_key' },
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tenant-features'] });
+      toast({ title: th ? 'อัพเดทสิทธิ์ฟีเจอร์แล้ว' : 'Feature access updated' });
+    },
+    onError: (e: Error) => toast({ title: th ? 'ผิดพลาด' : 'Error', description: e.message, variant: 'destructive' }),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Zap className="h-4 w-4 text-amber-500" />
+          {th ? 'การเปิดใช้ฟีเจอร์ต่อ Tenant' : 'Per-Tenant Feature Access'}
+        </CardTitle>
+        <CardDescription className="text-xs">
+          {th ? 'Super admin เปิด/ปิดฟีเจอร์ให้แต่ละ tenant — ปิดอยู่เป็นค่าเริ่มต้น' : 'Super admin enables/disables features per tenant — off by default'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[520px]">
+          <thead>
+            <tr className="border-b text-left text-xs text-gray-500">
+              <th className="pb-2 font-medium">{th ? 'Tenant' : 'Tenant'}</th>
+              {FEATURES.map(f => (
+                <th key={f.key} className="pb-2 font-medium text-center">
+                  <div>{th ? f.labelTh : f.labelEn}</div>
+                  <div className="text-[10px] font-normal text-gray-400 max-w-[200px] mx-auto">{th ? f.descTh : f.descEn}</div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {tenants.map(t => (
+              <tr key={t.tenant_id} className="text-gray-700">
+                <td className="py-2.5 font-medium">{t.name}<span className="ml-1.5 text-[10px] text-gray-400 uppercase">{t.plan}</span></td>
+                {FEATURES.map(f => {
+                  const on = isOn(t.tenant_id, f.key);
+                  return (
+                    <td key={f.key} className="py-2.5 text-center">
+                      <div className="inline-flex items-center gap-2">
+                        <Switch
+                          checked={on}
+                          onCheckedChange={(v) => toggle.mutate({ tenant_id: t.tenant_id, key: f.key, enabled: v })}
+                          className="data-[state=checked]:bg-emerald-600"
+                        />
+                        <span className={`text-[10px] ${on ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>
+                          {on ? (th ? 'เปิด' : 'On') : (th ? 'ปิด' : 'Off')}
+                        </span>
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
   );
 }
 

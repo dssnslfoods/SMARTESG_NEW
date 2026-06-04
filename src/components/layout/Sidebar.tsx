@@ -55,7 +55,18 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
   const { pathname } = useLocation();
   const { role, signOut, isSuperAdmin } = useAuth();
   const { t, language } = useLanguage();
-  const { canSeeMenu } = useMenuPermissions();
+  const { canSeeMenu, hasFeature } = useMenuPermissions();
+
+  // Menus gated behind a super-admin feature flag (hidden when the flag is off).
+  const FEATURE_GATED: Record<string, string> = {
+    'reports/ghg': 'ghg_auto_calc',
+    'master/ghg-settings': 'ghg_auto_calc',
+  };
+  const canSeeMenuWithFeature = (key: string) => {
+    const feat = FEATURE_GATED[key];
+    if (feat && !hasFeature(feat)) return false;
+    return canSeeMenu(key);
+  };
   const { tenantName, logoUrl, primaryColor } = useBranding();
   const [masterDataOpen, setMasterDataOpen] = useState(pathname.startsWith('/master'));
   const [reportSettingsOpen, setReportSettingsOpen] = useState(pathname === '/reports');
@@ -77,7 +88,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
     { label: language === 'th' ? 'การปล่อย GHG' : 'GHG Emissions', href: '/reports/ghg',        icon: Cloud },
     { label: 'ESG Overview',                                    href: '/reports/esg-overview',   icon: Globe },
   ];
-  const navItems = allNavItems.filter((item) => canSeeMenu(item.href.slice(1)));
+  const navItems = allNavItems.filter((item) => canSeeMenuWithFeature(item.href.slice(1)));
 
   const allMasterDataItems = [
     { label: t('companies'),                                            href: '/master/companies',         icon: Building2 },
@@ -91,7 +102,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
     { label: language === 'th' ? 'สิทธิ์เมนู' : 'Menu Permissions',   href: '/master/menu-permissions',   icon: LayoutGrid },
     { label: language === 'th' ? 'ตั้งค่าระบบ' : 'System Settings',   href: '/master/settings',           icon: Settings },
   ];
-  const masterDataItems = allMasterDataItems.filter((item) => canSeeMenu(item.href.slice(1)));
+  const masterDataItems = allMasterDataItems.filter((item) => canSeeMenuWithFeature(item.href.slice(1)));
 
   const allAdminItems = [
     { label: t('users'),                                               href: '/users',       icon: Users },

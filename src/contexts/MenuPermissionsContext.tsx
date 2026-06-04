@@ -22,6 +22,8 @@ interface MenuPermissionsContextType {
   allPermissions: PermMap;
   /** Tenant-level allowlist (from super_admin). */
   tenantAllowlist: AllowMap;
+  /** True if a super-admin-controlled feature flag is enabled for this tenant. */
+  hasFeature: (key: string) => boolean;
   loading: boolean;
   /** Re-fetch from DB. */
   refresh: () => Promise<void>;
@@ -34,16 +36,18 @@ export function MenuPermissionsProvider({ children }: { children: ReactNode }) {
   const { role, user } = useAuth();
   const [permMap, setPermMap] = useState<PermMap>({});
   const [allowMap, setAllowMap] = useState<AllowMap>({});
+  const [featureMap, setFeatureMap] = useState<Record<string, boolean>>({});
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const fetchPermissions = useCallback(async () => {
     setLoading(true);
     try {
-      // Both queries in parallel — they read different tables.
-      const [permRes, allowRes] = await Promise.all([
+      // Read the three tables in parallel.
+      const [permRes, allowRes, featRes] = await Promise.all([
         supabase.from('menu_permission').select('menu_key, role, is_active'),
         supabase.from('tenant_menu_allowlist').select('menu_key, is_allowed'),
+        supabase.from('tenant_feature').select('feature_key, enabled'),
       ]);
 
       if (permRes.error) throw permRes.error;
@@ -60,6 +64,10 @@ export function MenuPermissionsProvider({ children }: { children: ReactNode }) {
         aMap[row.menu_key] = row.is_allowed;
       });
       setAllowMap(aMap);
+
+      const fMap: Record<string, boolean> = {};
+      (featRes.data ?? []).forEach((row: any) => { fMap[row.feature_key] = row.enabled; });
+      setFeatureMap(fMap);
     } catch (e) {
       console.error('MenuPermissions fetch error:', e);
     } finally {
@@ -77,9 +85,13 @@ export function MenuPermissionsProvider({ children }: { children: ReactNode }) {
       // Reset on logout
       setPermMap({});
       setAllowMap({});
+      setFeatureMap({});
       setLoaded(false);
     }
   }, [user, fetchPermissions]);
+
+  // Super-admin-controlled feature flags for the current tenant. Default off.
+  const hasFeature = useCallback((key: string): boolean => featureMap[key] === true, [featureMap]);
 
   const canSeeMenu = useCallback(
     (menuKey: string): boolean => {
@@ -111,6 +123,7 @@ export function MenuPermissionsProvider({ children }: { children: ReactNode }) {
         canSeeMenu,
         allPermissions: permMap,
         tenantAllowlist: allowMap,
+        hasFeature,
         loading,
         refresh: fetchPermissions,
       }}
