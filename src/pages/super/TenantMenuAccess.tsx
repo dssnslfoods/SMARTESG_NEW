@@ -24,7 +24,12 @@ import {
   CheckCircle2,
   Globe,
 } from 'lucide-react';
-import { MENU_ITEMS } from '@/lib/menuConfig';
+import { MENU_ITEMS as ALL_MENU_ITEMS } from '@/lib/menuConfig';
+
+// Menus controlled by a super-admin FEATURE FLAG (Plan Management → Feature
+// Access) are excluded here so each menu has a single source of truth.
+const FEATURE_GATED_MENUS = new Set(['reports/ghg', 'master/ghg-settings']);
+const MENU_ITEMS = ALL_MENU_ITEMS.filter((m) => !FEATURE_GATED_MENUS.has(m.key));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TenantOption {
