@@ -92,6 +92,7 @@ interface EsgMetric {
   metric_name: string;
   theme_id: string;
   unit: string | null;
+  calc_mode?: string; // 'manual' (default) | 'auto' (GHG computed from activity data)
 }
 
 interface MetricValue {
@@ -584,6 +585,20 @@ export default function DataEntry() {
         description: language === 'th'
           ? 'ต้องเลือก: บริษัท · สถานที่ · เดือน/ปี · ตัวชี้วัด'
           : 'Required: Company · Site · Month/Year · Metric',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Auto (GHG-computed) metrics can't be entered directly — they are derived
+    // from activity data by the database. Tell the user to enter the activity.
+    const selectedMetric = metrics.find(m => m.metric_id === formData.metric_id);
+    if (!editingValue && selectedMetric?.calc_mode === 'auto') {
+      toast({
+        title: language === 'th' ? 'ตัวชี้วัดนี้คำนวณอัตโนมัติ' : 'This metric is auto-calculated',
+        description: language === 'th'
+          ? 'GHG คำนวณจากข้อมูลกิจกรรม (เช่น ดีเซล, ไฟฟ้า) — กรุณากรอกค่ากิจกรรมเหล่านั้นแทน'
+          : 'GHG is computed from activity data (e.g. diesel, electricity). Please enter those activity values instead.',
         variant: 'destructive',
       });
       return;
@@ -1724,6 +1739,10 @@ export default function DataEntry() {
               </div>
             )}
 
+            {(() => {
+              const selMetric = metrics.find(m => m.metric_id === formData.metric_id);
+              const isAutoMetric = selMetric?.calc_mode === 'auto';
+              return (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'ค่า' : 'Value'} *</Label>
@@ -1731,8 +1750,16 @@ export default function DataEntry() {
                   type="number"
                   value={formData.value}
                   onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
-                  className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  disabled={isAutoMetric}
+                  className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:bg-gray-100 disabled:opacity-70"
                 />
+                {isAutoMetric && (
+                  <p className="text-[11px] text-blue-600 leading-snug">
+                    🔒 {language === 'th'
+                      ? 'คำนวณอัตโนมัติจากข้อมูลกิจกรรม (GHG) — กรุณากรอก "ค่ากิจกรรม" เช่น ปริมาณดีเซล / ไฟฟ้า ระบบจะคำนวณการปล่อยก๊าซให้เอง'
+                      : 'Auto-calculated from activity data (GHG). Enter the activity values (e.g. diesel / electricity) instead — the system computes emissions for you.'}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'สถานะ' : 'Status'}</Label>
@@ -1750,6 +1777,8 @@ export default function DataEntry() {
                 </Select>
               </div>
             </div>
+              );
+            })()}
 
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'แหล่งข้อมูล' : 'Data Source'}</Label>
