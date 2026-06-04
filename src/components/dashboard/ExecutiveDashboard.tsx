@@ -12,6 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   Briefcase,
   TrendingUp,
   TrendingDown,
@@ -28,6 +31,8 @@ import {
   ArrowRight,
   Globe,
   Info,
+  Building2,
+  MapPin,
 } from 'lucide-react';
 import {
   Tooltip as ReTooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -67,6 +72,8 @@ interface ExecutiveSummary {
   overall: { total: number; on_track: number; off_track: number };
   monthly_trend: Array<{ month: string; records: number }>;
 }
+interface CompanyRow { company_id: string; company_name: string }
+interface SiteRow { site_id: string; site_name: string; company_id: string | null }
 
 const MONTHS_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -102,10 +109,25 @@ export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [dimFilter, setDimFilter] = useState<string | null>(null); // null = all dimensions
 
-  const load = async () => {
+  // ── Scope filters: Company / Site / Year ───────────────────────────────────
+  const [companies, setCompanies] = useState<CompanyRow[]>([]);
+  const [sites, setSites] = useState<SiteRow[]>([]);
+  const [years, setYears] = useState<number[]>([]);
+  const [filterCompany, setFilterCompany] = useState<string | null>(null);
+  const [filterSite, setFilterSite] = useState<string | null>(null);
+  const [filterYear, setFilterYear] = useState<number | null>(null); // null = current year (RPC default)
+
+  // Sites narrowed by the selected Company.
+  const scopedSites = filterCompany ? sites.filter(s => s.company_id === filterCompany) : sites;
+
+  const load = async (year = filterYear, company = filterCompany, site = filterSite) => {
     setRefreshing(true);
     try {
-      const { data: res, error } = await supabase.rpc('get_executive_summary');
+      const { data: res, error } = await supabase.rpc('get_executive_summary', {
+        p_year: year,
+        p_company_id: company,
+        p_site_id: site,
+      });
       if (error) throw error;
       setData(res as ExecutiveSummary);
     } catch (e) {
@@ -116,7 +138,41 @@ export default function ExecutiveDashboard() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  // Load scope options (Company / Site / Year) from master data — no hardcoding.
+  const loadScopeOptions = async () => {
+    try {
+      const [compRes, siteRes, periodRes] = await Promise.all([
+        supabase.from('company').select('company_id, company_name').order('company_name'),
+        supabase.from('site').select('site_id, site_name, company_id').order('site_name'),
+        supabase.from('reporting_period').select('year'),
+      ]);
+      setCompanies((compRes.data ?? []) as CompanyRow[]);
+      setSites((siteRes.data ?? []) as SiteRow[]);
+      const ys = Array.from(
+        new Set((periodRes.data ?? []).map((p: any) => Number(p.year)).filter(Boolean)),
+      ).sort((a, b) => b - a);
+      setYears(ys);
+    } catch (e) {
+      console.error('Executive scope options error:', e);
+    }
+  };
+
+  useEffect(() => { load(); loadScopeOptions(); }, []);
+
+  // Reload whenever a scope filter changes.
+  useEffect(() => {
+    if (loading) return; // skip the very first render (initial load handles it)
+    load(filterYear, filterCompany, filterSite);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterYear, filterCompany, filterSite]);
+
+  // Keep the Site filter valid when the Company changes.
+  useEffect(() => {
+    if (filterSite && !scopedSites.some(s => s.site_id === filterSite)) {
+      setFilterSite(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterCompany]);
 
   if (loading) {
     return (
@@ -169,12 +225,96 @@ export default function ExecutiveDashboard() {
               </p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={load} disabled={refreshing} className="gap-1.5 bg-white/10 border-white/20 hover:bg-white/20 text-white">
+          <Button variant="outline" size="sm" onClick={() => load()} disabled={refreshing} className="gap-1.5 bg-white/10 border-white/20 hover:bg-white/20 text-white">
             <RefreshCcw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             {th ? 'รีเฟรช' : 'Refresh'}
           </Button>
         </div>
       </div>
+
+      {/* ── Scope filters: Company / Site / Year ──────────────────────── */}
+      <Card>
+        <CardContent className="py-3 px-4">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            {/* Company */}
+            <div className="flex-1 space-y-1 min-w-0">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Building2 className="h-3 w-3 text-emerald-600" />
+                {th ? 'บริษัท' : 'Company'}
+              </label>
+              <Select
+                value={filterCompany ?? '__all__'}
+                onValueChange={v => setFilterCompany(v === '__all__' ? null : v)}
+              >
+                <SelectTrigger className="h-9 bg-white border-gray-200 rounded-xl text-xs">
+                  <SelectValue placeholder={th ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">{th ? 'ทุกบริษัท' : 'All companies'}</SelectItem>
+                  {companies.map(c => (
+                    <SelectItem key={c.company_id} value={c.company_id}>{c.company_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Site */}
+            <div className="flex-1 space-y-1 min-w-0">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <MapPin className="h-3 w-3 text-blue-600" />
+                {th ? 'สถานที่' : 'Site'}
+              </label>
+              <Select
+                value={filterSite ?? '__all__'}
+                onValueChange={v => setFilterSite(v === '__all__' ? null : v)}
+              >
+                <SelectTrigger className="h-9 bg-white border-gray-200 rounded-xl text-xs">
+                  <SelectValue placeholder={th ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">{th ? 'ทุกสถานที่' : 'All sites'}</SelectItem>
+                  {scopedSites.map(s => (
+                    <SelectItem key={s.site_id} value={s.site_id}>{s.site_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Year */}
+            <div className="flex-1 space-y-1 min-w-0">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Calendar className="h-3 w-3 text-amber-600" />
+                {th ? 'ปี' : 'Year'}
+              </label>
+              <Select
+                value={filterYear != null ? String(filterYear) : '__current__'}
+                onValueChange={v => setFilterYear(v === '__current__' ? null : Number(v))}
+              >
+                <SelectTrigger className="h-9 bg-white border-gray-200 rounded-xl text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__current__">
+                    {th ? 'ปีปัจจุบัน' : 'Current year'}
+                  </SelectItem>
+                  {years.map(y => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Reset */}
+            {(filterCompany || filterSite || filterYear != null) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setFilterCompany(null); setFilterSite(null); setFilterYear(null); }}
+                className="h-9 text-xs text-muted-foreground shrink-0"
+              >
+                {th ? 'รีเซ็ต' : 'Reset'}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Quick navigation shortcuts ────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
