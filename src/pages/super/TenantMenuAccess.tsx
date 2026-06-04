@@ -24,12 +24,14 @@ import {
   CheckCircle2,
   Globe,
 } from 'lucide-react';
-import { MENU_ITEMS as ALL_MENU_ITEMS } from '@/lib/menuConfig';
+import { MENU_ITEMS } from '@/lib/menuConfig';
 
-// Menus controlled by a super-admin FEATURE FLAG (Plan Management → Feature
-// Access) are excluded here so each menu has a single source of truth.
-const FEATURE_GATED_MENUS = new Set(['reports/ghg', 'master/ghg-settings']);
-const MENU_ITEMS = ALL_MENU_ITEMS.filter((m) => !FEATURE_GATED_MENUS.has(m.key));
+// Menus that require a super-admin feature flag (Plan Management → Feature
+// Access) to be enabled before they appear here at all.
+const MENU_FEATURE: Record<string, string> = {
+  'reports/ghg': 'ghg_auto_calc',
+  'master/ghg-settings': 'ghg_auto_calc',
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TenantOption {
@@ -57,9 +59,17 @@ export default function TenantMenuAccess() {
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [allow, setAllow] = useState<Record<string, boolean>>({});
+  const [tenantFeatures, setTenantFeatures] = useState<Record<string, boolean>>({});
   const [loadingTenants, setLoadingTenants] = useState(true);
   const [loadingAllow, setLoadingAllow] = useState(false);
   const [saving, setSaving] = useState<Set<string>>(new Set());
+
+  // Menus visible for the selected tenant: a feature-gated menu only shows when
+  // its feature flag is enabled for this tenant.
+  const visibleMenuItems = MENU_ITEMS.filter((m) => {
+    const feat = MENU_FEATURE[m.key];
+    return !feat || tenantFeatures[feat] === true;
+  });
 
   // ── Fetch tenants ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -79,24 +89,25 @@ export default function TenantMenuAccess() {
       });
   }, [isSuperAdmin]);
 
-  // ── Fetch allowlist for selected tenant ───────────────────────────────────
+  // ── Fetch allowlist + feature flags for selected tenant ───────────────────
   useEffect(() => {
     if (!selectedTenantId) return;
     setLoadingAllow(true);
-    supabase
-      .from('tenant_menu_allowlist')
-      .select('menu_key, is_allowed')
-      .eq('tenant_id', selectedTenantId)
-      .then(({ data }) => {
-        const map: Record<string, boolean> = {};
-        // Default every menu to true if not yet in DB
-        MENU_ITEMS.forEach((m) => (map[m.key] = true));
-        (data ?? []).forEach((row: any) => {
-          map[row.menu_key] = row.is_allowed;
-        });
-        setAllow(map);
-        setLoadingAllow(false);
-      });
+    Promise.all([
+      supabase.from('tenant_menu_allowlist').select('menu_key, is_allowed').eq('tenant_id', selectedTenantId),
+      supabase.from('tenant_feature').select('feature_key, enabled').eq('tenant_id', selectedTenantId),
+    ]).then(([allowRes, featRes]) => {
+      const map: Record<string, boolean> = {};
+      MENU_ITEMS.forEach((m) => (map[m.key] = true)); // default allowed
+      (allowRes.data ?? []).forEach((row: any) => { map[row.menu_key] = row.is_allowed; });
+      setAllow(map);
+
+      const fMap: Record<string, boolean> = {};
+      (featRes.data ?? []).forEach((row: any) => { fMap[row.feature_key] = row.enabled; });
+      setTenantFeatures(fMap);
+
+      setLoadingAllow(false);
+    });
   }, [selectedTenantId]);
 
   // ── Toggle handler ────────────────────────────────────────────────────────
@@ -140,7 +151,7 @@ export default function TenantMenuAccess() {
   // ── Bulk: enable all / disable all (per current tenant) ──────────────────
   const handleSetAll = async (value: boolean) => {
     if (!selectedTenantId || !user) return;
-    const rows = MENU_ITEMS.map((m) => ({
+    const rows = visibleMenuItems.map((m) => ({
       tenant_id: selectedTenantId,
       menu_key: m.key,
       is_allowed: value,
@@ -152,7 +163,7 @@ export default function TenantMenuAccess() {
         .from('tenant_menu_allowlist')
         .upsert(rows, { onConflict: 'tenant_id,menu_key' });
       if (error) throw error;
-      setAllow(Object.fromEntries(MENU_ITEMS.map((m) => [m.key, value])));
+      setAllow(Object.fromEntries(visibleMenuItems.map((m) => [m.key, value])));
       toast({
         title: th ? 'สำเร็จ' : 'Success',
         description: th
@@ -171,18 +182,21 @@ export default function TenantMenuAccess() {
   // ── Group menus by section ────────────────────────────────────────────────
   const grouped = useMemo(() => {
     const m = new Map<string, typeof MENU_ITEMS>();
-    MENU_ITEMS.forEach((item) => {
+    visibleMenuItems.forEach((item) => {
       if (!m.has(item.section)) m.set(item.section, []);
       m.get(item.section)!.push(item);
     });
     return m;
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantFeatures]);
 
   const stats = useMemo(() => {
-    const total = MENU_ITEMS.length;
-    const allowed = Object.values(allow).filter(Boolean).length;
+    const total = visibleMenuItems.length;
+    const visibleKeys = new Set(visibleMenuItems.map((m) => m.key));
+    const allowed = Object.entries(allow).filter(([k, v]) => v && visibleKeys.has(k)).length;
     return { total, allowed };
-  }, [allow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allow, tenantFeatures]);
 
   const selectedTenant = tenants.find((t) => t.tenant_id === selectedTenantId);
 
