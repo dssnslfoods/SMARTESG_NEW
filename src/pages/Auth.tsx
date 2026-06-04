@@ -375,8 +375,7 @@ export default function Auth() {
           >
             {language === "th" ? "ภาวะโลกร้อน" : "Global Warming"}
           </h1>
-          <p className="text-white/60 mt-4 text-base">{language === "th" ? "บริษัท เอ็นเอสแอล ฟู้ดส์ จำกัด (มหาชน)" : "NSL FOODS Public Company Limited"}</p>
-          <p className="text-white/40 mt-1 text-xs tracking-widest uppercase">
+          <p className="text-white/60 mt-4 text-base tracking-widest uppercase">
             {language === "th" ? "ขับเคลื่อนความยั่งยืนเพื่ออนาคต" : "Sustainability for the Future"}
           </p>
         </div>
