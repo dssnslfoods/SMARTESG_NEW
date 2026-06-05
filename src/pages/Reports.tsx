@@ -513,7 +513,7 @@ export default function Reports() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
             <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-            {language === "th" ? "Executive ESG Dashboard" : "Executive ESG Dashboard"}
+            {language === "th" ? "Data Entry Summary" : "Data Entry Summary"}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {language === "th" 
