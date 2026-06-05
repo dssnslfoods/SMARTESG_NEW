@@ -62,6 +62,7 @@ const dataCache = {
   data: null as MetricValueMinimal[] | null,
   fullData: null as MetricValueFull[] | null,
   totalCount: 0,
+  stats: null as DataStats | null,
   cacheTimeout: 30000, // 30 seconds cache
 };
 
@@ -100,18 +101,11 @@ export function useOptimizedMetricValues(
       dataCache.lastFetch > 0 && 
       (now - dataCache.lastFetch) < dataCache.cacheTimeout;
 
-    if (cacheValid && !fetchFullData && dataCache.data) {
-      // Use cached data
-      setData(dataCache.data);
-      const calcStats = calculateStats(dataCache.data, userId);
-      setStats({
-        totalDbRecords: dataCache.totalCount,
-        visibleRecords: dataCache.data.length,
-        draftCount: calcStats.draft,
-        submittedCount: calcStats.submitted,
-        myDrafts: calcStats.myDrafts,
-        mySubmitted: calcStats.mySubmitted,
-      });
+    if (cacheValid && !fetchFullData && !fetchWithTimestamp && dataCache.stats) {
+      // Use cached server-side stats (no row transfer needed)
+      setData([]);
+      setStats(dataCache.stats);
+      setProgress({ loaded: dataCache.totalCount, total: dataCache.totalCount });
       setLoading(false);
       setLastRefresh(new Date(dataCache.lastFetch));
       return;
@@ -128,6 +122,33 @@ export function useOptimizedMetricValues(
     setProgress({ loaded: 0, total: null });
 
     try {
+      // ── Stats-only path (Dashboard) ──────────────────────────────────────
+      // The dashboard only needs counters, so compute them server-side under
+      // RLS in a single round-trip instead of streaming every visible row to
+      // the browser. This keeps load time flat regardless of role/data size.
+      if (!fetchFullData && !fetchWithTimestamp) {
+        const { data: s, error: rpcErr } = await supabase.rpc('get_dashboard_metric_stats');
+        if (rpcErr) throw rpcErr;
+        if (!isMountedRef.current) return;
+        const total = Number((s as any)?.total ?? 0);
+        const computed: DataStats = {
+          totalDbRecords: total,
+          visibleRecords: total,
+          draftCount: Number((s as any)?.draft ?? 0),
+          submittedCount: Number((s as any)?.submitted ?? 0),
+          myDrafts: Number((s as any)?.my_drafts ?? 0),
+          mySubmitted: Number((s as any)?.my_submitted ?? 0),
+        };
+        setData([]);
+        setStats(computed);
+        setProgress({ loaded: total, total });
+        dataCache.stats = computed;
+        dataCache.totalCount = total;
+        dataCache.lastFetch = now;
+        setLastRefresh(new Date());
+        return;
+      }
+
       // Get total count first
       const totalCount = await fetchTotalCount();
       if (!isMountedRef.current) return;
@@ -331,5 +352,6 @@ export function useMasterData() {
 export function invalidateMetricValueCache() {
   dataCache.data = null;
   dataCache.fullData = null;
+  dataCache.stats = null;
   dataCache.lastFetch = 0;
 }
