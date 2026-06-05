@@ -8,7 +8,7 @@ export interface ReportSection {
 }
 
 const DEFAULT_SECTIONS: ReportSection[] = [
-  { id: "summary", labelTh: "สรุปภาพรวม", labelEn: "Executive Summary", visible: true },
+  { id: "summary", labelTh: "สรุปการบันทึกข้อมูล", labelEn: "Entry Summary", visible: true },
   { id: "dimensions", labelTh: "มิติ ESG", labelEn: "ESG Dimensions", visible: true },
   { id: "trend", labelTh: "กราฟแนวโน้ม", labelEn: "Trend Chart", visible: true },
   { id: "themes", labelTh: "แนวโน้มหัวข้อ", labelEn: "Theme Trends", visible: true },
