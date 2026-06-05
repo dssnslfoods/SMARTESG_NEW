@@ -43,6 +43,7 @@ const MetricManagement    = lazy(() => import("./pages/master/MetricManagement")
 const SystemSettings      = lazy(() => import("./pages/master/SystemSettings"));
 const TargetManagement    = lazy(() => import("./pages/master/TargetManagement"));
 const MenuPermission      = lazy(() => import("./pages/master/MenuPermission"));
+const DataEntryPermission = lazy(() => import("./pages/master/DataEntryPermission"));
 const TenantManagement    = lazy(() => import("./pages/super/TenantManagement"));
 const TenantMenuAccess    = lazy(() => import("./pages/super/TenantMenuAccess"));
 const PlanManagement      = lazy(() => import("./pages/super/PlanManagement"));
@@ -195,6 +196,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <MenuPermission />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/master/data-entry-permissions"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <DataEntryPermission />
                   </ProtectedRoute>
                 }
               />

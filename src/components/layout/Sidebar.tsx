@@ -34,6 +34,7 @@ import {
   Crown,
   Layers2,
   Zap,
+  KeyRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -100,6 +101,7 @@ export function Sidebar({ onNavigate, showCloseButton = false }: SidebarProps) {
     { label: language === 'th' ? 'เป้าหมาย KPI' : 'KPI Targets',      href: '/master/targets',            icon: Target },
     { label: language === 'th' ? 'ตั้งค่า GHG' : 'GHG Settings',       href: '/master/ghg-settings',       icon: Cloud },
     { label: language === 'th' ? 'สิทธิ์เมนู' : 'Menu Permissions',   href: '/master/menu-permissions',   icon: LayoutGrid },
+    { label: language === 'th' ? 'สิทธิ์บันทึกข้อมูล' : 'Data Entry Permissions', href: '/master/data-entry-permissions', icon: KeyRound },
     { label: language === 'th' ? 'ตั้งค่าระบบ' : 'System Settings',   href: '/master/settings',           icon: Settings },
   ];
   const masterDataItems = allMasterDataItems.filter((item) => canSeeMenuWithFeature(item.href.slice(1)));

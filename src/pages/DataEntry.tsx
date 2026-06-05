@@ -146,6 +146,45 @@ export default function DataEntry() {
   const [prefilledFromExisting, setPrefilledFromExisting] = useState(false);
   const latestLookupKeyRef = useRef<string | null>(null);
 
+  // ── Data-entry permission for the current role (from data_entry_permission) ──
+  const [rolePerm, setRolePerm] = useState<{
+    can_create: boolean; create_scope: string; edit_scope: string; delete_scope: string;
+  } | null>(null);
+
+  // Legacy fallback = historical behaviour, used only if a row is missing so an
+  // existing role is never accidentally locked out before its row is seeded.
+  const LEGACY_PERM: Record<string, { can_create: boolean; create_scope: string; edit_scope: string; delete_scope: string }> = {
+    supervisor: { can_create: true,  create_scope: 'all',      edit_scope: 'all',  delete_scope: 'all'  },
+    executive:  { can_create: false, create_scope: 'all',      edit_scope: 'none', delete_scope: 'none' },
+    staff:      { can_create: true,  create_scope: 'own_site', edit_scope: 'own',  delete_scope: 'own'  },
+    guest:      { can_create: false, create_scope: 'all',      edit_scope: 'none', delete_scope: 'none' },
+  };
+
+  // Effective permission: admin/super_admin are always full.
+  const dePerm = useMemo(() => {
+    if (role === 'admin' || role === 'super_admin') {
+      return { can_create: true, create_scope: 'all', edit_scope: 'all', delete_scope: 'all' };
+    }
+    return rolePerm ?? LEGACY_PERM[role ?? ''] ?? { can_create: false, create_scope: 'own_site', edit_scope: 'none', delete_scope: 'none' };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, rolePerm]);
+
+  useEffect(() => {
+    if (!role || role === 'admin' || role === 'super_admin') return;
+    supabase
+      .from('data_entry_permission')
+      .select('can_create, create_scope, edit_scope, delete_scope')
+      .eq('role', role)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setRolePerm(data as any); });
+  }, [role]);
+
+  // Whether the current user may edit / delete a specific record.
+  const canEditRecord = (v: MetricValue) =>
+    dePerm.edit_scope === 'all' || (dePerm.edit_scope === 'own' && v.submitted_by === user?.id);
+  const canDeleteRecord = (v: MetricValue) =>
+    dePerm.delete_scope === 'all' || (dePerm.delete_scope === 'own' && v.submitted_by === user?.id);
+
   // Confirm-update dialog for supervisor/admin
   const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
   const [pendingUpdateRecord, setPendingUpdateRecord] = useState<MetricValue | null>(null);
@@ -313,18 +352,28 @@ export default function DataEntry() {
     setEditingValue(null);
     setExistingMatch(null);
     setPrefilledFromExisting(false);
-    setFormCompany('');
     setFormDimension('');
     setFormTheme('');
     setFormMonth('');
     setFormYear('');
-    
-    // For staff role, auto-set site_id from profile
-    const staffSiteId = role === 'staff' && profile?.site_id ? profile.site_id : '';
-    
+
+    // Pre-fill company/site according to the role's create scope:
+    //   own_site    → lock to the user's profile site (and its company)
+    //   own_company → lock the company to the user's profile company
+    //   all         → free choice
+    let presetCompany = '';
+    let presetSite = '';
+    if (dePerm.create_scope === 'own_site' && profile?.site_id) {
+      presetSite = profile.site_id;
+      presetCompany = profile.company_id || sites.find(s => s.site_id === profile.site_id)?.company_id || '';
+    } else if (dePerm.create_scope === 'own_company' && profile?.company_id) {
+      presetCompany = profile.company_id;
+    }
+    setFormCompany(presetCompany);
+
     setFormData({
       value_id: generateValueId(),
-      site_id: staffSiteId,
+      site_id: presetSite,
       period_id: '',
       metric_id: '',
       value: 0,
@@ -1021,13 +1070,15 @@ export default function DataEntry() {
               </p>
             </div>
           </div>
-          <Button 
-            onClick={handleCreate} 
-            className="gap-2 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl px-6 py-2.5 border-0"
-          >
-            <Plus className="h-4 w-4" />
-            {language === 'th' ? 'เพิ่มข้อมูล' : 'Add Data'}
-          </Button>
+          {dePerm.can_create && (
+            <Button
+              onClick={handleCreate}
+              className="gap-2 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl px-6 py-2.5 border-0"
+            >
+              <Plus className="h-4 w-4" />
+              {language === 'th' ? 'เพิ่มข้อมูล' : 'Add Data'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1432,22 +1483,31 @@ export default function DataEntry() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(value)}
-                            className="h-8 w-8 rounded-lg hover:bg-emerald-100 hover:text-emerald-700"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(value.value_id)}
-                            className="h-8 w-8 rounded-lg hover:bg-red-100 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canEditRecord(value) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(value)}
+                              className="h-8 w-8 rounded-lg hover:bg-emerald-100 hover:text-emerald-700"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canDeleteRecord(value) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(value.value_id)}
+                              className="h-8 w-8 rounded-lg hover:bg-red-100 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {!canEditRecord(value) && !canDeleteRecord(value) && (
+                            <span className="text-[11px] text-muted-foreground/50 italic pr-1">
+                              {language === 'th' ? '— ดูอย่างเดียว' : '— view only'}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1541,8 +1601,8 @@ export default function DataEntry() {
             </div>
           </DialogHeader>
           <div className="grid gap-5 py-6">
-            {/* Staff: Show fixed company + site info (read-only) */}
-            {role === 'staff' && profile?.site_id ? (
+            {/* Own-site scope: show fixed company + site info (read-only) */}
+            {dePerm.create_scope === 'own_site' && profile?.site_id ? (
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'บริษัท / สถานที่' : 'Company / Site'}</Label>
                 <div className="flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3 text-sm items-center">
@@ -1568,7 +1628,7 @@ export default function DataEntry() {
                       setFormCompany(v);
                       setFormData({ ...formData, site_id: '' });
                     }}
-                    disabled={!!editingValue}
+                    disabled={!!editingValue || dePerm.create_scope === 'own_company'}
                   >
                     <SelectTrigger className="h-12 bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-60">
                       <SelectValue placeholder={language === 'th' ? 'เลือกบริษัท' : 'Select company'} />
