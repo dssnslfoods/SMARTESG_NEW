@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3, CheckSquare, Square, X, Leaf, TrendingUp, Clock, Filter, AlertTriangle, Database } from "lucide-react";
+import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3, CheckSquare, Square, X, Leaf, TrendingUp, Clock, Filter, AlertTriangle, Database, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
@@ -54,7 +54,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataEntryLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { LoadingOverlay } from "@/components/ui/loading-progress";
-import { fetchMetricValuesFull, fetchTotalCount, FETCH_CONFIG } from "@/lib/dataFetcher";
 import { invalidateMetricValueCache } from "@/hooks/useOptimizedData";
 
 interface Site {
@@ -138,7 +137,7 @@ export default function DataEntry() {
   const [factors, setFactors] = useState<EmissionFactor[]>([]);
   const [ghgMappings, setGhgMappings] = useState<GhgMapping[]>([]);
   const [totalDbCount, setTotalDbCount] = useState<number>(0); // Actual count in database
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number | null }>({ loaded: 0, total: null });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingValue, setEditingValue] = useState<MetricValue | null>(null);
@@ -214,6 +213,8 @@ export default function DataEntry() {
   const [filterDimension, setFilterDimension] = useState<string>("");
   const [filterTheme, setFilterTheme] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
+  // Records are loaded on demand (filter-first + Search), not on page load.
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -272,19 +273,13 @@ export default function DataEntry() {
   });
 
   useEffect(() => {
-    fetchAllData();
+    fetchMasterData();
   }, []);
 
-  const fetchAllData = async () => {
-    setLoading(true);
-    setLoadProgress({ loaded: 0, total: null });
+  // Master data only (small lists for the form + filters). Loaded on mount.
+  // Metric VALUE records are intentionally NOT loaded here — see fetchRecords().
+  const fetchMasterData = async () => {
     try {
-      // First, get the actual count from database using optimized fetcher
-      const dbCount = await fetchTotalCount();
-      setTotalDbCount(dbCount);
-      setLoadProgress(prev => ({ ...prev, total: dbCount }));
-
-      // Use optimized fetcher with larger batch size for 100K+ records
       const [
         { data: sitesData },
         { data: companiesData },
@@ -294,7 +289,6 @@ export default function DataEntry() {
         { data: metricsData },
         { data: factorsData },
         { data: ghgMapData },
-        valuesData,
       ] = await Promise.all([
         supabase.from('site').select('*').order('site_name'),
         supabase.from('company').select('*').order('company_name'),
@@ -304,12 +298,7 @@ export default function DataEntry() {
         supabase.from('esg_metric').select('*').order('metric_name'),
         supabase.from('emission_factor').select('source_code, scope, factor_value, factor_unit'),
         supabase.from('ghg_calc_mapping').select('target_code, source_code'),
-        fetchMetricValuesFull({
-          pageSize: FETCH_CONFIG.PAGE_SIZE,
-          onProgress: (loaded) => setLoadProgress(prev => ({ ...prev, loaded })),
-        }),
       ]);
-
       setSites(sitesData || []);
       setCompanies(companiesData || []);
       setPeriods(periodsData || []);
@@ -318,7 +307,44 @@ export default function DataEntry() {
       setMetrics(metricsData || []);
       setFactors((factorsData || []) as EmissionFactor[]);
       setGhgMappings((ghgMapData || []) as GhgMapping[]);
-      setMetricValues(valuesData.map(v => ({
+    } catch (error) {
+      console.error('Error fetching master data:', error);
+    }
+  };
+
+  // On-demand record loader. Scopes the query server-side by the current
+  // Company / Site / Period / Status filters so only the relevant slice is
+  // pulled (never the whole table). Dimension/Theme are refined client-side.
+  // Capped at MAX_RECORDS most-recent rows; `count` reports the true total.
+  const MAX_RECORDS = 2000;
+  const fetchRecords = async () => {
+    setLoading(true);
+    setHasSearched(true);
+    setLoadProgress({ loaded: 0, total: null });
+    try {
+      let q = supabase
+        .from('metric_value')
+        .select(
+          'value_id, metric_id, site_id, period_id, value, status, data_source, remark, submitted_by, created_at',
+          { count: 'exact' },
+        );
+
+      if (filterSite) {
+        q = q.eq('site_id', filterSite);
+      } else if (filterCompany) {
+        const ids = sites.filter(s => s.company_id === filterCompany).map(s => s.site_id);
+        q = q.in('site_id', ids.length ? ids : ['__none__']);
+      }
+      if (filterPeriod) q = q.eq('period_id', filterPeriod);
+      if (filterStatus) q = q.eq('status', filterStatus);
+
+      const { data, count, error } = await q
+        .order('created_at', { ascending: false })
+        .limit(MAX_RECORDS);
+      if (error) throw error;
+
+      setTotalDbCount(count ?? (data?.length ?? 0));
+      setMetricValues((data || []).map(v => ({
         value_id: v.value_id,
         metric_id: v.metric_id,
         site_id: v.site_id,
@@ -330,15 +356,10 @@ export default function DataEntry() {
         submitted_by: v.submitted_by,
         created_at: v.created_at,
       })));
-      
-      // Invalidate cache after data modification
+      setLoadProgress({ loaded: data?.length ?? 0, total: count ?? (data?.length ?? 0) });
       invalidateMetricValueCache();
-      
-      if (FETCH_CONFIG.DEBUG_MODE) {
-        console.log(`[DataEntry] Loaded ${valuesData.length} metric values (DB total: ${dbCount})`);
-      }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching records:', error);
     } finally {
       setLoading(false);
     }
@@ -511,7 +532,7 @@ export default function DataEntry() {
         newSet.delete(valueId);
         return newSet;
       });
-      fetchAllData();
+      fetchRecords();
     }
   };
 
@@ -569,7 +590,7 @@ export default function DataEntry() {
       });
       setSelectedIds(new Set());
       setIsDeleteDialogOpen(false);
-      fetchAllData();
+      fetchRecords();
     }
   };
 
@@ -611,7 +632,7 @@ export default function DataEntry() {
       });
       setPendingUpdateRecord(null);
       setIsDialogOpen(false);
-      fetchAllData();
+      fetchRecords();
     }
   };
 
@@ -632,7 +653,7 @@ export default function DataEntry() {
           periodId = pid as string;
           setFormData(prev => ({ ...prev, period_id: pid as string }));
           // refresh the period list so it shows up in tables/filters
-          fetchData();
+          fetchMasterData();
         }
       } catch (e) {
         console.error('get_or_create_period error:', e);
@@ -793,7 +814,7 @@ export default function DataEntry() {
           : (language === 'th' ? 'บันทึกข้อมูลสำเร็จ' : 'Data saved successfully'),
       });
       setIsDialogOpen(false);
-      fetchAllData();
+      fetchRecords();
     }
   };
 
@@ -1319,12 +1340,49 @@ export default function DataEntry() {
             </div>
           </div>
 
+          {/* On-demand search — records load only when requested, scoped to the
+              selected filters (keeps the page fast at any data volume). */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button
+              onClick={fetchRecords}
+              disabled={loading}
+              className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md hover:shadow-lg rounded-xl px-6"
+            >
+              <Search className="h-4 w-4" />
+              {loading
+                ? (language === 'th' ? 'กำลังค้นหา...' : 'Searching...')
+                : (language === 'th' ? 'ค้นหา / แสดงข้อมูล' : 'Search / Load Records')}
+            </Button>
+            {hasSearched && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFilterCompany(''); setFilterSite(''); setFilterPeriod('');
+                  setFilterDimension(''); setFilterTheme(''); setFilterStatus('');
+                }}
+                className="gap-1.5 rounded-xl"
+              >
+                <X className="h-3.5 w-3.5" />
+                {language === 'th' ? 'ล้างตัวกรอง' : 'Clear filters'}
+              </Button>
+            )}
+            {hasSearched && totalDbCount > MAX_RECORDS && (
+              <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1">
+                {language === 'th'
+                  ? `แสดง ${MAX_RECORDS.toLocaleString()} รายการล่าสุด จากทั้งหมด ${totalDbCount.toLocaleString()} — กรองเพิ่มเพื่อดูให้แคบลง`
+                  : `Showing latest ${MAX_RECORDS.toLocaleString()} of ${totalDbCount.toLocaleString()} — narrow the filters to see more`}
+              </span>
+            )}
+          </div>
+
           <div className="mt-4 flex flex-col gap-2">
-            <div className="text-xs text-gray-500">
-              {language === 'th'
-                ? `ทั้งหมด ${metricValues.length.toLocaleString()} รายการ • หลังกรอง ${filteredValues.length.toLocaleString()} รายการ`
-                : `Total ${metricValues.length.toLocaleString()} • After filters ${filteredValues.length.toLocaleString()}`}
-            </div>
+            {hasSearched && (
+              <div className="text-xs text-gray-500">
+                {language === 'th'
+                  ? `โหลดมา ${metricValues.length.toLocaleString()} รายการ • หลังกรอง ${filteredValues.length.toLocaleString()} รายการ`
+                  : `Loaded ${metricValues.length.toLocaleString()} • After filters ${filteredValues.length.toLocaleString()}`}
+              </div>
+            )}
 
             {filterDropReason && (
               <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
@@ -1419,6 +1477,27 @@ export default function DataEntry() {
           {loading ? (
             <div className="text-center py-12 text-gray-500">
               {language === 'th' ? 'กำลังโหลด...' : 'Loading...'}
+            </div>
+          ) : !hasSearched ? (
+            <div className="text-center py-16">
+              <div className="p-4 bg-emerald-50 rounded-2xl inline-block mb-4">
+                <Search className="h-8 w-8 text-emerald-500" />
+              </div>
+              <p className="text-gray-700 font-medium">
+                {language === 'th' ? 'เลือกตัวกรองแล้วกด “ค้นหา / แสดงข้อมูล”' : 'Choose filters, then click “Search / Load Records”'}
+              </p>
+              <p className="text-gray-400 text-sm mt-1">
+                {language === 'th'
+                  ? 'ระบบจะดึงเฉพาะข้อมูลตามขอบเขตที่เลือก เพื่อให้โหลดเร็วแม้ข้อมูลจำนวนมาก'
+                  : 'Only the selected scope is loaded, so the page stays fast even with large datasets'}
+              </p>
+              <Button
+                onClick={fetchRecords}
+                className="mt-5 gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md rounded-xl px-6"
+              >
+                <Search className="h-4 w-4" />
+                {language === 'th' ? 'ค้นหา / แสดงข้อมูล' : 'Search / Load Records'}
+              </Button>
             </div>
           ) : filteredValues.length === 0 ? (
             <div className="text-center py-12">
