@@ -393,23 +393,6 @@ export default function Dashboard() {
     },
   ];
 
-  const quickActions = {
-    admin: [
-      { label: t('dataEntry'), href: '/data-entry', icon: FileInput },
-      { label: t('reports'), href: '/reports', icon: BarChart3 },
-      { label: t('users'), href: '/users', icon: Building2 },
-    ],
-    executive: [
-      { label: t('reports'), href: '/reports', icon: BarChart3 },
-    ],
-    supervisor: [
-      { label: t('dataEntry'), href: '/data-entry', icon: FileInput },
-    ],
-    staff: [
-      { label: t('dataEntry'), href: '/data-entry', icon: FileInput },
-    ],
-  };
-
   if (loading) {
     return (
       <>
@@ -611,33 +594,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
-
-      {/* Quick Actions - Liquid Glass Card */}
-      <Card className="glass-card-solid">
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="text-base sm:text-lg text-foreground">{t('quickActions')}</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">
-            {language === 'th' ? 'การดำเนินการที่ใช้บ่อย' : 'Frequently used actions'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
-          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3">
-            {role && quickActions[role]?.map((action) => (
-              <Button 
-                key={action.href} 
-                variant="outline" 
-                asChild 
-                className="w-full sm:w-auto justify-start sm:justify-center h-10 sm:h-9 text-sm hover:shadow-lg hover:border-primary/40 rounded-2xl transition-all duration-200"
-              >
-                <Link to={action.href} className="gap-2">
-                  <action.icon className="h-4 w-4 text-primary" />
-                  {action.label}
-                </Link>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Detail Dialog - Liquid Glass Style */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
