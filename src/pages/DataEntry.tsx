@@ -313,50 +313,68 @@ export default function DataEntry() {
   };
 
   // On-demand record loader. Scopes the query server-side by the current
-  // Company / Site / Period / Status filters so only the relevant slice is
-  // pulled (never the whole table). Dimension/Theme are refined client-side.
-  // Capped at MAX_RECORDS most-recent rows; `count` reports the true total.
-  const MAX_RECORDS = 2000;
+  // Company / Site / Period / Status filters, then paginates through ALL
+  // matching rows (PostgREST caps a single request at ~1000) so the table
+  // shows every record in the selected scope — no artificial limit.
+  // Dimension/Theme are refined client-side on the loaded set.
+  const PAGE = 1000;
   const fetchRecords = async () => {
     setLoading(true);
     setHasSearched(true);
     setLoadProgress({ loaded: 0, total: null });
     try {
-      let q = supabase
-        .from('metric_value')
-        .select(
-          'value_id, metric_id, site_id, period_id, value, status, data_source, remark, submitted_by, created_at',
-          { count: 'exact' },
-        );
+      const companyScopeIds =
+        !filterSite && filterCompany
+          ? (sites.filter(s => s.company_id === filterCompany).map(s => s.site_id) || [])
+          : null;
 
-      if (filterSite) {
-        q = q.eq('site_id', filterSite);
-      } else if (filterCompany) {
-        const ids = sites.filter(s => s.company_id === filterCompany).map(s => s.site_id);
-        q = q.in('site_id', ids.length ? ids : ['__none__']);
+      const all: MetricValue[] = [];
+      let from = 0;
+      let total: number | null = null;
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        let q = supabase
+          .from('metric_value')
+          .select(
+            'value_id, metric_id, site_id, period_id, value, status, data_source, remark, submitted_by, created_at',
+            from === 0 ? { count: 'exact' } : undefined,
+          );
+
+        if (filterSite) q = q.eq('site_id', filterSite);
+        else if (companyScopeIds) q = q.in('site_id', companyScopeIds.length ? companyScopeIds : ['__none__']);
+        if (filterPeriod) q = q.eq('period_id', filterPeriod);
+        if (filterStatus) q = q.eq('status', filterStatus);
+
+        const { data, count, error } = await q
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+
+        if (from === 0 && count != null) {
+          total = count;
+          setLoadProgress(prev => ({ ...prev, total: count }));
+        }
+        (data || []).forEach(v => all.push({
+          value_id: v.value_id,
+          metric_id: v.metric_id,
+          site_id: v.site_id,
+          period_id: v.period_id,
+          value: v.value,
+          status: v.status,
+          data_source: v.data_source,
+          remark: v.remark,
+          submitted_by: v.submitted_by,
+          created_at: v.created_at,
+        }));
+        setLoadProgress(prev => ({ ...prev, loaded: all.length }));
+
+        if (!data || data.length < PAGE) break;
+        from += PAGE;
       }
-      if (filterPeriod) q = q.eq('period_id', filterPeriod);
-      if (filterStatus) q = q.eq('status', filterStatus);
 
-      const { data, count, error } = await q
-        .order('created_at', { ascending: false })
-        .limit(MAX_RECORDS);
-      if (error) throw error;
-
-      setTotalDbCount(count ?? (data?.length ?? 0));
-      setMetricValues((data || []).map(v => ({
-        value_id: v.value_id,
-        metric_id: v.metric_id,
-        site_id: v.site_id,
-        period_id: v.period_id,
-        value: v.value,
-        status: v.status,
-        data_source: v.data_source,
-        remark: v.remark,
-        submitted_by: v.submitted_by,
-        created_at: v.created_at,
-      })));
-      setLoadProgress({ loaded: data?.length ?? 0, total: count ?? (data?.length ?? 0) });
+      setTotalDbCount(total ?? all.length);
+      setMetricValues(all);
       invalidateMetricValueCache();
     } catch (error) {
       console.error('Error fetching records:', error);
@@ -1365,13 +1383,6 @@ export default function DataEntry() {
                 <X className="h-3.5 w-3.5" />
                 {language === 'th' ? 'ล้างตัวกรอง' : 'Clear filters'}
               </Button>
-            )}
-            {hasSearched && totalDbCount > MAX_RECORDS && (
-              <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1">
-                {language === 'th'
-                  ? `แสดง ${MAX_RECORDS.toLocaleString()} รายการล่าสุด จากทั้งหมด ${totalDbCount.toLocaleString()} — กรองเพิ่มเพื่อดูให้แคบลง`
-                  : `Showing latest ${MAX_RECORDS.toLocaleString()} of ${totalDbCount.toLocaleString()} — narrow the filters to see more`}
-              </span>
             )}
           </div>
 
