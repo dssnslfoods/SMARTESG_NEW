@@ -10,7 +10,7 @@ import {
 import {
   BookOpen, LayoutDashboard, Network, FileInput, BarChart3, Leaf, Heart, Scale,
   Cloud, Globe, Building2, MapPin, Calendar, Layers, Tag, Activity, Target,
-  LayoutGrid, Settings, Users, History, HardDrive, Lightbulb, Rocket, ShieldCheck,
+  LayoutGrid, Settings, Users, History, HardDrive, Lightbulb, Rocket, ShieldCheck, KeyRound,
 } from 'lucide-react';
 
 // ─── Guide content, keyed by sidebar menu key ────────────────────────────────
@@ -79,21 +79,21 @@ const GUIDES: Guide[] = [
     introEn: 'Where you record ESG metric values for a company, site and reporting period.',
     introTh: 'หน้าสำหรับบันทึกค่าตัวชี้วัด ESG ตามบริษัท สถานที่ และรอบรายงาน',
     stepsEn: [
-      'Click "Add Data" to open the entry form.',
-      'Pick Company → Site → Reporting Period (the period list comes from master data).',
-      'Choose the Dimension → Theme → Metric you are recording.',
+      'The top cards show your overall totals (Database / Visible / Draft / Submitted) immediately, even before any records are loaded.',
+      'To view records: choose the Company / Site / Period / Status filters, then click "Search / Load Records" — only the selected scope is loaded, so the page stays fast.',
+      'To add data: click "Add Data", pick Company → Site → Reporting Period, then Dimension → Theme → Metric.',
       'Enter the Value, set Status to Draft (work-in-progress) or Submit (final), then Save.',
-      'Use the filters and search on the records table to find, edit (✏️) or delete (🗑️) entries.',
+      'In the results table, edit (✏️) or delete (🗑️) entries — actions shown depend on your data-entry permission.',
     ],
     stepsTh: [
-      'กด "Add Data" เพื่อเปิดฟอร์มบันทึก',
-      'เลือก บริษัท → สถานที่ → รอบรายงาน (รายการรอบมาจากข้อมูลหลัก)',
-      'เลือก มิติ → หัวข้อ → ตัวชี้วัด ที่ต้องการบันทึก',
+      'การ์ดด้านบนแสดงยอดรวมทั้งหมด (ทั้งหมด / ที่เห็น / ร่าง / ส่งแล้ว) ทันที แม้ยังไม่ได้โหลดรายการ',
+      'ดูรายการ: เลือกตัวกรอง บริษัท / สถานที่ / รอบ / สถานะ แล้วกด "ค้นหา / แสดงข้อมูล" — ระบบดึงเฉพาะขอบเขตที่เลือก ทำให้หน้าโหลดเร็ว',
+      'เพิ่มข้อมูล: กด "Add Data" เลือก บริษัท → สถานที่ → รอบรายงาน แล้ว มิติ → หัวข้อ → ตัวชี้วัด',
       'กรอกค่า เลือกสถานะ Draft (ร่าง) หรือ Submit (ส่ง/ขั้นสุดท้าย) แล้วกด Save',
-      'ใช้ตัวกรองและช่องค้นหาในตาราง เพื่อค้นหา แก้ไข (✏️) หรือลบ (🗑️) ข้อมูล',
+      'ในตารางผลลัพธ์ แก้ไข (✏️) หรือลบ (🗑️) ได้ — ปุ่มที่แสดงขึ้นกับสิทธิ์บันทึกข้อมูลของคุณ',
     ],
-    tipTh: 'ตัวชี้วัดที่ตั้งเป็นโหมดคำนวณอัตโนมัติจะกรอกค่าเองไม่ได้ — ช่องค่าจะถูกล็อกและระบบคำนวณให้',
-    tipEn: 'Metrics set to auto-calculation can’t be typed in — the value field is locked and the system computes it.',
+    tipTh: 'ตัวชี้วัดที่ตั้งโหมดคำนวณอัตโนมัติจะกรอกค่าเองไม่ได้ (ช่องค่าถูกล็อก) · เมื่อกดค้นหา ระบบจะโหลด “ครบทุกรายการ” ในขอบเขตที่เลือก',
+    tipEn: 'Auto-calculation metrics can’t be typed in (the value field is locked). When you search, ALL records in the selected scope are loaded.',
   },
   {
     key: 'reports', section: 'main', icon: BarChart3,
@@ -322,6 +322,26 @@ const GUIDES: Guide[] = [
     ],
     tipTh: 'Admin เห็นทุกเมนูเสมอ — หน้านี้ควบคุมเฉพาะ role อื่น',
     tipEn: 'Admin always sees every menu — this page controls the other roles.',
+  },
+  {
+    key: 'master/data-entry-permissions', section: 'master', icon: KeyRound,
+    titleEn: 'Data Entry Permissions', titleTh: 'สิทธิ์บันทึกข้อมูล',
+    introEn: 'Admin sets what each role can do in Data Entry — create, scope, edit and delete.',
+    introTh: 'Admin กำหนดว่าแต่ละ role ทำอะไรได้บ้างในหน้า Data Entry — สร้าง / ขอบเขต / แก้ไข / ลบ',
+    stepsEn: [
+      'For each role set: Can Create (on/off).',
+      'Create Scope: any company/site, own company only, or own site only (from the user’s profile).',
+      'Edit and Delete: all records, own only (records the user created), or not allowed.',
+      'Changes apply per tenant and take effect after the user refreshes Data Entry.',
+    ],
+    stepsTh: [
+      'ตั้งต่อ role: สร้างข้อมูลได้ (เปิด/ปิด)',
+      'ขอบเขตการสร้าง: ทุกบริษัท/สถานที่ · เฉพาะบริษัทที่สังกัด · เฉพาะสถานที่ที่สังกัด (อิงโปรไฟล์ผู้ใช้)',
+      'แก้ไข/ลบ: ทุกรายการ · เฉพาะที่ตนสร้าง · ไม่อนุญาต',
+      'มีผลเฉพาะ tenant ของคุณ และเห็นผลหลังผู้ใช้ refresh หน้า Data Entry',
+    ],
+    tipTh: 'Admin บันทึก/แก้ไข/ลบได้ทุกอย่างเสมอ — หน้านี้ควบคุมเฉพาะ role อื่น',
+    tipEn: 'Admin always has full data-entry access — this page controls the other roles.',
   },
   {
     key: 'master/settings', section: 'master', icon: Settings,
