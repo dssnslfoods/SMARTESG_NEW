@@ -137,6 +137,9 @@ export default function DataEntry() {
   const [factors, setFactors] = useState<EmissionFactor[]>([]);
   const [ghgMappings, setGhgMappings] = useState<GhgMapping[]>([]);
   const [totalDbCount, setTotalDbCount] = useState<number>(0); // Actual count in database
+  // Server-side summary counters (shown in the top cards even before records
+  // are loaded), so the dashboard never shows 0 while the table is on demand.
+  const [summary, setSummary] = useState({ total: 0, draft: 0, submitted: 0 });
   const [loading, setLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number | null }>({ loaded: 0, total: null });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -274,7 +277,24 @@ export default function DataEntry() {
 
   useEffect(() => {
     fetchMasterData();
+    fetchSummary();
   }, []);
+
+  // Pull RLS-respecting counters (total / draft / submitted) for the top cards.
+  const fetchSummary = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_dashboard_metric_stats');
+      if (error) throw error;
+      const s = data as any;
+      setSummary({
+        total: Number(s?.total ?? 0),
+        draft: Number(s?.draft ?? 0),
+        submitted: Number(s?.submitted ?? 0),
+      });
+    } catch (e) {
+      console.error('Error fetching summary:', e);
+    }
+  };
 
   // Master data only (small lists for the form + filters). Loaded on mount.
   // Metric VALUE records are intentionally NOT loaded here — see fetchRecords().
@@ -376,6 +396,7 @@ export default function DataEntry() {
       setTotalDbCount(total ?? all.length);
       setMetricValues(all);
       invalidateMetricValueCache();
+      fetchSummary(); // keep the top cards in sync after a load / mutation
     } catch (error) {
       console.error('Error fetching records:', error);
     } finally {
@@ -1150,7 +1171,7 @@ export default function DataEntry() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-800">{totalDbCount.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-gray-800">{summary.total.toLocaleString()}</p>
             <p className="text-xs text-purple-600 mt-1">{language === 'th' ? 'รายการทั้งหมด' : 'total entries'}</p>
           </CardContent>
         </Card>
@@ -1166,7 +1187,7 @@ export default function DataEntry() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-800">{metricValues.length.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-gray-800">{(hasSearched ? metricValues.length : summary.total).toLocaleString()}</p>
             <p className="text-xs text-gray-500 mt-1">{language === 'th' ? 'รายการ' : 'entries'}</p>
           </CardContent>
         </Card>
@@ -1182,7 +1203,7 @@ export default function DataEntry() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-800">{metricValues.filter(v => v.status === 'draft').length.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-gray-800">{summary.draft.toLocaleString()}</p>
             <p className="text-xs text-amber-600 mt-1">{language === 'th' ? 'รอดำเนินการ' : 'pending'}</p>
           </CardContent>
         </Card>
@@ -1198,7 +1219,7 @@ export default function DataEntry() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-800">{metricValues.filter(v => v.status === 'submitted').length.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-gray-800">{summary.submitted.toLocaleString()}</p>
             <p className="text-xs text-blue-600 mt-1">{language === 'th' ? 'เสร็จสิ้น' : 'completed'}</p>
           </CardContent>
         </Card>
