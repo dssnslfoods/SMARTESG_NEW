@@ -215,6 +215,7 @@ export default function DataEntry() {
   const [filterPeriod, setFilterPeriod] = useState<string>("");
   const [filterDimension, setFilterDimension] = useState<string>("");
   const [filterTheme, setFilterTheme] = useState<string>("");
+  const [filterMetric, setFilterMetric] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
   // Records are loaded on demand (filter-first + Search), not on page load.
   const [hasSearched, setHasSearched] = useState(false);
@@ -866,9 +867,15 @@ export default function DataEntry() {
     ? themes.filter(t => t.dimension_id === filterDimension)
     : themes;
 
+  // Metric dropdown options narrow by the selected Theme, else by Dimension.
+  const themeIdsInDimension = filterDimension
+    ? new Set(themes.filter(t => t.dimension_id === filterDimension).map(t => t.theme_id))
+    : null;
   const filteredMetrics = filterTheme
     ? metrics.filter(m => m.theme_id === filterTheme)
-    : metrics;
+    : themeIdsInDimension
+      ? metrics.filter(m => themeIdsInDimension.has(m.theme_id))
+      : metrics;
 
   // Form filtered data
   const formFilteredThemes = formDimension
@@ -945,6 +952,7 @@ export default function DataEntry() {
     if (filterSite && v.site_id !== filterSite) return false;
     if (filterPeriod && v.period_id !== filterPeriod) return false;
     if (filterStatus && v.status !== filterStatus) return false;
+    if (filterMetric && v.metric_id !== filterMetric) return false;
     if (filterTheme) {
       const metric = metrics.find(m => m.metric_id === v.metric_id);
       if (metric?.theme_id !== filterTheme) return false;
@@ -965,7 +973,7 @@ export default function DataEntry() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterCompany, filterSite, filterPeriod, filterDimension, filterTheme, filterStatus]);
+  }, [filterCompany, filterSite, filterPeriod, filterDimension, filterTheme, filterMetric, filterStatus]);
 
   const unique = (items: string[]) => Array.from(new Set(items)).filter(Boolean);
 
@@ -1334,7 +1342,7 @@ export default function DataEntry() {
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'มิติ ESG' : 'Dimension'}</Label>
-              <Select value={filterDimension || "__all__"} onValueChange={(v) => { setFilterDimension(v === "__all__" ? "" : v); setFilterTheme(''); }}>
+              <Select value={filterDimension || "__all__"} onValueChange={(v) => { setFilterDimension(v === "__all__" ? "" : v); setFilterTheme(''); setFilterMetric(''); }}>
                 <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
                   <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
                 </SelectTrigger>
@@ -1350,7 +1358,7 @@ export default function DataEntry() {
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'หัวข้อ ESG' : 'Theme'}</Label>
-              <Select value={filterTheme || "__all__"} onValueChange={(v) => setFilterTheme(v === "__all__" ? "" : v)}>
+              <Select value={filterTheme || "__all__"} onValueChange={(v) => { setFilterTheme(v === "__all__" ? "" : v); setFilterMetric(''); }}>
                 <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
                   <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
                 </SelectTrigger>
@@ -1359,6 +1367,22 @@ export default function DataEntry() {
                   {filteredThemes.map((theme) => (
                     <SelectItem key={theme.theme_id} value={theme.theme_id}>
                       {theme.theme_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">{language === 'th' ? 'ตัวชี้วัด' : 'Metric'}</Label>
+              <Select value={filterMetric || "__all__"} onValueChange={(v) => setFilterMetric(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="bg-white/80 backdrop-blur border-gray-200 rounded-xl hover:border-emerald-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all">
+                  <SelectValue placeholder={language === 'th' ? 'ทั้งหมด' : 'All'} />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50 max-h-72">
+                  <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
+                  {filteredMetrics.map((metric) => (
+                    <SelectItem key={metric.metric_id} value={metric.metric_id}>
+                      {metric.metric_name}{metric.unit ? ` (${metric.unit})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1397,7 +1421,7 @@ export default function DataEntry() {
                 variant="outline"
                 onClick={() => {
                   setFilterCompany(''); setFilterSite(''); setFilterPeriod('');
-                  setFilterDimension(''); setFilterTheme(''); setFilterStatus('');
+                  setFilterDimension(''); setFilterTheme(''); setFilterMetric(''); setFilterStatus('');
                 }}
                 className="gap-1.5 rounded-xl"
               >
