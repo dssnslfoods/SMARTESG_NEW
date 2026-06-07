@@ -33,6 +33,42 @@ interface EmissionFactor {
   reference_detail?: string | null; effective_year?: number | null; active?: boolean | null;
 }
 interface Mapping { mapping_id: string; target_code: string; source_code: string; }
+interface RefRow {
+  ref_id: string; activity_code: string; activity_name_th: string | null; activity_name_en: string | null;
+  scope: number | null; factor: number | null; unit: string | null; source: string | null;
+  reference_detail: string | null; effective_year: number | null; active: boolean | null;
+}
+
+// ─── Fuzzy name matching (guide EF from the reference library) ──────────────────
+const normalize = (s: string | null | undefined) =>
+  (s ?? '').toLowerCase().replace(/[()_\-/.,:]/g, ' ').replace(/\s+/g, ' ').trim();
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const prev = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let prevDiag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j];
+      prev[j] = Math.min(
+        prev[j] + 1,
+        prev[j - 1] + 1,
+        prevDiag + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+      prevDiag = tmp;
+    }
+  }
+  return prev[b.length];
+}
+function strRatio(a: string, b: string): number {
+  if (!a && !b) return 1;
+  const max = Math.max(a.length, b.length);
+  return max === 0 ? 0 : 1 - levenshtein(a, b) / max;
+}
 
 export default function GhgSettings() {
   const { profile } = useAuth();
@@ -46,29 +82,33 @@ export default function GhgSettings() {
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
   const [factors, setFactors] = useState<EmissionFactor[]>([]);
   const [mappings, setMappings] = useState<Mapping[]>([]);
+  const [refs, setRefs] = useState<RefRow[]>([]);          // imported reference library
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showRefs, setShowRefs] = useState(false);
 
-  // new factor draft
-  const [newF, setNewF] = useState({ source_code: '', scope: '1', factor_value: '', factor_unit: '', source: '' });
+  // Per-activity editable EF draft, keyed by activity code: { value, unit, scope }
+  const [efDraft, setEfDraft] = useState<Record<string, { value: string; unit: string; scope: string }>>({});
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [mRes, thRes, dRes, fRes, gRes] = await Promise.all([
+      const [mRes, thRes, dRes, fRes, gRes, rRes] = await Promise.all([
         supabase.from('esg_metric').select('metric_id, metric_name, unit, code, calc_mode, theme_id').order('metric_name'),
         supabase.from('esg_theme').select('theme_id, dimension_id'),
         supabase.from('esg_dimension').select('dimension_id, dimension_name'),
         supabase.from('emission_factor').select('*').order('scope'),
         supabase.from('ghg_calc_mapping').select('*'),
+        supabase.from('emission_factor_reference').select('*'),
       ]);
       setMetrics((mRes.data ?? []) as Metric[]);
       setThemes((thRes.data ?? []) as Theme[]);
       setDimensions((dRes.data ?? []) as Dimension[]);
       setFactors((fRes.data ?? []) as EmissionFactor[]);
       setMappings((gRes.data ?? []) as Mapping[]);
+      setRefs((rRes.data ?? []) as RefRow[]);
     } catch (e) {
       console.error('GhgSettings fetch error:', e);
     } finally {
@@ -91,6 +131,28 @@ export default function GhgSettings() {
 
   const metricByCode = useMemo(() => new Map(metrics.map(m => [m.code ?? '', m])), [metrics]);
   const factorCodes = useMemo(() => new Set(factors.map(f => f.source_code)), [factors]);
+  const factorByCode = useMemo(() => new Map(factors.map(f => [f.source_code, f])), [factors]);
+
+  // Closest reference-library row for a system activity (exact code → fuzzy name).
+  const bestRefMatch = (m: Metric): { ref: RefRow; score: number } | null => {
+    if (refs.length === 0) return null;
+    const mTh = normalize(m.metric_name);
+    const mCode = (m.code ?? '').toUpperCase();
+    let best: RefRow | null = null;
+    let bestScore = 0;
+    for (const r of refs) {
+      if (r.active === false) continue;
+      if (r.activity_code && mCode && r.activity_code.toUpperCase() === mCode) return { ref: r, score: 1 };
+      const cands = [
+        r.activity_name_th, r.activity_name_en,
+        [r.activity_name_th, r.activity_name_en].filter(Boolean).join(' '),
+      ].map(normalize).filter(Boolean);
+      let s = 0;
+      for (const c of cands) s = Math.max(s, strRatio(mTh, c));
+      if (s > bestScore) { bestScore = s; best = r; }
+    }
+    return best ? { ref: best, score: bestScore } : null;
+  };
 
   // Emission-generating ACTIVITIES (sources): Environment-dimension metrics that
   // have a code and aren't themselves a GHG output (CO₂e) metric.
@@ -134,20 +196,15 @@ export default function GhgSettings() {
   };
 
   const exportFactors = async () => {
-    const rows = factors.map(f => [
-      f.source_code,
-      f.activity_name_th ?? (metricByCode.get(f.source_code)?.metric_name ?? ''),
-      f.activity_name_en ?? '',
-      f.scope,
-      f.factor_value,
-      f.factor_unit ?? '',
-      f.source ?? '',
-      f.reference_detail ?? '',
-      f.effective_year ?? '',
-      f.active === false ? 'FALSE' : 'TRUE',
+    // Export the reference library (round-trips with import).
+    const rows = refs.map(r => [
+      r.activity_code, r.activity_name_th ?? '', r.activity_name_en ?? '',
+      r.scope ?? '', r.factor ?? '', r.unit ?? '', r.source ?? '',
+      r.reference_detail ?? '', r.effective_year ?? '',
+      r.active === false ? 'FALSE' : 'TRUE',
     ]);
     const stamp = new Date().toISOString().slice(0, 10);
-    await buildAndDownload(rows, `GHG_EmissionFactors_${stamp}.xlsx`);
+    await buildAndDownload(rows, `GHG_EmissionFactor_Reference_${stamp}.xlsx`);
   };
 
   const downloadTemplate = async () => {
@@ -196,10 +253,10 @@ export default function GhgSettings() {
         const scope = cScope >= 0 ? (parseInt(String(r[cScope]), 10) || 1) : 1;
         upserts.push({
           tenant_id: tenantId,
-          source_code: code,
+          activity_code: code,
           scope: scope >= 1 && scope <= 3 ? scope : 1,
-          factor_value: factor,
-          factor_unit: cUnit >= 0 ? String(r[cUnit] ?? '').trim() || null : null,
+          factor,
+          unit: cUnit >= 0 ? String(r[cUnit] ?? '').trim() || null : null,
           source: cSource >= 0 ? String(r[cSource] ?? '').trim() || null : null,
           activity_name_th: cTh >= 0 ? String(r[cTh] ?? '').trim() || null : null,
           activity_name_en: cEn >= 0 ? String(r[cEn] ?? '').trim() || null : null,
@@ -210,21 +267,24 @@ export default function GhgSettings() {
       }
       if (upserts.length === 0) throw new Error(th ? 'ไม่พบแถวข้อมูลที่ใช้ได้' : 'No valid rows to import');
 
-      const existing = new Set(factors.map(f => f.source_code));
-      const inserted = upserts.filter(u => !existing.has(u.source_code)).length;
+      const existing = new Set(refs.map(r => r.activity_code));
+      const inserted = upserts.filter(u => !existing.has(u.activity_code)).length;
       const updated = upserts.length - inserted;
 
+      // Import populates the REFERENCE library — a lookup source for guiding EFs,
+      // not the active factors the GHG calc uses.
       const { error } = await supabase
-        .from('emission_factor')
-        .upsert(upserts, { onConflict: 'tenant_id,source_code' });
+        .from('emission_factor_reference')
+        .upsert(upserts, { onConflict: 'tenant_id,activity_code' });
       if (error) throw error;
 
       await fetchAll();
+      setShowRefs(true);
       toast({
-        title: th ? 'นำเข้าสำเร็จ' : 'Import complete',
+        title: th ? 'นำเข้าตารางอ้างอิงสำเร็จ' : 'Reference imported',
         description: th
-          ? `เพิ่ม ${inserted} · อัปเดต ${updated}${skipped ? ` · ข้าม ${skipped}` : ''} รายการ`
-          : `${inserted} added · ${updated} updated${skipped ? ` · ${skipped} skipped` : ''}`,
+          ? `เพิ่ม ${inserted} · อัปเดต ${updated}${skipped ? ` · ข้าม ${skipped}` : ''} รายการอ้างอิง`
+          : `${inserted} added · ${updated} updated${skipped ? ` · ${skipped} skipped` : ''} reference rows`,
       });
     } catch (e: any) {
       toast({ variant: 'destructive', title: th ? 'นำเข้าไม่สำเร็จ' : 'Import failed', description: e.message });
@@ -235,40 +295,46 @@ export default function GhgSettings() {
   };
 
   // ── Emission factor: add ──────────────────────────────────────────────────
-  const addFactor = async () => {
-    if (!tenantId || !newF.source_code || !newF.factor_value) {
-      toast({ title: th ? 'กรอกข้อมูลไม่ครบ' : 'Missing fields', description: th ? 'เลือกกิจกรรมและใส่ค่า Factor' : 'Pick an activity and enter a factor', variant: 'destructive' });
+  // Effective EF view for one activity row: the saved factor if any, otherwise
+  // the value guided from the closest reference-library match.
+  const efFor = (m: Metric) => {
+    const current = m.code ? factorByCode.get(m.code) ?? null : null;
+    const match = bestRefMatch(m);
+    const draft = m.code ? efDraft[m.code] : undefined;
+    const value = draft?.value ?? (current ? String(current.factor_value) : (match?.ref.factor != null ? String(match.ref.factor) : ''));
+    const unit = draft?.unit ?? (current?.factor_unit ?? match?.ref.unit ?? (m.unit ? `kgCO2e/${m.unit}` : ''));
+    const scope = draft?.scope ?? (current ? String(current.scope) : String(match?.ref.scope ?? 1));
+    return { current, match, value, unit, scope };
+  };
+
+  // Save the (edited or suggested) EF for one activity into emission_factor.
+  const saveActivityFactor = async (m: Metric) => {
+    if (!tenantId || !m.code) return;
+    const { current, match, value, unit, scope } = efFor(m);
+    const num = Number(value);
+    if (!Number.isFinite(num) || value === '') {
+      toast({ title: th ? 'ใส่ค่า Factor เป็นตัวเลข' : 'Enter a numeric factor', variant: 'destructive' });
       return;
     }
-    setBusy('add-factor');
+    setBusy('save-' + m.code);
     try {
       const { error } = await supabase.from('emission_factor').upsert({
         tenant_id: tenantId,
-        source_code: newF.source_code,
-        scope: Number(newF.scope),
-        factor_value: Number(newF.factor_value),
-        factor_unit: newF.factor_unit || null,
-        source: newF.source || null,
+        source_code: m.code,
+        scope: Number(scope) || 1,
+        factor_value: num,
+        factor_unit: unit || null,
+        source: current?.source ?? match?.ref.source ?? null,
       }, { onConflict: 'tenant_id,source_code' });
       if (error) throw error;
-      setNewF({ source_code: '', scope: '1', factor_value: '', factor_unit: '', source: '' });
       await fetchAll();
-      toast({ title: th ? 'บันทึกสำเร็จ' : 'Saved' });
+      setEfDraft(p => { const n = { ...p }; delete n[m.code!]; return n; });
+      toast({ title: th ? 'บันทึกค่า EF แล้ว' : 'EF saved' });
     } catch (e: any) {
       toast({ title: th ? 'ผิดพลาด' : 'Error', description: e.message, variant: 'destructive' });
     } finally { setBusy(null); }
   };
 
-  const deleteFactor = async (factor_id: string) => {
-    setBusy(factor_id);
-    try {
-      const { error } = await supabase.from('emission_factor').delete().eq('factor_id', factor_id);
-      if (error) throw error;
-      await fetchAll();
-    } catch (e: any) {
-      toast({ title: th ? 'ผิดพลาด' : 'Error', description: e.message, variant: 'destructive' });
-    } finally { setBusy(null); }
-  };
 
   // ── Toggle a metric's calc_mode ───────────────────────────────────────────
   const setCalcMode = async (metric: Metric, auto: boolean) => {
@@ -355,9 +421,9 @@ export default function GhgSettings() {
                 <FileSpreadsheet className="h-3.5 w-3.5" />
                 {th ? 'เทมเพลต' : 'Template'}
               </Button>
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={exportFactors} disabled={factors.length === 0}>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={exportFactors} disabled={refs.length === 0}>
                 <Download className="h-3.5 w-3.5" />
-                {th ? 'ส่งออก' : 'Export'}
+                {th ? 'ส่งออกอ้างอิง' : 'Export Ref'}
               </Button>
               <Button size="sm" className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => fileInputRef.current?.click()} disabled={importing}>
                 {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
@@ -367,85 +433,142 @@ export default function GhgSettings() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* existing factors */}
+          {/* How it works */}
+          <p className="text-[11px] text-muted-foreground bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+            {th
+              ? 'ตารางด้านล่างคือ “กิจกรรมของระบบ” ระบบจะ guide ค่า EF จากตารางอ้างอิงที่ import (จับคู่ด้วยชื่อใกล้เคียงที่สุด) — คุณแก้ค่าได้ แล้วกดบันทึก ค่าที่บันทึกจะถูกใช้คำนวณ GHG จริง'
+              : 'The table below lists your system activities. The system guides each EF from the imported reference library (closest-name match) — edit the value and Save; saved values are what the GHG calc uses.'}
+          </p>
+
+          {/* Activity-based EF table (guided + editable) */}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[640px]">
+            <table className="w-full text-sm min-w-[760px]">
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="pb-2 font-medium">{th ? 'กิจกรรม' : 'Activity'}</th>
-                  <th className="pb-2 font-medium">Scope</th>
-                  <th className="pb-2 font-medium text-right">{th ? 'ค่า Factor' : 'Factor'}</th>
-                  <th className="pb-2 font-medium">{th ? 'หน่วย' : 'Unit'}</th>
-                  <th className="pb-2 font-medium">{th ? 'แหล่งอ้างอิง' : 'Source'}</th>
-                  <th className="pb-2"></th>
+                  <th className="pb-2 font-medium">{th ? 'กิจกรรมของระบบ' : 'System Activity'}</th>
+                  <th className="pb-2 font-medium">{th ? 'แนะนำจากอ้างอิง' : 'Guided from reference'}</th>
+                  <th className="pb-2 font-medium w-24">Scope</th>
+                  <th className="pb-2 font-medium w-28 text-right">{th ? 'ค่า EF' : 'EF value'}</th>
+                  <th className="pb-2 font-medium w-32">{th ? 'หน่วย' : 'Unit'}</th>
+                  <th className="pb-2 w-20"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {factors.length === 0 && (
-                  <tr><td colSpan={6} className="py-4 text-center text-xs text-muted-foreground italic">{th ? 'ยังไม่มี Emission Factor' : 'No emission factors yet'}</td></tr>
+                {activityMetrics.length === 0 && (
+                  <tr><td colSpan={6} className="py-4 text-center text-xs text-muted-foreground italic">{th ? 'ไม่มีกิจกรรมด้านสิ่งแวดล้อมในระบบ' : 'No environmental activities in the system'}</td></tr>
                 )}
-                {factors.map(f => (
-                  <tr key={f.factor_id} className="text-slate-700">
-                    <td className="py-2 font-medium">{nameForCode(f.source_code)}<span className="text-[10px] text-muted-foreground/60 font-mono ml-1">{f.source_code}</span></td>
-                    <td className="py-2"><Badge variant="outline" className={`text-[10px] ${SCOPE_BADGE[f.scope]}`}>Scope {f.scope}</Badge></td>
-                    <td className="py-2 text-right font-mono">{f.factor_value}</td>
-                    <td className="py-2 text-muted-foreground">{f.factor_unit}</td>
-                    <td className="py-2 text-xs text-muted-foreground">{f.source}</td>
-                    <td className="py-2 text-right">
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" disabled={busy === f.factor_id} onClick={() => deleteFactor(f.factor_id)}>
-                        {busy === f.factor_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {activityMetrics.map(m => {
+                  const { current, match, value, unit, scope } = efFor(m);
+                  const code = m.code!;
+                  const pct = match ? Math.round(match.score * 100) : 0;
+                  const matchColor = pct >= 85 ? 'text-emerald-600' : pct >= 60 ? 'text-amber-600' : 'text-slate-400';
+                  return (
+                    <tr key={m.metric_id} className="text-slate-700 align-top">
+                      <td className="py-2 pr-2">
+                        <span className="font-medium">{m.metric_name}</span>
+                        <span className="block text-[10px] text-muted-foreground/60 font-mono">{code}{m.unit ? ` · ${m.unit}` : ''}</span>
+                      </td>
+                      <td className="py-2 pr-2 text-xs">
+                        {match ? (
+                          <span className="inline-flex flex-col">
+                            <span className="text-slate-600">{match.ref.activity_name_th || match.ref.activity_name_en || match.ref.activity_code}</span>
+                            <span className="text-[10px]">
+                              <span className={`font-semibold ${matchColor}`}>{pct === 100 ? (th ? 'ตรงรหัส' : 'code match') : `${pct}%`}</span>
+                              {match.ref.factor != null && <span className="text-muted-foreground"> · {match.ref.factor} {match.ref.unit}</span>}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50 italic">{refs.length === 0 ? (th ? 'ยังไม่ import อ้างอิง' : 'no reference yet') : (th ? 'ไม่พบที่ใกล้เคียง' : 'no close match')}</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Select value={scope} onValueChange={(v) => setEfDraft(p => ({ ...p, [code]: { value, unit, scope: v } }))}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">Scope 1</SelectItem>
+                            <SelectItem value="2">Scope 2</SelectItem>
+                            <SelectItem value="3">Scope 3</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Input
+                          type="number" step="any" value={value}
+                          onChange={(e) => setEfDraft(p => ({ ...p, [code]: { value: e.target.value, unit, scope } }))}
+                          className="h-8 text-xs text-right font-mono" placeholder="—"
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Input
+                          value={unit}
+                          onChange={(e) => setEfDraft(p => ({ ...p, [code]: { value, unit: e.target.value, scope } }))}
+                          className="h-8 text-xs" placeholder="kgCO2e/L"
+                        />
+                      </td>
+                      <td className="py-2 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {current
+                            ? <Badge variant="outline" className="text-[9px] border-emerald-300 text-emerald-700 bg-emerald-50">{th ? 'บันทึกแล้ว' : 'saved'}</Badge>
+                            : value !== '' && <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 bg-amber-50">{th ? 'แนะนำ' : 'suggested'}</Badge>}
+                          <Button size="sm" className="h-7 px-2 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white" disabled={busy === 'save-' + code} onClick={() => saveActivityFactor(m)}>
+                            {busy === 'save-' + code ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* add new factor */}
-          <div className="rounded-xl border border-dashed border-border p-3 grid grid-cols-1 sm:grid-cols-6 gap-2 items-end">
-            <div className="sm:col-span-2">
-              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{th ? 'กิจกรรม' : 'Activity'}</label>
-              <Select value={newF.source_code} onValueChange={(v) => {
-                const m = metricByCode.get(v);
-                setNewF(p => ({ ...p, source_code: v, factor_unit: m?.unit ? `kgCO2e/${m.unit}` : p.factor_unit }));
-              }}>
-                <SelectTrigger className="h-9 text-xs"><SelectValue placeholder={th ? 'เลือกกิจกรรม' : 'Select activity'} /></SelectTrigger>
-                <SelectContent>
-                  {activityMetrics.length === 0 && (
-                    <div className="px-2 py-3 text-xs text-muted-foreground italic">{th ? 'ไม่มีกิจกรรมด้านสิ่งแวดล้อม' : 'No environmental activities'}</div>
-                  )}
-                  {activityMetrics.map(m => (
-                    <SelectItem key={m.metric_id} value={m.code!}>{m.metric_name}{m.unit ? ` (${m.unit})` : ''}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Scope</label>
-              <Select value={newF.scope} onValueChange={(v) => setNewF(p => ({ ...p, scope: v }))}>
-                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Scope 1</SelectItem>
-                  <SelectItem value="2">Scope 2</SelectItem>
-                  <SelectItem value="3">Scope 3</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{th ? 'ค่า Factor' : 'Factor'}</label>
-              <Input type="number" step="any" value={newF.factor_value} onChange={(e) => setNewF(p => ({ ...p, factor_value: e.target.value }))} className="h-9 text-xs" placeholder="2.7406" />
-            </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{th ? 'หน่วย' : 'Unit'}</label>
-              <Input value={newF.factor_unit} onChange={(e) => setNewF(p => ({ ...p, factor_unit: e.target.value }))} className="h-9 text-xs" placeholder="kgCO2e/L" />
-            </div>
-            <div className="flex gap-1.5">
-              <Input value={newF.source} onChange={(e) => setNewF(p => ({ ...p, source: e.target.value }))} className="h-9 text-xs flex-1" placeholder={th ? 'อ้างอิง' : 'Source'} />
-              <Button size="sm" className="h-9 gap-1 shrink-0" disabled={busy === 'add-factor'} onClick={addFactor}>
-                {busy === 'add-factor' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-              </Button>
-            </div>
+          {/* Reference library (read-only, imported from Excel) */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60">
+            <button
+              type="button"
+              onClick={() => setShowRefs(s => !s)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
+            >
+              <span className="flex items-center gap-1.5">
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                {th ? `ตารางอ้างอิง (Reference Library)` : 'Reference Library'} · {refs.length}
+              </span>
+              <span>{showRefs ? '▲' : '▼'}</span>
+            </button>
+            {showRefs && (
+              <div className="overflow-x-auto border-t border-slate-200 px-3 pb-3 pt-1">
+                {refs.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground italic py-3">{th ? 'ยังไม่มีข้อมูลอ้างอิง — กด “นำเข้า Excel”' : 'No reference rows yet — click “Import Excel”.'}</p>
+                ) : (
+                  <table className="w-full text-xs min-w-[640px]">
+                    <thead>
+                      <tr className="text-left text-[10px] text-muted-foreground border-b">
+                        <th className="py-1.5 font-medium">activity_code</th>
+                        <th className="py-1.5 font-medium">{th ? 'ชื่อ' : 'name'}</th>
+                        <th className="py-1.5 font-medium">scope</th>
+                        <th className="py-1.5 font-medium text-right">factor</th>
+                        <th className="py-1.5 font-medium">unit</th>
+                        <th className="py-1.5 font-medium">source</th>
+                        <th className="py-1.5 font-medium">year</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {refs.map(r => (
+                        <tr key={r.ref_id} className="text-slate-600">
+                          <td className="py-1.5 font-mono text-[11px]">{r.activity_code}</td>
+                          <td className="py-1.5">{r.activity_name_th || r.activity_name_en || '—'}</td>
+                          <td className="py-1.5">{r.scope ?? '—'}</td>
+                          <td className="py-1.5 text-right font-mono">{r.factor ?? '—'}</td>
+                          <td className="py-1.5 text-muted-foreground">{r.unit ?? '—'}</td>
+                          <td className="py-1.5 text-muted-foreground">{r.source ?? '—'}</td>
+                          <td className="py-1.5">{r.effective_year ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
