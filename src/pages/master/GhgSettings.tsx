@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -16,7 +16,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Cloud, Plus, Trash2, Loader2, Calculator, Factory, Save } from 'lucide-react';
+import { Cloud, Plus, Trash2, Loader2, Calculator, Factory, Save, Upload, Download, FileSpreadsheet } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Metric { metric_id: string; metric_name: string; unit: string | null; code: string | null; calc_mode: string; theme_id: string; }
@@ -26,7 +26,12 @@ interface Dimension { dimension_id: string; dimension_name: string; }
 // A metric whose unit looks like a CO₂-equivalent is a GHG OUTPUT (a target),
 // not an emission-generating activity.
 const isCO2e = (unit: string | null) => !!unit && /co2e/i.test(unit);
-interface EmissionFactor { factor_id: string; source_code: string; scope: number; factor_value: number; factor_unit: string | null; source: string | null; }
+interface EmissionFactor {
+  factor_id: string; source_code: string; scope: number; factor_value: number;
+  factor_unit: string | null; source: string | null;
+  activity_name_th?: string | null; activity_name_en?: string | null;
+  reference_detail?: string | null; effective_year?: number | null; active?: boolean | null;
+}
 interface Mapping { mapping_id: string; target_code: string; source_code: string; }
 
 export default function GhgSettings() {
@@ -46,6 +51,8 @@ export default function GhgSettings() {
 
   // new factor draft
   const [newF, setNewF] = useState({ source_code: '', scope: '1', factor_value: '', factor_unit: '', source: '' });
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -101,6 +108,130 @@ export default function GhgSettings() {
   const nameForCode = (code: string) => {
     const m = metricByCode.get(code);
     return m ? m.metric_name : code;
+  };
+
+  // ── Excel: column order shared by template / export / import ────────────────
+  const EF_COLUMNS = [
+    'activity_code', 'activity_name_th', 'activity_name_en', 'scope', 'factor',
+    'unit', 'source', 'reference_detail', 'effective_year', 'active',
+  ];
+
+  // Build an .xlsx workbook (README + EmissionFactors sheet) and download it.
+  const buildAndDownload = async (rows: any[][], filename: string) => {
+    const XLSX = await import('xlsx');
+    const wb = XLSX.utils.book_new();
+    const readme = XLSX.utils.aoa_to_sheet([
+      ['GHG Emission Factor — Import/Export'],
+      ['1 แถว = 1 emission factor · KEY = activity_code (UPPER_SNAKE_CASE) · ระบบ match การคำนวณด้วย code นี้'],
+      ['สูตร: GHG (kgCO2e) = activity_value × factor   →   tCO2e = ÷ 1000'],
+      ['คอลัมน์: ' + EF_COLUMNS.join(', ')],
+      ['scope = 1/2/3 · active = TRUE/FALSE · factor เป็นตัวเลขล้วน (ไม่มีหน่วย)'],
+    ]);
+    XLSX.utils.book_append_sheet(wb, readme, 'README');
+    const ws = XLSX.utils.aoa_to_sheet([EF_COLUMNS, ...rows]);
+    XLSX.utils.book_append_sheet(wb, ws, 'EmissionFactors');
+    XLSX.writeFile(wb, filename);
+  };
+
+  const exportFactors = async () => {
+    const rows = factors.map(f => [
+      f.source_code,
+      f.activity_name_th ?? (metricByCode.get(f.source_code)?.metric_name ?? ''),
+      f.activity_name_en ?? '',
+      f.scope,
+      f.factor_value,
+      f.factor_unit ?? '',
+      f.source ?? '',
+      f.reference_detail ?? '',
+      f.effective_year ?? '',
+      f.active === false ? 'FALSE' : 'TRUE',
+    ]);
+    const stamp = new Date().toISOString().slice(0, 10);
+    await buildAndDownload(rows, `GHG_EmissionFactors_${stamp}.xlsx`);
+  };
+
+  const downloadTemplate = async () => {
+    // A couple of TGO reference rows so users see the expected format.
+    const sample = [
+      ['DIESEL_FLEET', 'ปริมาณการใช้น้ำมันดีเซล (ยานพาหนะ)', 'Diesel Consumption (mobile)', 1, 2.7406, 'kgCO2e/L', 'TGO 2022', 'IPCC 2006 vol.2', 2022, 'TRUE'],
+      ['GRID_ELECTRICITY', 'ปริมาณการใช้ไฟฟ้าจากโครงข่าย', 'Grid Electricity', 2, 0.4999, 'kgCO2e/kWh', 'TGO Grid Mix', 'TGO grid emission factor', 2022, 'TRUE'],
+    ];
+    await buildAndDownload(sample, 'GHG_EmissionFactor_Template.xlsx');
+  };
+
+  // Parse the uploaded workbook and upsert factors by (tenant, activity_code).
+  const importFactors = async (file: File) => {
+    if (!tenantId) return;
+    setImporting(true);
+    try {
+      const XLSX = await import('xlsx');
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      // Prefer the EmissionFactors sheet; else the first sheet containing activity_code.
+      let aoa: any[][] | null = null;
+      const sheetNames = [...wb.SheetNames].sort(n => (/emission|factor/i.test(n) ? -1 : 1));
+      for (const name of sheetNames) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as any[][];
+        if (rows.some(r => r.some(c => String(c).trim().toLowerCase() === 'activity_code'))) { aoa = rows; break; }
+      }
+      if (!aoa) throw new Error(th ? 'ไม่พบคอลัมน์ activity_code ในไฟล์' : 'No "activity_code" column found in the file');
+
+      const headerIdx = aoa.findIndex(r => r.some(c => String(c).trim().toLowerCase() === 'activity_code'));
+      const headers = aoa[headerIdx].map(c => String(c).trim().toLowerCase());
+      const col = (name: string) => headers.indexOf(name);
+      const cAct = col('activity_code'), cFactor = col('factor'), cScope = col('scope'),
+        cUnit = col('unit'), cSource = col('source'), cTh = col('activity_name_th'),
+        cEn = col('activity_name_en'), cRef = col('reference_detail'),
+        cYear = col('effective_year'), cActive = col('active');
+
+      const seen = new Set<string>();
+      const upserts: any[] = [];
+      let skipped = 0;
+      for (const r of aoa.slice(headerIdx + 1)) {
+        const code = String(r[cAct] ?? '').trim().toUpperCase();
+        const factor = Number(r[cFactor]);
+        if (!code || !Number.isFinite(factor)) { skipped++; continue; }
+        if (seen.has(code)) { skipped++; continue; } // de-dupe within the file
+        seen.add(code);
+        const scope = cScope >= 0 ? (parseInt(String(r[cScope]), 10) || 1) : 1;
+        upserts.push({
+          tenant_id: tenantId,
+          source_code: code,
+          scope: scope >= 1 && scope <= 3 ? scope : 1,
+          factor_value: factor,
+          factor_unit: cUnit >= 0 ? String(r[cUnit] ?? '').trim() || null : null,
+          source: cSource >= 0 ? String(r[cSource] ?? '').trim() || null : null,
+          activity_name_th: cTh >= 0 ? String(r[cTh] ?? '').trim() || null : null,
+          activity_name_en: cEn >= 0 ? String(r[cEn] ?? '').trim() || null : null,
+          reference_detail: cRef >= 0 ? String(r[cRef] ?? '').trim() || null : null,
+          effective_year: cYear >= 0 && r[cYear] !== '' ? (parseInt(String(r[cYear]), 10) || null) : null,
+          active: cActive >= 0 ? !/^(false|0|no|n)$/i.test(String(r[cActive]).trim()) : true,
+        });
+      }
+      if (upserts.length === 0) throw new Error(th ? 'ไม่พบแถวข้อมูลที่ใช้ได้' : 'No valid rows to import');
+
+      const existing = new Set(factors.map(f => f.source_code));
+      const inserted = upserts.filter(u => !existing.has(u.source_code)).length;
+      const updated = upserts.length - inserted;
+
+      const { error } = await supabase
+        .from('emission_factor')
+        .upsert(upserts, { onConflict: 'tenant_id,source_code' });
+      if (error) throw error;
+
+      await fetchAll();
+      toast({
+        title: th ? 'นำเข้าสำเร็จ' : 'Import complete',
+        description: th
+          ? `เพิ่ม ${inserted} · อัปเดต ${updated}${skipped ? ` · ข้าม ${skipped}` : ''} รายการ`
+          : `${inserted} added · ${updated} updated${skipped ? ` · ${skipped} skipped` : ''}`,
+      });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: th ? 'นำเข้าไม่สำเร็จ' : 'Import failed', description: e.message });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   // ── Emission factor: add ──────────────────────────────────────────────────
@@ -201,13 +332,39 @@ export default function GhgSettings() {
       {/* ── Section 1: Emission Factors ────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Factory className="h-4 w-4 text-amber-600" />
-            {th ? 'ค่าสัมประสิทธิ์การปล่อย (Emission Factors)' : 'Emission Factors'}
-          </CardTitle>
-          <CardDescription className="text-xs">
-            {th ? 'kgCO₂e ต่อหน่วยกิจกรรม เช่น ดีเซล 2.7406 kgCO₂e/ลิตร (อ้างอิง TGO)' : 'kgCO₂e per activity unit, e.g. diesel 2.7406 kgCO₂e/L (TGO reference)'}
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Factory className="h-4 w-4 text-amber-600" />
+                {th ? 'ค่าสัมประสิทธิ์การปล่อย (Emission Factors)' : 'Emission Factors'}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {th ? 'kgCO₂e ต่อหน่วยกิจกรรม เช่น ดีเซล 2.7406 kgCO₂e/ลิตร (อ้างอิง TGO)' : 'kgCO₂e per activity unit, e.g. diesel 2.7406 kgCO₂e/L (TGO reference)'}
+              </CardDescription>
+            </div>
+            {/* Excel import / export — match factors by activity_code */}
+            <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) importFactors(f); }}
+              />
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={downloadTemplate}>
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                {th ? 'เทมเพลต' : 'Template'}
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={exportFactors} disabled={factors.length === 0}>
+                <Download className="h-3.5 w-3.5" />
+                {th ? 'ส่งออก' : 'Export'}
+              </Button>
+              <Button size="sm" className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                {th ? 'นำเข้า Excel' : 'Import Excel'}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {/* existing factors */}
