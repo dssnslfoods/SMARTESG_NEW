@@ -15,7 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Cloud, Loader2, Factory, Save, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { Cloud, Loader2, Factory, Save, Upload, Download, FileSpreadsheet, RotateCcw } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Metric { metric_id: string; metric_name: string; unit: string | null; code: string | null; calc_mode: string; theme_id: string; }
@@ -421,8 +421,37 @@ export default function GhgSettings() {
     } finally { setBusy(null); }
   };
 
+  // Restore every activity's EF to the value guided by the reference library
+  // (overwrites manual edits) — the standard you imported is the "default".
+  const restoreDefaults = async () => {
+    if (!tenantId) return;
+    const rows = activityMetrics
+      .map(m => ({ m, match: bestRefMatch(m) }))
+      .filter(({ m, match }) => m.code && match && match.ref.factor != null)
+      .map(({ m, match }) => ({
+        tenant_id: tenantId,
+        source_code: m.code,
+        scope: match!.ref.scope ?? 1,
+        factor_value: Number(match!.ref.factor),
+        factor_unit: match!.ref.unit ?? (m.unit ? `kgCO2e/${m.unit}` : null),
+        source: match!.ref.source ?? null,
+      }));
+    if (rows.length === 0) {
+      toast({ variant: 'destructive', title: th ? 'ไม่มีค่าอ้างอิงให้คืนค่า — กรุณานำเข้าคลังอ้างอิงก่อน' : 'No reference values — import the reference library first' });
+      return;
+    }
+    setBusy('restore');
+    try {
+      const { error } = await supabase.from('emission_factor').upsert(rows, { onConflict: 'tenant_id,source_code' });
+      if (error) throw error;
+      setEfDraft({});
+      await fetchAll();
+      toast({ title: th ? `คืนค่าเริ่มต้น ${rows.length} รายการแล้ว` : `Restored ${rows.length} factors to default` });
+    } catch (e: any) {
+      toast({ title: th ? 'ผิดพลาด' : 'Error', description: e.message, variant: 'destructive' });
+    } finally { setBusy(null); }
+  };
 
-  // ── Toggle a metric's calc_mode ───────────────────────────────────────────
   const SCOPE_BADGE: Record<number, string> = {
     1: 'bg-red-100 text-red-700 border-red-200',
     2: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -494,12 +523,36 @@ export default function GhgSettings() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* How it works */}
-          <p className="text-[11px] text-muted-foreground bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-            {th
-              ? 'ตารางด้านล่างคือ “กิจกรรมของระบบ” ระบบจะ guide ค่า EF จากคลังอ้างอิงที่นำเข้า (จับคู่ด้วยชื่อใกล้เคียงที่สุด) — ค่าที่เป็น “suggested” ยังไม่ถูกใช้ ต้องกด Save ก่อน · ค่าที่ “saved” เท่านั้นที่ระบบใช้คำนวณ GHG'
-              : 'The table below lists your system activities. The system guides each EF from the imported reference library (closest-name match) — “suggested” values are NOT used until you Save; only “saved” values feed the GHG calc.'}
-          </p>
+          {/* How it works + restore-to-default */}
+          <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+            <p className="flex-1 text-[11px] text-muted-foreground bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              {th
+                ? 'ตารางด้านล่างคือ “กิจกรรมของระบบ” ระบบจะ guide ค่า EF จากคลังอ้างอิงที่นำเข้า (จับคู่ด้วยชื่อใกล้เคียงที่สุด) — ค่าที่เป็น “suggested” ยังไม่ถูกใช้ ต้องกด Save ก่อน · ค่าที่ “saved” เท่านั้นที่ระบบใช้คำนวณ GHG'
+                : 'The table below lists your system activities. The system guides each EF from the imported reference library (closest-name match) — “suggested” values are NOT used until you Save; only “saved” values feed the GHG calc.'}
+            </p>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs shrink-0" disabled={refs.length === 0 || busy === 'restore'}>
+                  {busy === 'restore' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                  {th ? 'คืนค่าเริ่มต้น' : 'Restore to default'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{th ? 'คืนค่า EF เป็นค่าจากคลังอ้างอิง?' : 'Restore EF to reference defaults?'}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {th
+                      ? 'ระบบจะตั้งค่า EF (ค่า/หน่วย/Scope) ของทุกกิจกรรมที่จับคู่กับคลังอ้างอิงได้ กลับไปเป็นค่ามาตรฐานจากคลังอ้างอิง — ค่าที่คุณแก้ไขเองจะถูกเขียนทับ การกระทำนี้มีผลเฉพาะ tenant ของคุณ'
+                      : 'This sets every activity that matches the reference library back to the reference standard EF (value/unit/scope), overwriting your manual edits. Affects only your tenant.'}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{th ? 'ยกเลิก' : 'Cancel'}</AlertDialogCancel>
+                  <AlertDialogAction onClick={restoreDefaults}>{th ? 'คืนค่าเริ่มต้น' : 'Restore'}</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
 
           {/* Save-all-suggested bar — only when there are unsaved suggestions */}
           {suggestedRows.length > 0 && (
