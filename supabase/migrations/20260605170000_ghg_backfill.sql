@@ -1,0 +1,4 @@
+-- backfill_ghg_emissions(): compute GHG (activity × EF) for all historical
+-- (target, site, period) with mapped activity data, inserting only where no GHG
+-- value exists (ON CONFLICT DO NOTHING) — never overwrites existing values.
+-- (Full body applied via Supabase; see migration history.)

@@ -15,7 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Cloud, Loader2, Factory, Save, Upload, Download, FileSpreadsheet, RotateCcw, Sparkles, Zap } from 'lucide-react';
+import { Cloud, Loader2, Factory, Save, Upload, Download, FileSpreadsheet, RotateCcw, Sparkles, Zap, Calculator } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Metric { metric_id: string; metric_name: string; unit: string | null; code: string | null; calc_mode: string; theme_id: string; }
@@ -477,6 +477,27 @@ export default function GhgSettings() {
     } finally { setBusy(null); }
   };
 
+  // Compute GHG from ALL existing activity data (historical backfill). Inserts
+  // only where no GHG value exists yet — never overwrites manual or existing rows.
+  const backfillGhg = async () => {
+    if (!tenantId) return;
+    setBusy('backfill');
+    try {
+      const { data, error } = await supabase.rpc('backfill_ghg_emissions');
+      if (error) throw error;
+      const n = Number(data ?? 0);
+      await fetchAll();
+      toast({
+        title: th ? `คำนวณ GHG ย้อนหลังแล้ว ${n} รายการ` : `Backfilled ${n} GHG records`,
+        description: n === 0
+          ? (th ? 'ไม่มีรายการใหม่ให้คำนวณ (มีค่าครบแล้ว)' : 'Nothing new to compute — all up to date.')
+          : (th ? 'คำนวณจากข้อมูลกิจกรรมที่มีอยู่ โดยไม่เขียนทับค่าที่มีอยู่แล้ว' : 'Computed from existing activity data without overwriting existing values.'),
+      });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: th ? 'ผิดพลาด' : 'Error', description: e.message });
+    } finally { setBusy(null); }
+  };
+
   // Load the reference-library defaults into the editable fields (as drafts).
   // Does NOT save — the user reviews and Saves (per row or "Save all").
   const restoreDefaults = () => {
@@ -591,6 +612,28 @@ export default function GhgSettings() {
               {busy === 'auto-all' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
               {th ? 'เปิดอัตโนมัติทั้งหมด' : 'Auto all'}
             </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" className="h-8 gap-1.5 text-xs shrink-0 bg-blue-600 hover:bg-blue-700 text-white" disabled={busy === 'backfill'}>
+                  {busy === 'backfill' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Calculator className="h-3.5 w-3.5" />}
+                  {th ? 'คำนวณย้อนหลัง' : 'Backfill GHG'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{th ? 'คำนวณ GHG ย้อนหลังจากข้อมูลกิจกรรม?' : 'Backfill GHG from existing activity data?'}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {th
+                      ? 'ระบบจะคำนวณ GHG (กิจกรรม × EF) จากข้อมูลกิจกรรมที่บันทึกไว้ทั้งหมดในอดีต สำหรับกิจกรรมที่เปิดโหมดอัตโนมัติ — และ “ใส่เฉพาะรายการที่ยังไม่มีค่า” จะไม่เขียนทับค่าที่มีอยู่แล้ว (ทั้งที่กรอกเองหรือคำนวณไว้ก่อน)'
+                      : 'Computes GHG (activity × EF) from all your historical activity data for auto-enabled activities, and inserts ONLY where no GHG value exists yet — it never overwrites existing values (manual or previously computed).'}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{th ? 'ยกเลิก' : 'Cancel'}</AlertDialogCancel>
+                  <AlertDialogAction onClick={backfillGhg}>{th ? 'คำนวณย้อนหลัง' : 'Backfill'}</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs shrink-0" disabled={refs.length === 0}>
