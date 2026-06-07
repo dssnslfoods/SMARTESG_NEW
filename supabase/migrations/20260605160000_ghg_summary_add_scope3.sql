@@ -1,0 +1,3 @@
+-- get_ghg_summary() now includes Scope 3 (GHG_SCOPE3) across ytd / monthly /
+-- by_site / yearly / target, plus a has_scope3 flag so the UI can adapt.
+-- (Full body applied via Supabase; see migration history.)

@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Cloud, Factory, Zap, TrendingDown, TrendingUp, Target, RefreshCcw, Loader2,
+  Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
+} from '@/components/ui/tooltip';
+import {
+  Cloud, Factory, Zap, TrendingDown, TrendingUp, Target, RefreshCcw, Loader2, Info, Layers,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ResponsiveContainer,
@@ -14,22 +16,38 @@ import {
 
 interface GhgSummary {
   year: number; prev_year: number; current_month: number; unit: string; tenant: string;
-  ytd: { scope1: number; scope2: number; total: number };
+  has_scope3: boolean;
+  ytd: { scope1: number; scope2: number; scope3: number; total: number };
   prev_ytd: { total: number };
-  monthly: Array<{ month: string; scope1: number; scope2: number }>;
-  by_site: Array<{ site: string; scope1: number; scope2: number; total: number }>;
-  yearly: Array<{ year: number; scope1: number; scope2: number; total: number }>;
-  target: { scope1: number | null; scope2: number | null };
+  monthly: Array<{ month: string; scope1: number; scope2: number; scope3: number }>;
+  by_site: Array<{ site: string; scope1: number; scope2: number; scope3: number; total: number }>;
+  yearly: Array<{ year: number; scope1: number; scope2: number; scope3: number; total: number }>;
+  target: { scope1: number | null; scope2: number | null; scope3: number | null };
 }
 
-const S1 = '#ef4444'; // scope 1 red
-const S2 = '#f59e0b'; // scope 2 amber
+const S1 = '#ef4444'; // scope 1 — red
+const S2 = '#f59e0b'; // scope 2 — amber
+const S3 = '#3b82f6'; // scope 3 — blue
 
 function fmt(n: number): string {
   if (n == null) return '—';
   if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
   if (Math.abs(n) >= 1_000) return (n / 1_000).toFixed(1) + 'k';
   return n.toLocaleString(undefined, { maximumFractionDigits: 1 });
+}
+
+// Small (i) tooltip used on every card to explain how to read it.
+function InfoTip({ text }: { text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" className="text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[260px] whitespace-pre-line text-xs leading-relaxed">{text}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 export default function GhgDashboard() {
@@ -59,12 +77,13 @@ export default function GhgDashboard() {
   }
   if (!data) return null;
 
+  const has3 = !!data.has_scope3;
   const months = th
     ? ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
     : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const reportingPeriod = `${months[0]}–${months[data.current_month - 1]} ${data.year}`;
 
-  const totalTarget = (data.target.scope1 ?? 0) + (data.target.scope2 ?? 0);
+  const totalTarget = (data.target.scope1 ?? 0) + (data.target.scope2 ?? 0) + (has3 ? (data.target.scope3 ?? 0) : 0);
   const yoy = data.prev_ytd.total > 0
     ? ((data.ytd.total - data.prev_ytd.total) / data.prev_ytd.total) * 100
     : null;
@@ -73,16 +92,20 @@ export default function GhgDashboard() {
   const donut = [
     { name: th ? 'Scope 1 (ทางตรง)' : 'Scope 1 (direct)', value: data.ytd.scope1, color: S1 },
     { name: th ? 'Scope 2 (ไฟฟ้า)' : 'Scope 2 (electricity)', value: data.ytd.scope2, color: S2 },
+    ...(has3 ? [{ name: th ? 'Scope 3 (ทางอ้อมอื่น)' : 'Scope 3 (other indirect)', value: data.ytd.scope3, color: S3 }] : []),
   ];
   const monthlyChart = data.monthly.map(m => ({ ...m, label: m.month.slice(2) }));
-  // yearly with a target marker on the current year
   const yearlyChart = data.yearly.map(y => ({
     year: String(y.year),
     total: y.total,
     target: y.year === data.year && totalTarget > 0 ? totalTarget : null,
   }));
 
+  const scopeLabel = (n: string) => (n === 'scope1' ? 'Scope 1' : n === 'scope2' ? 'Scope 2' : 'Scope 3');
+  const totalLabel = has3 ? (th ? 'รวมทุก Scope (YTD)' : 'Total all scopes (YTD)') : (th ? 'รวม Scope 1+2 (YTD)' : 'Total Scope 1+2 (YTD)');
+
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -102,17 +125,28 @@ export default function GhgDashboard() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard icon={Cloud}   color="from-slate-700 to-slate-900"  label={th ? 'รวม Scope 1+2 (YTD)' : 'Total Scope 1+2 (YTD)'}
-                 value={fmt(data.ytd.total)} sub="tCO₂e" />
+      <div className={`grid grid-cols-2 gap-3 ${has3 ? 'md:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        <KpiCard icon={Cloud}   color="from-slate-700 to-slate-900"  label={totalLabel}
+                 value={fmt(data.ytd.total)} sub="tCO₂e"
+                 tip={th ? 'ผลรวมการปล่อย GHG ของทุก Scope สะสมตั้งแต่ต้นปีถึงเดือนปัจจุบัน (YTD) — ตัวเลขรวมที่ใช้รายงานภาพรวม' : 'Sum of GHG across all scopes, year-to-date (Jan→current month). The headline total.'} />
         <KpiCard icon={Factory} color="from-red-500 to-rose-600"     label={th ? 'Scope 1 — ทางตรง' : 'Scope 1 — Direct'}
-                 value={fmt(data.ytd.scope1)} sub="tCO₂e" />
+                 value={fmt(data.ytd.scope1)} sub="tCO₂e"
+                 tip={th ? 'การปล่อยทางตรงจากแหล่งที่องค์กรเป็นเจ้าของ/ควบคุม เช่น เผาไหม้น้ำมันดีเซลในรถ/เครื่องจักร' : 'Direct emissions from sources you own/control — e.g. burning diesel in vehicles/machinery.'} />
         <KpiCard icon={Zap}     color="from-amber-500 to-orange-600" label={th ? 'Scope 2 — ไฟฟ้า' : 'Scope 2 — Electricity'}
-                 value={fmt(data.ytd.scope2)} sub="tCO₂e" />
+                 value={fmt(data.ytd.scope2)} sub="tCO₂e"
+                 tip={th ? 'การปล่อยทางอ้อมจากพลังงานที่ซื้อมาใช้ เช่น ไฟฟ้าจากโครงข่าย (คำนวณจากปริมาณไฟฟ้า × emission factor)' : 'Indirect emissions from purchased energy, e.g. grid electricity (kWh × emission factor).'} />
+        {has3 && (
+          <KpiCard icon={Layers} color="from-blue-500 to-indigo-600" label={th ? 'Scope 3 — ทางอ้อมอื่น' : 'Scope 3 — Other indirect'}
+                   value={fmt(data.ytd.scope3)} sub="tCO₂e"
+                   tip={th ? 'การปล่อยทางอ้อมอื่น ๆ ในห่วงโซ่คุณค่า เช่น ของเสีย น้ำ การขนส่งภายนอก พนักงานเดินทาง' : 'Other indirect value-chain emissions — e.g. waste, water, outsourced transport, business travel.'} />
+        )}
         <Card className="overflow-hidden border-0 shadow-sm">
           <CardContent className="p-3.5">
             <div className="flex items-start justify-between mb-2">
-              <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{th ? 'เทียบปีก่อน (YoY)' : 'Year-over-Year'}</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1">
+                {th ? 'เทียบปีก่อน (YoY)' : 'Year-over-Year'}
+                <InfoTip text={th ? 'เปรียบเทียบ YTD ปีนี้กับช่วงเดียวกันของปีก่อน · ค่าติดลบ = ปล่อยลดลง (ดี) · บวก = เพิ่มขึ้น' : 'This year’s YTD vs the same period last year. Negative = emissions fell (good); positive = rose.'} />
+              </p>
               <div className={`rounded-lg p-1.5 ${yoyGood ? 'bg-emerald-100' : 'bg-red-100'}`}>
                 {yoyGood ? <TrendingDown className="h-3.5 w-3.5 text-emerald-600" /> : <TrendingUp className="h-3.5 w-3.5 text-red-600" />}
               </div>
@@ -128,7 +162,12 @@ export default function GhgDashboard() {
       {/* Scope breakdown donut + Net Zero trajectory */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Card className="lg:col-span-1">
-          <CardHeader className="pb-1"><CardTitle className="text-sm flex items-center gap-1.5"><Target className="h-3.5 w-3.5 text-emerald-500" />{th ? 'สัดส่วนตาม Scope (YTD)' : 'Breakdown by Scope (YTD)'}</CardTitle></CardHeader>
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <Target className="h-3.5 w-3.5 text-emerald-500" />{th ? 'สัดส่วนตาม Scope (YTD)' : 'Breakdown by Scope (YTD)'}
+              <span className="ml-auto"><InfoTip text={th ? 'สัดส่วน % ของการปล่อยแต่ละ Scope ในยอดรวม YTD — ช่วยดูว่าแหล่งปล่อยหลักมาจาก Scope ไหน' : 'Each scope’s share of the YTD total — shows where most emissions come from.'} /></span>
+            </CardTitle>
+          </CardHeader>
           <CardContent>
             <div className="relative" style={{ height: 190 }}>
               <ResponsiveContainer>
@@ -147,12 +186,18 @@ export default function GhgDashboard() {
             <div className="space-y-1.5 mt-1">
               <Row color={S1} label={th ? 'Scope 1 (ทางตรง)' : 'Scope 1 (direct)'} value={data.ytd.scope1} total={data.ytd.total} />
               <Row color={S2} label={th ? 'Scope 2 (ไฟฟ้า)' : 'Scope 2 (electricity)'} value={data.ytd.scope2} total={data.ytd.total} />
+              {has3 && <Row color={S3} label={th ? 'Scope 3 (ทางอ้อมอื่น)' : 'Scope 3 (other indirect)'} value={data.ytd.scope3} total={data.ytd.total} />}
             </div>
           </CardContent>
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader className="pb-1"><CardTitle className="text-sm flex items-center gap-1.5"><TrendingDown className="h-3.5 w-3.5 text-emerald-500" />{th ? 'เส้นทางสู่ Net Zero (รายปี)' : 'Net-Zero Trajectory (yearly)'}</CardTitle></CardHeader>
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <TrendingDown className="h-3.5 w-3.5 text-emerald-500" />{th ? 'เส้นทางสู่ Net Zero (รายปี)' : 'Net-Zero Trajectory (yearly)'}
+              <span className="ml-auto"><InfoTip text={th ? 'แท่ง = การปล่อยรวมจริงรายปี (ทุก Scope) · เส้นประ = เป้าหมายปีปัจจุบัน — แท่งควรลดลงเข้าหาเส้นเป้าเพื่อมุ่งสู่ Net Zero' : 'Bars = actual total emissions per year (all scopes); dashed line = current-year target. Bars should trend down toward the target.'} /></span>
+            </CardTitle>
+          </CardHeader>
           <CardContent className="pt-2 pb-4">
             <div style={{ width: '100%', height: 230 }}>
               <ResponsiveContainer>
@@ -176,7 +221,12 @@ export default function GhgDashboard() {
       {/* Monthly stacked + by site */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <Card>
-          <CardHeader className="pb-1"><CardTitle className="text-sm flex items-center gap-1.5"><Cloud className="h-3.5 w-3.5 text-blue-500" />{th ? 'รายเดือน (12 เดือน) — Scope 1+2' : 'Monthly (12 mo) — Scope 1+2'}</CardTitle></CardHeader>
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <Cloud className="h-3.5 w-3.5 text-blue-500" />{th ? `รายเดือน (12 เดือน) — ${has3 ? 'ทุก Scope' : 'Scope 1+2'}` : `Monthly (12 mo) — ${has3 ? 'all scopes' : 'Scope 1+2'}`}
+              <span className="ml-auto"><InfoTip text={th ? 'แนวโน้มการปล่อยรายเดือน 12 เดือนล่าสุด · แต่ละแท่งซ้อนสีตาม Scope (แดง=1 เหลือง=2 น้ำเงิน=3) · ดูฤดูกาล/เดือนที่ปล่อยสูง' : 'Last 12 months of emissions; each bar is stacked by scope (red=1, amber=2, blue=3). Spot seasonal/high-emission months.'} /></span>
+            </CardTitle>
+          </CardHeader>
           <CardContent className="pt-2 pb-4">
             <div style={{ width: '100%', height: 230 }}>
               <ResponsiveContainer>
@@ -184,10 +234,11 @@ export default function GhgDashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => fmt(v)} />
-                  <ReTooltip formatter={(v: number, n: string) => [`${fmt(v)} tCO₂e`, n === 'scope1' ? 'Scope 1' : 'Scope 2']} />
+                  <ReTooltip formatter={(v: number, n: string) => [`${fmt(v)} tCO₂e`, scopeLabel(n)]} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="scope1" name="Scope 1" stackId="a" fill={S1} />
-                  <Bar dataKey="scope2" name="Scope 2" stackId="a" fill={S2} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="scope2" name="Scope 2" stackId="a" fill={S2} radius={has3 ? undefined : [4, 4, 0, 0]} />
+                  {has3 && <Bar dataKey="scope3" name="Scope 3" stackId="a" fill={S3} radius={[4, 4, 0, 0]} />}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -195,7 +246,12 @@ export default function GhgDashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-1"><CardTitle className="text-sm flex items-center gap-1.5"><Factory className="h-3.5 w-3.5 text-purple-500" />{th ? 'รายสถานที่ (ปีนี้)' : 'By Site (this year)'}</CardTitle></CardHeader>
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <Factory className="h-3.5 w-3.5 text-purple-500" />{th ? 'รายสถานที่ (ปีนี้)' : 'By Site (this year)'}
+              <span className="ml-auto"><InfoTip text={th ? 'การปล่อยรวมรายสถานที่ปีนี้ แยกสีตาม Scope (แท่งซ้อน) · เรียงจากมากไปน้อย — สถานที่บนสุดปล่อยมากสุด ควรให้ความสำคัญก่อน' : 'This year’s emissions per site, stacked by scope, sorted high→low. The top site emits the most — prioritise it.'} /></span>
+            </CardTitle>
+          </CardHeader>
           <CardContent className="pt-2 pb-4">
             <div style={{ width: '100%', height: 230 }}>
               <ResponsiveContainer>
@@ -203,10 +259,11 @@ export default function GhgDashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v: number) => fmt(v)} />
                   <YAxis type="category" dataKey="site" tick={{ fontSize: 10 }} width={130} />
-                  <ReTooltip formatter={(v: number, n: string) => [`${fmt(v)} tCO₂e`, n === 'scope1' ? 'Scope 1' : 'Scope 2']} />
+                  <ReTooltip formatter={(v: number, n: string) => [`${fmt(v)} tCO₂e`, scopeLabel(n)]} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="scope1" name="Scope 1" stackId="b" fill={S1} />
-                  <Bar dataKey="scope2" name="Scope 2" stackId="b" fill={S2} radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="scope2" name="Scope 2" stackId="b" fill={S2} radius={has3 ? undefined : [0, 4, 4, 0]} />
+                  {has3 && <Bar dataKey="scope3" name="Scope 3" stackId="b" fill={S3} radius={[0, 4, 4, 0]} />}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -215,18 +272,23 @@ export default function GhgDashboard() {
       </div>
 
       <p className="text-xs text-muted-foreground text-center pb-2 italic">
-        {th ? '💡 สอดคล้องมาตรฐาน GHG Protocol (Scope 1 = ทางตรง, Scope 2 = พลังงานซื้อ)' : '💡 Aligned with the GHG Protocol (Scope 1 = direct, Scope 2 = purchased energy)'}
+        {th
+          ? '💡 สอดคล้องมาตรฐาน GHG Protocol — Scope 1 = ทางตรง · Scope 2 = พลังงานที่ซื้อ · Scope 3 = ทางอ้อมอื่นในห่วงโซ่คุณค่า'
+          : '💡 Aligned with the GHG Protocol — Scope 1 = direct · Scope 2 = purchased energy · Scope 3 = other value-chain indirect'}
       </p>
     </div>
+    </TooltipProvider>
   );
 }
 
-function KpiCard({ icon: Icon, color, label, value, sub }: { icon: typeof Cloud; color: string; label: string; value: string; sub: string }) {
+function KpiCard({ icon: Icon, color, label, value, sub, tip }: { icon: typeof Cloud; color: string; label: string; value: string; sub: string; tip?: string }) {
   return (
     <Card className="overflow-hidden border-0 shadow-sm">
       <CardContent className="p-3.5">
         <div className="flex items-start justify-between mb-2">
-          <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground leading-tight">{label}</p>
+          <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground leading-tight flex items-center gap-1">
+            {label}{tip && <InfoTip text={tip} />}
+          </p>
           <div className={`rounded-lg bg-gradient-to-br ${color} p-1.5 shrink-0`}><Icon className="h-3.5 w-3.5 text-white" /></div>
         </div>
         <p className="text-2xl font-bold text-slate-900 leading-none">{value}</p>
