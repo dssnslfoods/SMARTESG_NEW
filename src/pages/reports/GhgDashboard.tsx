@@ -234,7 +234,7 @@ export default function GhgDashboard() {
           <CardHeader className="pb-1">
             <CardTitle className="text-sm flex items-center gap-1.5">
               <Cloud className="h-3.5 w-3.5 text-blue-500" />{th ? `รายเดือน (12 เดือน) — ${has3 ? 'ทุก Scope' : 'Scope 1+2'}` : `Monthly (12 mo) — ${has3 ? 'all scopes' : 'Scope 1+2'}`}
-              <span className="ml-auto"><InfoTip text={th ? 'แนวโน้มการปล่อยรายเดือน 12 เดือนล่าสุด · แต่ละแท่งซ้อนสีตาม Scope (แดง=1 เหลือง=2 น้ำเงิน=3) · ดูฤดูกาล/เดือนที่ปล่อยสูง' : 'Last 12 months of emissions; each bar is stacked by scope (red=1, amber=2, blue=3). Spot seasonal/high-emission months.'} /></span>
+              <span className="ml-auto"><InfoTip text={th ? 'แนวโน้มการปล่อยรายเดือน 12 เดือนล่าสุด · แท่งซ้อนสีตาม Scope (แดง=1 เหลือง=2 น้ำเงิน=3) · เส้นประแนวนอน = เป้าเฉลี่ยต่อเดือน (เป้าทั้งปี ÷ 12) — เดือนที่เกินเส้นคือปล่อยเกินเป้า' : 'Last 12 months, stacked by scope (red=1, amber=2, blue=3). Dashed line = monthly average target (annual target ÷ 12) — months above the line exceed target pace.'} /></span>
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-2 pb-4">
@@ -249,6 +249,15 @@ export default function GhgDashboard() {
                   <Bar dataKey="scope1" name="Scope 1" stackId="a" fill={S1} />
                   <Bar dataKey="scope2" name="Scope 2" stackId="a" fill={S2} radius={has3 ? undefined : [4, 4, 0, 0]} />
                   {has3 && <Bar dataKey="scope3" name="Scope 3" stackId="a" fill={S3} radius={[4, 4, 0, 0]} />}
+                  {totalTarget > 0 && (
+                    <ReferenceLine
+                      y={totalTarget / 12} stroke="#0f766e" strokeWidth={2} strokeDasharray="6 4" ifOverflow="extendDomain"
+                      label={{
+                        value: `${th ? 'เป้าเฉลี่ย/เดือน ≤' : 'monthly avg ≤'} ${fmt(totalTarget / 12)}`,
+                        position: 'insideTopRight', fill: '#0f766e', fontSize: 10, fontWeight: 700,
+                      }}
+                    />
+                  )}
                 </BarChart>
               </ResponsiveContainer>
             </div>
