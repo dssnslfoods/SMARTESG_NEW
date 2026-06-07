@@ -609,19 +609,22 @@ export default function GhgSettings() {
                   <div className="mt-3 pt-3 border-t border-emerald-200/60">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">{th ? 'รวมจากกิจกรรม (ที่มี Emission Factor)' : 'Sum from activities (with an emission factor)'}</p>
                     <div className="flex flex-wrap gap-2">
-                      {[...factorCodes].length === 0 && (
-                        <span className="text-[11px] text-amber-600 italic">{th ? 'ยังไม่มี Emission Factor — เพิ่มด้านบนก่อน' : 'No emission factors yet — add one above first'}</span>
+                      {activityMetrics.filter(m => factorCodes.has(m.code ?? '')).length === 0 && (
+                        <span className="text-[11px] text-amber-600 italic">{th ? 'ยังไม่มีกิจกรรมที่บันทึกค่า EF — ตั้งค่าด้านบนก่อน' : 'No activities with a saved EF yet — set one above first'}</span>
                       )}
-                      {[...factorCodes].map(code => {
-                        const checked = targetSources.includes(code);
-                        const cellId = `${target.code}:${code}`;
-                        return (
-                          <label key={code} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 cursor-pointer text-xs transition ${checked ? 'border-emerald-400 bg-white' : 'border-border bg-white/60 hover:bg-white'}`}>
-                            <Checkbox checked={checked} disabled={busy === cellId} onCheckedChange={(v) => toggleMapping(target.code!, code, !!v)} />
-                            {nameForCode(code)}
-                          </label>
-                        );
-                      })}
+                      {activityMetrics
+                        .filter(m => m.code && factorCodes.has(m.code))
+                        .map(m => {
+                          const code = m.code!;
+                          const checked = targetSources.includes(code);
+                          const cellId = `${target.code}:${code}`;
+                          return (
+                            <label key={code} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 cursor-pointer text-xs transition ${checked ? 'border-emerald-400 bg-white' : 'border-border bg-white/60 hover:bg-white'}`}>
+                              <Checkbox checked={checked} disabled={busy === cellId} onCheckedChange={(v) => toggleMapping(target.code!, code, !!v)} />
+                              {m.metric_name}
+                            </label>
+                          );
+                        })}
                     </div>
                   </div>
                 )}
