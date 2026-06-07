@@ -94,7 +94,10 @@ export default function GhgDashboard() {
     { name: th ? 'Scope 2 (ไฟฟ้า)' : 'Scope 2 (electricity)', value: data.ytd.scope2, color: S2 },
     ...(has3 ? [{ name: th ? 'Scope 3 (ทางอ้อมอื่น)' : 'Scope 3 (other indirect)', value: data.ytd.scope3, color: S3 }] : []),
   ];
-  const monthlyChart = data.monthly.map(m => ({ ...m, label: m.month.slice(2) }));
+  // Monthly chart = current-year YTD only (Jan → current month).
+  const monthlyChart = data.monthly
+    .filter(m => m.month.startsWith(String(data.year)))
+    .map(m => ({ ...m, label: months[parseInt(m.month.slice(5, 7), 10) - 1] ?? m.month.slice(2) }));
   const yearlyChart = data.yearly.map(y => ({
     year: String(y.year),
     scope1: y.scope1, scope2: y.scope2, scope3: y.scope3,
@@ -233,8 +236,8 @@ export default function GhgDashboard() {
         <Card>
           <CardHeader className="pb-1">
             <CardTitle className="text-sm flex items-center gap-1.5">
-              <Cloud className="h-3.5 w-3.5 text-blue-500" />{th ? `รายเดือน (12 เดือน) — ${has3 ? 'ทุก Scope' : 'Scope 1+2'}` : `Monthly (12 mo) — ${has3 ? 'all scopes' : 'Scope 1+2'}`}
-              <span className="ml-auto"><InfoTip text={th ? 'แนวโน้มการปล่อยรายเดือน 12 เดือนล่าสุด · แท่งซ้อนสีตาม Scope (แดง=1 เหลือง=2 น้ำเงิน=3) · เส้นประแนวนอน = เป้าเฉลี่ยต่อเดือน (เป้าทั้งปี ÷ 12) — เดือนที่เกินเส้นคือปล่อยเกินเป้า' : 'Last 12 months, stacked by scope (red=1, amber=2, blue=3). Dashed line = monthly average target (annual target ÷ 12) — months above the line exceed target pace.'} /></span>
+              <Cloud className="h-3.5 w-3.5 text-blue-500" />{th ? `รายเดือน (YTD ${data.year}) — ${has3 ? 'ทุก Scope' : 'Scope 1+2'}` : `Monthly (YTD ${data.year}) — ${has3 ? 'all scopes' : 'Scope 1+2'}`}
+              <span className="ml-auto"><InfoTip text={th ? `การปล่อยรายเดือนสะสมปีนี้ (ม.ค.–เดือนปัจจุบัน ${data.year}) · แท่งซ้อนสีตาม Scope (แดง=1 เหลือง=2 น้ำเงิน=3) · เส้นประแนวนอน = เป้าเฉลี่ยต่อเดือน (เป้าทั้งปี ÷ 12) — เดือนที่เกินเส้นคือปล่อยเกินเป้า` : `This year’s monthly emissions YTD (Jan→current month ${data.year}), stacked by scope (red=1, amber=2, blue=3). Dashed line = monthly average target (annual ÷ 12) — months above it exceed target pace.`} /></span>
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-2 pb-4">
