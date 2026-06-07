@@ -335,6 +335,45 @@ export default function GhgSettings() {
     } finally { setBusy(null); }
   };
 
+  // Activities that currently show a (numeric) suggested value but aren't saved.
+  const suggestedRows = useMemo(
+    () => activityMetrics.filter(m => {
+      if (!m.code || factorByCode.has(m.code)) return false; // already saved
+      const draft = efDraft[m.code];
+      const match = bestRefMatch(m);
+      const value = draft?.value ?? (match?.ref.factor != null ? String(match.ref.factor) : '');
+      return value !== '' && Number.isFinite(Number(value));
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activityMetrics, factorByCode, efDraft, refs],
+  );
+
+  // Save every suggested (unsaved) activity factor in one batch.
+  const saveAllSuggested = async () => {
+    if (!tenantId || suggestedRows.length === 0) return;
+    setBusy('save-all');
+    try {
+      const rows = suggestedRows.map(m => {
+        const { value, unit, scope, match } = efFor(m);
+        return {
+          tenant_id: tenantId,
+          source_code: m.code,
+          scope: Number(scope) || 1,
+          factor_value: Number(value),
+          factor_unit: unit || null,
+          source: match?.ref.source ?? null,
+        };
+      });
+      const { error } = await supabase.from('emission_factor').upsert(rows, { onConflict: 'tenant_id,source_code' });
+      if (error) throw error;
+      setEfDraft({});
+      await fetchAll();
+      toast({ title: th ? `บันทึก ${rows.length} รายการที่แนะนำแล้ว` : `Saved ${rows.length} suggested factors` });
+    } catch (e: any) {
+      toast({ title: th ? 'ผิดพลาด' : 'Error', description: e.message, variant: 'destructive' });
+    } finally { setBusy(null); }
+  };
+
 
   // ── Toggle a metric's calc_mode ───────────────────────────────────────────
   const setCalcMode = async (metric: Metric, auto: boolean) => {
@@ -417,18 +456,26 @@ export default function GhgSettings() {
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) importFactors(f); }}
               />
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={downloadTemplate}>
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                {th ? 'เทมเพลต' : 'Template'}
-              </Button>
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={exportFactors} disabled={refs.length === 0}>
-                <Download className="h-3.5 w-3.5" />
-                {th ? 'ส่งออกอ้างอิง' : 'Export Ref'}
-              </Button>
-              <Button size="sm" className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => fileInputRef.current?.click()} disabled={importing}>
-                {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                {th ? 'นำเข้า Excel' : 'Import Excel'}
-              </Button>
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                  <FileSpreadsheet className="h-3 w-3" />
+                  {th ? 'คลังอ้างอิง EF (Excel)' : 'EF Reference Library (Excel)'}
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/70 p-1.5">
+                  <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs bg-white" onClick={downloadTemplate}>
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-slate-500" />
+                    {th ? 'ดาวน์โหลดเทมเพลต' : 'Template'}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs bg-white" onClick={exportFactors} disabled={refs.length === 0}>
+                    <Download className="h-3.5 w-3.5 text-slate-500" />
+                    {th ? 'ส่งออกอ้างอิง' : 'Export Reference'}
+                  </Button>
+                  <Button size="sm" className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                    {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {th ? 'นำเข้าอ้างอิง' : 'Import Reference'}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -436,9 +483,29 @@ export default function GhgSettings() {
           {/* How it works */}
           <p className="text-[11px] text-muted-foreground bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
             {th
-              ? 'ตารางด้านล่างคือ “กิจกรรมของระบบ” ระบบจะ guide ค่า EF จากตารางอ้างอิงที่ import (จับคู่ด้วยชื่อใกล้เคียงที่สุด) — คุณแก้ค่าได้ แล้วกดบันทึก ค่าที่บันทึกจะถูกใช้คำนวณ GHG จริง'
-              : 'The table below lists your system activities. The system guides each EF from the imported reference library (closest-name match) — edit the value and Save; saved values are what the GHG calc uses.'}
+              ? 'ตารางด้านล่างคือ “กิจกรรมของระบบ” ระบบจะ guide ค่า EF จากคลังอ้างอิงที่นำเข้า (จับคู่ด้วยชื่อใกล้เคียงที่สุด) — ค่าที่เป็น “suggested” ยังไม่ถูกใช้ ต้องกด Save ก่อน · ค่าที่ “saved” เท่านั้นที่ระบบใช้คำนวณ GHG'
+              : 'The table below lists your system activities. The system guides each EF from the imported reference library (closest-name match) — “suggested” values are NOT used until you Save; only “saved” values feed the GHG calc.'}
           </p>
+
+          {/* Save-all-suggested bar — only when there are unsaved suggestions */}
+          {suggestedRows.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+              <span className="text-xs text-amber-800">
+                {th
+                  ? `มี ${suggestedRows.length} กิจกรรมที่มีค่าแนะนำแต่ยังไม่ได้บันทึก — ตรวจค่าให้ถูกก่อนบันทึก`
+                  : `${suggestedRows.length} activities have a suggested value that isn’t saved — review before saving`}
+              </span>
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                disabled={busy === 'save-all'}
+                onClick={saveAllSuggested}
+              >
+                {busy === 'save-all' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                {th ? `บันทึกค่าแนะนำทั้งหมด (${suggestedRows.length})` : `Save all suggested (${suggestedRows.length})`}
+              </Button>
+            </div>
+          )}
 
           {/* Activity-based EF table (guided + editable) */}
           <div className="overflow-x-auto">
