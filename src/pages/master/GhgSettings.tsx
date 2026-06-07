@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -16,7 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Cloud, Plus, Trash2, Loader2, Calculator, Factory, Save, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { Cloud, Loader2, Factory, Save, Upload, Download, FileSpreadsheet } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Metric { metric_id: string; metric_name: string; unit: string | null; code: string | null; calc_mode: string; theme_id: string; }
@@ -129,8 +128,6 @@ export default function GhgSettings() {
     return map;
   }, [metrics, themes, dimensions]);
 
-  const metricByCode = useMemo(() => new Map(metrics.map(m => [m.code ?? '', m])), [metrics]);
-  const factorCodes = useMemo(() => new Set(factors.map(f => f.source_code)), [factors]);
   const factorByCode = useMemo(() => new Map(factors.map(f => [f.source_code, f])), [factors]);
 
   // Closest reference-library row for a system activity (exact code → fuzzy name).
@@ -167,10 +164,6 @@ export default function GhgSettings() {
     [metrics],
   );
 
-  const nameForCode = (code: string) => {
-    const m = metricByCode.get(code);
-    return m ? m.metric_name : code;
-  };
 
   // ── Excel: column order shared by template / export / import ────────────────
   const EF_COLUMNS = [
@@ -348,6 +341,60 @@ export default function GhgSettings() {
     [activityMetrics, factorByCode, efDraft, refs],
   );
 
+  const SCOPE_LABELS: Record<number, { en: string; th: string }> = {
+    1: { en: 'Scope 1 · Direct emissions',        th: 'Scope 1 · การปล่อยทางตรง' },
+    2: { en: 'Scope 2 · Purchased energy',        th: 'Scope 2 · พลังงานที่ซื้อมา' },
+    3: { en: 'Scope 3 · Other indirect',          th: 'Scope 3 · ทางอ้อมอื่น ๆ' },
+  };
+
+  // The GHG OUTPUT metric (tCO₂e) for each scope, matched by its code (…SCOPE1…).
+  const targetByScope = useMemo(() => {
+    const map = new Map<number, Metric>();
+    targetMetrics.forEach(t => {
+      const code = (t.code ?? '').toUpperCase();
+      [1, 2, 3].forEach(n => {
+        if (!map.has(n) && new RegExp(`SCOPE\\s*${n}\\b`).test(code)) map.set(n, t);
+      });
+    });
+    return map;
+  }, [targetMetrics]);
+
+  // Stable scope bucket for an activity: saved EF scope → reference match → 1.
+  const groupScopeOf = (m: Metric): number => {
+    const cur = m.code ? factorByCode.get(m.code) : null;
+    if (cur) return cur.scope || 1;
+    return bestRefMatch(m)?.ref.scope ?? 1;
+  };
+
+  // Per-activity auto/manual: map (or unmap) the activity to its scope's GHG
+  // target and keep that target's calc_mode in sync.
+  const setActivityAuto = async (m: Metric, scopeNum: number, on: boolean) => {
+    if (!tenantId || !m.code) return;
+    const target = targetByScope.get(scopeNum);
+    if (!target?.code) {
+      toast({ variant: 'destructive', title: th ? `ไม่มีตัวชี้วัด GHG สำหรับ Scope ${scopeNum}` : `No GHG metric for Scope ${scopeNum}` });
+      return;
+    }
+    setBusy('auto-' + m.code);
+    try {
+      if (on) {
+        const { error } = await supabase.from('ghg_calc_mapping')
+          .upsert({ tenant_id: tenantId, target_code: target.code, source_code: m.code }, { onConflict: 'tenant_id,target_code,source_code' });
+        if (error) throw error;
+        await supabase.from('esg_metric').update({ calc_mode: 'auto' }).eq('metric_id', target.metric_id);
+      } else {
+        const { error } = await supabase.from('ghg_calc_mapping')
+          .delete().eq('tenant_id', tenantId).eq('target_code', target.code).eq('source_code', m.code);
+        if (error) throw error;
+        const remaining = mappings.filter(x => x.target_code === target.code && x.source_code !== m.code).length;
+        if (remaining === 0) await supabase.from('esg_metric').update({ calc_mode: 'manual' }).eq('metric_id', target.metric_id);
+      }
+      await fetchAll();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: th ? 'ผิดพลาด' : 'Error', description: e.message });
+    } finally { setBusy(null); }
+  };
+
   // Save every suggested (unsaved) activity factor in one batch.
   const saveAllSuggested = async () => {
     if (!tenantId || suggestedRows.length === 0) return;
@@ -376,39 +423,6 @@ export default function GhgSettings() {
 
 
   // ── Toggle a metric's calc_mode ───────────────────────────────────────────
-  const setCalcMode = async (metric: Metric, auto: boolean) => {
-    setBusy(metric.metric_id);
-    try {
-      const { error } = await supabase.from('esg_metric')
-        .update({ calc_mode: auto ? 'auto' : 'manual' })
-        .eq('metric_id', metric.metric_id);
-      if (error) throw error;
-      setMetrics(prev => prev.map(m => m.metric_id === metric.metric_id ? { ...m, calc_mode: auto ? 'auto' : 'manual' } : m));
-    } catch (e: any) {
-      toast({ title: th ? 'ผิดพลาด' : 'Error', description: e.message, variant: 'destructive' });
-    } finally { setBusy(null); }
-  };
-
-  // ── Toggle a source for a target mapping ──────────────────────────────────
-  const toggleMapping = async (target_code: string, source_code: string, on: boolean) => {
-    if (!tenantId) return;
-    setBusy(`${target_code}:${source_code}`);
-    try {
-      if (on) {
-        const { error } = await supabase.from('ghg_calc_mapping')
-          .upsert({ tenant_id: tenantId, target_code, source_code }, { onConflict: 'tenant_id,target_code,source_code' });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('ghg_calc_mapping').delete()
-          .eq('tenant_id', tenantId).eq('target_code', target_code).eq('source_code', source_code);
-        if (error) throw error;
-      }
-      await fetchAll();
-    } catch (e: any) {
-      toast({ title: th ? 'ผิดพลาด' : 'Error', description: e.message, variant: 'destructive' });
-    } finally { setBusy(null); }
-  };
-
   const SCOPE_BADGE: Record<number, string> = {
     1: 'bg-red-100 text-red-700 border-red-200',
     2: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -441,10 +455,10 @@ export default function GhgSettings() {
             <div>
               <CardTitle className="text-base flex items-center gap-2">
                 <Factory className="h-4 w-4 text-amber-600" />
-                {th ? 'ค่าสัมประสิทธิ์การปล่อย (Emission Factors)' : 'Emission Factors'}
+                {th ? 'Emission Factor & การคำนวณ GHG' : 'Emission Factors & GHG Calculation'}
               </CardTitle>
               <CardDescription className="text-xs">
-                {th ? 'kgCO₂e ต่อหน่วยกิจกรรม เช่น ดีเซล 2.7406 kgCO₂e/ลิตร (อ้างอิง TGO)' : 'kgCO₂e per activity unit, e.g. diesel 2.7406 kgCO₂e/L (TGO reference)'}
+                {th ? 'ตั้งค่า EF ต่อกิจกรรม แยกตาม Scope 1/2/3 และเลือกคำนวณ GHG แบบอัตโนมัติหรือกรอกเองในแต่ละกิจกรรม' : 'Set each activity’s EF by Scope 1/2/3 and choose auto or manual GHG calculation per activity.'}
               </CardDescription>
             </div>
             {/* Excel import / export — match factors by activity_code */}
@@ -507,87 +521,119 @@ export default function GhgSettings() {
             </div>
           )}
 
-          {/* Activity-based EF table (guided + editable) */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[760px]">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="pb-2 font-medium">{th ? 'กิจกรรมของระบบ' : 'System Activity'}</th>
-                  <th className="pb-2 font-medium">{th ? 'แนะนำจากอ้างอิง' : 'Guided from reference'}</th>
-                  <th className="pb-2 font-medium w-24">Scope</th>
-                  <th className="pb-2 font-medium w-28 text-right">{th ? 'ค่า EF' : 'EF value'}</th>
-                  <th className="pb-2 font-medium w-32">{th ? 'หน่วย' : 'Unit'}</th>
-                  <th className="pb-2 w-20"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {activityMetrics.length === 0 && (
-                  <tr><td colSpan={6} className="py-4 text-center text-xs text-muted-foreground italic">{th ? 'ไม่มีกิจกรรมด้านสิ่งแวดล้อมในระบบ' : 'No environmental activities in the system'}</td></tr>
-                )}
-                {activityMetrics.map(m => {
-                  const { current, match, value, unit, scope } = efFor(m);
-                  const code = m.code!;
-                  const pct = match ? Math.round(match.score * 100) : 0;
-                  const matchColor = pct >= 85 ? 'text-emerald-600' : pct >= 60 ? 'text-amber-600' : 'text-slate-400';
-                  return (
-                    <tr key={m.metric_id} className="text-slate-700 align-top">
-                      <td className="py-2 pr-2">
-                        <span className="font-medium">{m.metric_name}</span>
-                        <span className="block text-[10px] text-muted-foreground/60 font-mono">{code}{m.unit ? ` · ${m.unit}` : ''}</span>
-                      </td>
-                      <td className="py-2 pr-2 text-xs">
-                        {match ? (
-                          <span className="inline-flex flex-col">
-                            <span className="text-slate-600">{match.ref.activity_name_th || match.ref.activity_name_en || match.ref.activity_code}</span>
-                            <span className="text-[10px]">
-                              <span className={`font-semibold ${matchColor}`}>{pct === 100 ? (th ? 'ตรงรหัส' : 'code match') : `${pct}%`}</span>
-                              {match.ref.factor != null && <span className="text-muted-foreground"> · {match.ref.factor} {match.ref.unit}</span>}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground/50 italic">{refs.length === 0 ? (th ? 'ยังไม่ import อ้างอิง' : 'no reference yet') : (th ? 'ไม่พบที่ใกล้เคียง' : 'no close match')}</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-2">
-                        <Select value={scope} onValueChange={(v) => setEfDraft(p => ({ ...p, [code]: { value, unit, scope: v } }))}>
-                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">Scope 1</SelectItem>
-                            <SelectItem value="2">Scope 2</SelectItem>
-                            <SelectItem value="3">Scope 3</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="py-2 pr-2">
-                        <Input
-                          type="number" step="any" value={value}
-                          onChange={(e) => setEfDraft(p => ({ ...p, [code]: { value: e.target.value, unit, scope } }))}
-                          className="h-8 text-xs text-right font-mono" placeholder="—"
-                        />
-                      </td>
-                      <td className="py-2 pr-2">
-                        <Input
-                          value={unit}
-                          onChange={(e) => setEfDraft(p => ({ ...p, [code]: { value, unit: e.target.value, scope } }))}
-                          className="h-8 text-xs" placeholder="kgCO2e/L"
-                        />
-                      </td>
-                      <td className="py-2 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {current
-                            ? <Badge variant="outline" className="text-[9px] border-emerald-300 text-emerald-700 bg-emerald-50">{th ? 'บันทึกแล้ว' : 'saved'}</Badge>
-                            : value !== '' && <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 bg-amber-50">{th ? 'แนะนำ' : 'suggested'}</Badge>}
-                          <Button size="sm" className="h-7 px-2 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white" disabled={busy === 'save-' + code} onClick={() => saveActivityFactor(m)}>
-                            {busy === 'save-' + code ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {/* Activity EF + per-activity auto/manual, grouped by Scope */}
+          {activityMetrics.length === 0 ? (
+            <p className="py-4 text-center text-xs text-muted-foreground italic">{th ? 'ไม่มีกิจกรรมด้านสิ่งแวดล้อมในระบบ' : 'No environmental activities in the system'}</p>
+          ) : (
+            [1, 2, 3].map(scopeNum => {
+              const acts = activityMetrics.filter(m => groupScopeOf(m) === scopeNum);
+              if (acts.length === 0) return null;
+              const target = targetByScope.get(scopeNum);
+              const lbl = SCOPE_LABELS[scopeNum];
+              return (
+                <div key={scopeNum} className="rounded-xl border border-slate-200 overflow-hidden">
+                  {/* scope header */}
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 border-b border-slate-200">
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold`}>
+                      <Badge variant="outline" className={`text-[10px] ${SCOPE_BADGE[scopeNum]}`}>Scope {scopeNum}</Badge>
+                      {th ? lbl.th.replace(/^Scope \d · /, '') : lbl.en.replace(/^Scope \d · /, '')}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {target
+                        ? <>GHG → <span className="font-mono">{target.code}</span> · {target.calc_mode === 'auto' ? (th ? 'อัตโนมัติ' : 'auto') : (th ? 'กรอกเอง' : 'manual')}</>
+                        : (th ? 'ไม่มีตัวชี้วัด GHG สำหรับ Scope นี้' : 'no GHG metric for this scope')}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[820px]">
+                      <thead>
+                        <tr className="border-b text-left text-[11px] text-muted-foreground">
+                          <th className="py-2 px-3 font-medium">{th ? 'กิจกรรม' : 'Activity'}</th>
+                          <th className="py-2 px-2 font-medium w-28 text-right">{th ? 'ค่า EF' : 'EF value'}</th>
+                          <th className="py-2 px-2 font-medium w-28">{th ? 'หน่วย' : 'Unit'}</th>
+                          <th className="py-2 px-2 font-medium w-24">Scope</th>
+                          <th className="py-2 px-2 font-medium w-32 text-center">{th ? 'คำนวณ GHG' : 'GHG entry'}</th>
+                          <th className="py-2 px-2 w-16"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {acts.map(m => {
+                          const { current, match, value, unit, scope } = efFor(m);
+                          const code = m.code!;
+                          const pct = match ? Math.round(match.score * 100) : 0;
+                          const matchColor = pct >= 85 ? 'text-emerald-600' : pct >= 60 ? 'text-amber-600' : 'text-slate-400';
+                          const mapped = !!target && mappings.some(x => x.target_code === target.code && x.source_code === code);
+                          return (
+                            <tr key={m.metric_id} className="text-slate-700 align-top">
+                              <td className="py-2 px-3">
+                                <span className="font-medium">{m.metric_name}</span>
+                                <span className="block text-[10px] text-muted-foreground/60 font-mono">{code}{m.unit ? ` · ${m.unit}` : ''}</span>
+                                {match ? (
+                                  <span className="block text-[10px] mt-0.5">
+                                    <span className="text-muted-foreground/70">⤷ {th ? 'อ้างอิง' : 'ref'}: </span>
+                                    <span className={`font-semibold ${matchColor}`}>{pct === 100 ? (th ? 'ตรงรหัส' : 'code match') : `${pct}%`}</span>
+                                    {match.ref.factor != null && <span className="text-muted-foreground"> · {match.ref.factor} {match.ref.unit}</span>}
+                                  </span>
+                                ) : refs.length > 0 && (
+                                  <span className="block text-[10px] mt-0.5 text-muted-foreground/40 italic">⤷ {th ? 'ไม่พบที่ใกล้เคียง' : 'no close match'}</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-2">
+                                <Input type="number" step="any" value={value}
+                                  onChange={(e) => setEfDraft(p => ({ ...p, [code]: { value: e.target.value, unit, scope } }))}
+                                  className="h-8 text-xs text-right font-mono" placeholder="—" />
+                              </td>
+                              <td className="py-2 px-2">
+                                <Input value={unit}
+                                  onChange={(e) => setEfDraft(p => ({ ...p, [code]: { value, unit: e.target.value, scope } }))}
+                                  className="h-8 text-xs" placeholder="kgCO2e/L" />
+                              </td>
+                              <td className="py-2 px-2">
+                                <Select value={scope} onValueChange={(v) => setEfDraft(p => ({ ...p, [code]: { value, unit, scope: v } }))}>
+                                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="1">Scope 1</SelectItem>
+                                    <SelectItem value="2">Scope 2</SelectItem>
+                                    <SelectItem value="3">Scope 3</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                              <td className="py-2 px-2">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <span className={`text-[10px] ${mapped ? 'text-emerald-600 font-semibold' : 'text-muted-foreground'}`}>
+                                    {mapped ? (th ? 'อัตโนมัติ' : 'Auto') : (th ? 'กรอกเอง' : 'Manual')}
+                                  </span>
+                                  <Switch
+                                    checked={mapped}
+                                    disabled={!target || !current || busy === 'auto-' + code}
+                                    onCheckedChange={(v) => setActivityAuto(m, scopeNum, v)}
+                                    className="data-[state=checked]:bg-emerald-600 scale-90"
+                                  />
+                                </div>
+                                {!current && (
+                                  <span className="block text-[9px] text-amber-600 text-center mt-0.5">{th ? 'บันทึก EF ก่อน' : 'save EF first'}</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {current
+                                    ? <Badge variant="outline" className="text-[9px] border-emerald-300 text-emerald-700 bg-emerald-50">{th ? 'บันทึก' : 'saved'}</Badge>
+                                    : value !== '' && <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 bg-amber-50">{th ? 'แนะนำ' : 'sugg.'}</Badge>}
+                                  <Button size="sm" className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white" disabled={busy === 'save-' + code} onClick={() => saveActivityFactor(m)}>
+                                    {busy === 'save-' + code ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })
+          )}
 
           {/* Reference library (read-only, imported from Excel) */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60">
@@ -640,71 +686,10 @@ export default function GhgSettings() {
         </CardContent>
       </Card>
 
-      {/* ── Section 2: Auto-calc setup ─────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Calculator className="h-4 w-4 text-emerald-600" />
-            {th ? 'การคำนวณ GHG อัตโนมัติ' : 'GHG Auto-Calculation'}
-          </CardTitle>
-          <CardDescription className="text-xs">
-            {th ? 'เปิดโหมดอัตโนมัติให้ตัวชี้วัด GHG แล้วเลือกว่ารวมจากกิจกรรมใดบ้าง (ระบบคูณด้วย Emission Factor ให้)' : 'Turn a GHG metric to auto, then pick which activities it sums (the system multiplies by the emission factor).'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {targetMetrics.length === 0 && (
-            <p className="text-xs text-muted-foreground italic py-2">{th ? 'ไม่พบตัวชี้วัด GHG (หน่วย tCO₂e)' : 'No GHG output metrics (tCO₂e unit) found'}</p>
-          )}
-          {targetMetrics.map(target => {
-            const isAuto = target.calc_mode === 'auto';
-            const targetSources = mappings.filter(m => m.target_code === target.code).map(m => m.source_code);
-            return (
-              <div key={target.metric_id} className={`rounded-xl border p-3 ${isAuto ? 'border-emerald-200 bg-emerald-50/40' : 'border-border'}`}>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{target.metric_name}</p>
-                    <p className="text-[10px] text-muted-foreground font-mono">{target.code} {target.unit && `· ${target.unit}`}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] text-muted-foreground">{isAuto ? (th ? 'อัตโนมัติ' : 'Auto') : (th ? 'กรอกเอง' : 'Manual')}</span>
-                    <Switch checked={isAuto} disabled={busy === target.metric_id} onCheckedChange={(v) => setCalcMode(target, v)} className="data-[state=checked]:bg-emerald-600" />
-                  </div>
-                </div>
-
-                {/* source picker — only when auto */}
-                {isAuto && (
-                  <div className="mt-3 pt-3 border-t border-emerald-200/60">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">{th ? 'รวมจากกิจกรรม (ที่มี Emission Factor)' : 'Sum from activities (with an emission factor)'}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {activityMetrics.filter(m => factorCodes.has(m.code ?? '')).length === 0 && (
-                        <span className="text-[11px] text-amber-600 italic">{th ? 'ยังไม่มีกิจกรรมที่บันทึกค่า EF — ตั้งค่าด้านบนก่อน' : 'No activities with a saved EF yet — set one above first'}</span>
-                      )}
-                      {activityMetrics
-                        .filter(m => m.code && factorCodes.has(m.code))
-                        .map(m => {
-                          const code = m.code!;
-                          const checked = targetSources.includes(code);
-                          const cellId = `${target.code}:${code}`;
-                          return (
-                            <label key={code} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 cursor-pointer text-xs transition ${checked ? 'border-emerald-400 bg-white' : 'border-border bg-white/60 hover:bg-white'}`}>
-                              <Checkbox checked={checked} disabled={busy === cellId} onCheckedChange={(v) => toggleMapping(target.code!, code, !!v)} />
-                              {m.metric_name}
-                            </label>
-                          );
-                        })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
       <p className="text-xs text-muted-foreground text-center pb-2">
         {th
-          ? '💡 เมื่อเปิดโหมดอัตโนมัติ ค่าของตัวชี้วัด GHG จะถูกคำนวณใหม่ทันทีที่มีการกรอก/แก้ไขข้อมูลกิจกรรม'
-          : '💡 In auto mode, the GHG metric is recomputed instantly whenever its activity data is entered or changed.'}
+          ? '💡 ตั้งค่า EF ต่อกิจกรรม แล้วเลือก “อัตโนมัติ” เพื่อให้ระบบคำนวณ GHG (กิจกรรม × EF) เข้ารวมใน Scope นั้นทันทีที่กรอกข้อมูล — หรือเลือก “กรอกเอง” เพื่อใส่ค่าเอง'
+          : '💡 Set each activity’s EF, then switch it to “Auto” so the system computes its GHG (activity × EF) into that scope as data is entered — or keep it “Manual” to enter values yourself.'}
       </p>
     </div>
   );
