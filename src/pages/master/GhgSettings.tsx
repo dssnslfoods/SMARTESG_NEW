@@ -328,15 +328,19 @@ export default function GhgSettings() {
     } finally { setBusy(null); }
   };
 
-  // Activities that currently show a (numeric) suggested value but aren't saved.
-  const suggestedRows = useMemo(
-    () => activityMetrics.filter(m => {
-      if (!m.code || factorByCode.has(m.code)) return false; // already saved
-      const draft = efDraft[m.code];
-      const match = bestRefMatch(m);
-      const value = draft?.value ?? (match?.ref.factor != null ? String(match.ref.factor) : '');
-      return value !== '' && Number.isFinite(Number(value));
-    }),
+  // A row is "pending" (needs saving) when its displayed EF (a suggestion, a
+  // manual edit, or a restored default) differs from what's saved in the DB.
+  const isDirty = (m: Metric): boolean => {
+    if (!m.code) return false;
+    const { current, value, unit, scope } = efFor(m);
+    if (value === '' || !Number.isFinite(Number(value))) return false;
+    if (!current) return true; // shown but never saved (suggested / restored)
+    return String(current.factor_value) !== String(Number(value))
+        || (current.factor_unit ?? '') !== (unit ?? '')
+        || String(current.scope) !== String(scope);
+  };
+  const pendingRows = useMemo(
+    () => activityMetrics.filter(isDirty),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activityMetrics, factorByCode, efDraft, refs],
   );
@@ -395,61 +399,57 @@ export default function GhgSettings() {
     } finally { setBusy(null); }
   };
 
-  // Save every suggested (unsaved) activity factor in one batch.
+  // Save every pending (unsaved/edited/restored) activity factor in one batch.
   const saveAllSuggested = async () => {
-    if (!tenantId || suggestedRows.length === 0) return;
+    if (!tenantId || pendingRows.length === 0) return;
     setBusy('save-all');
     try {
-      const rows = suggestedRows.map(m => {
-        const { value, unit, scope, match } = efFor(m);
+      const rows = pendingRows.map(m => {
+        const { value, unit, scope, current, match } = efFor(m);
         return {
           tenant_id: tenantId,
           source_code: m.code,
           scope: Number(scope) || 1,
           factor_value: Number(value),
           factor_unit: unit || null,
-          source: match?.ref.source ?? null,
+          source: current?.source ?? match?.ref.source ?? null,
         };
       });
       const { error } = await supabase.from('emission_factor').upsert(rows, { onConflict: 'tenant_id,source_code' });
       if (error) throw error;
       setEfDraft({});
       await fetchAll();
-      toast({ title: th ? `บันทึก ${rows.length} รายการที่แนะนำแล้ว` : `Saved ${rows.length} suggested factors` });
+      toast({ title: th ? `บันทึก ${rows.length} รายการแล้ว` : `Saved ${rows.length} factors` });
     } catch (e: any) {
       toast({ title: th ? 'ผิดพลาด' : 'Error', description: e.message, variant: 'destructive' });
     } finally { setBusy(null); }
   };
 
-  // Restore every activity's EF to the value guided by the reference library
-  // (overwrites manual edits) — the standard you imported is the "default".
-  const restoreDefaults = async () => {
-    if (!tenantId) return;
-    const rows = activityMetrics
-      .map(m => ({ m, match: bestRefMatch(m) }))
-      .filter(({ m, match }) => m.code && match && match.ref.factor != null)
-      .map(({ m, match }) => ({
-        tenant_id: tenantId,
-        source_code: m.code,
-        scope: match!.ref.scope ?? 1,
-        factor_value: Number(match!.ref.factor),
-        factor_unit: match!.ref.unit ?? (m.unit ? `kgCO2e/${m.unit}` : null),
-        source: match!.ref.source ?? null,
-      }));
-    if (rows.length === 0) {
+  // Load the reference-library defaults into the editable fields (as drafts).
+  // Does NOT save — the user reviews and Saves (per row or "Save all").
+  const restoreDefaults = () => {
+    const next: Record<string, { value: string; unit: string; scope: string }> = {};
+    let n = 0;
+    activityMetrics.forEach(m => {
+      const match = bestRefMatch(m);
+      if (m.code && match && match.ref.factor != null) {
+        next[m.code] = {
+          value: String(match.ref.factor),
+          unit: match.ref.unit ?? (m.unit ? `kgCO2e/${m.unit}` : ''),
+          scope: String(match.ref.scope ?? 1),
+        };
+        n++;
+      }
+    });
+    if (n === 0) {
       toast({ variant: 'destructive', title: th ? 'ไม่มีค่าอ้างอิงให้คืนค่า — กรุณานำเข้าคลังอ้างอิงก่อน' : 'No reference values — import the reference library first' });
       return;
     }
-    setBusy('restore');
-    try {
-      const { error } = await supabase.from('emission_factor').upsert(rows, { onConflict: 'tenant_id,source_code' });
-      if (error) throw error;
-      setEfDraft({});
-      await fetchAll();
-      toast({ title: th ? `คืนค่าเริ่มต้น ${rows.length} รายการแล้ว` : `Restored ${rows.length} factors to default` });
-    } catch (e: any) {
-      toast({ title: th ? 'ผิดพลาด' : 'Error', description: e.message, variant: 'destructive' });
-    } finally { setBusy(null); }
+    setEfDraft(next);
+    toast({
+      title: th ? `โหลดค่าเริ่มต้น ${n} รายการแล้ว` : `Loaded ${n} default values`,
+      description: th ? 'ค่ายังไม่ถูกบันทึก — ตรวจสอบแล้วกด Save (หรือ “บันทึกทั้งหมด”)' : 'Not saved yet — review then Save (or “Save all”).',
+    });
   };
 
   const SCOPE_BADGE: Record<number, string> = {
@@ -532,18 +532,18 @@ export default function GhgSettings() {
             </p>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs shrink-0" disabled={refs.length === 0 || busy === 'restore'}>
-                  {busy === 'restore' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs shrink-0" disabled={refs.length === 0}>
+                  <RotateCcw className="h-3.5 w-3.5" />
                   {th ? 'คืนค่าเริ่มต้น' : 'Restore to default'}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{th ? 'คืนค่า EF เป็นค่าจากคลังอ้างอิง?' : 'Restore EF to reference defaults?'}</AlertDialogTitle>
+                  <AlertDialogTitle>{th ? 'โหลดค่า EF จากคลังอ้างอิง?' : 'Load EF from reference defaults?'}</AlertDialogTitle>
                   <AlertDialogDescription>
                     {th
-                      ? 'ระบบจะตั้งค่า EF (ค่า/หน่วย/Scope) ของทุกกิจกรรมที่จับคู่กับคลังอ้างอิงได้ กลับไปเป็นค่ามาตรฐานจากคลังอ้างอิง — ค่าที่คุณแก้ไขเองจะถูกเขียนทับ การกระทำนี้มีผลเฉพาะ tenant ของคุณ'
-                      : 'This sets every activity that matches the reference library back to the reference standard EF (value/unit/scope), overwriting your manual edits. Affects only your tenant.'}
+                      ? 'ระบบจะ “โหลด” ค่า EF (ค่า/หน่วย/Scope) จากคลังอ้างอิงเข้าช่องแก้ไขของทุกกิจกรรมที่จับคู่ได้ — แต่ยังไม่บันทึก คุณสามารถตรวจ/แก้ค่าก่อน แล้วกด Save (หรือ “บันทึกทั้งหมด”) เพื่อยืนยัน'
+                      : 'This loads the reference EF (value/unit/scope) into each matching activity’s editable fields — but does NOT save. Review/adjust, then click Save (or “Save all”) to confirm.'}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -554,13 +554,13 @@ export default function GhgSettings() {
             </AlertDialog>
           </div>
 
-          {/* Save-all-suggested bar — only when there are unsaved suggestions */}
-          {suggestedRows.length > 0 && (
+          {/* Save-all bar — shows when any row has unsaved/edited/restored values */}
+          {pendingRows.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
               <span className="text-xs text-amber-800">
                 {th
-                  ? `มี ${suggestedRows.length} กิจกรรมที่มีค่าแนะนำแต่ยังไม่ได้บันทึก — ตรวจค่าให้ถูกก่อนบันทึก`
-                  : `${suggestedRows.length} activities have a suggested value that isn’t saved — review before saving`}
+                  ? `มี ${pendingRows.length} กิจกรรมที่มีค่ายังไม่ได้บันทึก — ตรวจค่าให้ถูกก่อนบันทึก`
+                  : `${pendingRows.length} activities have unsaved values — review before saving`}
               </span>
               <Button
                 size="sm"
@@ -569,7 +569,7 @@ export default function GhgSettings() {
                 onClick={saveAllSuggested}
               >
                 {busy === 'save-all' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                {th ? `บันทึกค่าแนะนำทั้งหมด (${suggestedRows.length})` : `Save all suggested (${suggestedRows.length})`}
+                {th ? `บันทึกทั้งหมด (${pendingRows.length})` : `Save all (${pendingRows.length})`}
               </Button>
             </div>
           )}
@@ -669,9 +669,9 @@ export default function GhgSettings() {
                               </td>
                               <td className="py-2 px-2 text-right">
                                 <div className="flex items-center justify-end gap-1">
-                                  {current
-                                    ? <Badge variant="outline" className="text-[9px] border-emerald-300 text-emerald-700 bg-emerald-50">{th ? 'บันทึก' : 'saved'}</Badge>
-                                    : value !== '' && <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 bg-amber-50">{th ? 'แนะนำ' : 'sugg.'}</Badge>}
+                                  {isDirty(m)
+                                    ? <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 bg-amber-50">{current ? (th ? 'แก้ไข' : 'edited') : (th ? 'แนะนำ' : 'sugg.')}</Badge>
+                                    : current && <Badge variant="outline" className="text-[9px] border-emerald-300 text-emerald-700 bg-emerald-50">{th ? 'บันทึก' : 'saved'}</Badge>}
                                   <Button size="sm" className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white" disabled={busy === 'save-' + code} onClick={() => saveActivityFactor(m)}>
                                     {busy === 'save-' + code ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                                   </Button>
