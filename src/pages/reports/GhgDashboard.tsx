@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, ComposedChart, Line,
+  PieChart, Pie, Cell, Legend, ComposedChart, ReferenceLine,
 } from 'recharts';
 
 interface GhgSummary {
@@ -98,7 +98,6 @@ export default function GhgDashboard() {
   const yearlyChart = data.yearly.map(y => ({
     year: String(y.year),
     scope1: y.scope1, scope2: y.scope2, scope3: y.scope3,
-    target: y.year === data.year && totalTarget > 0 ? totalTarget : null,
   }));
 
   const scopeLabel = (n: string) => (n === 'scope1' ? 'Scope 1' : n === 'scope2' ? 'Scope 2' : 'Scope 3');
@@ -210,12 +209,20 @@ export default function GhgDashboard() {
                   <Bar dataKey="scope1" name="Scope 1" stackId="y" fill={S1} maxBarSize={56} />
                   <Bar dataKey="scope2" name="Scope 2" stackId="y" fill={S2} maxBarSize={56} radius={has3 ? undefined : [6, 6, 0, 0]} />
                   {has3 && <Bar dataKey="scope3" name="Scope 3" stackId="y" fill={S3} maxBarSize={56} radius={[6, 6, 0, 0]} />}
-                  <Line dataKey="target" name={th ? 'เป้าหมาย' : 'Target'} stroke="#0f766e" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 4 }} connectNulls />
+                  {totalTarget > 0 && (
+                    <ReferenceLine
+                      y={totalTarget} stroke="#0f766e" strokeWidth={2} strokeDasharray="6 4" ifOverflow="extendDomain"
+                      label={{
+                        value: `${th ? 'เป้า ≤' : 'below'} ${fmt(totalTarget)} tCO₂e (${data.year})`,
+                        position: 'insideTopRight', fill: '#0f766e', fontSize: 11, fontWeight: 700,
+                      }}
+                    />
+                  )}
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
             <p className="text-[11px] text-muted-foreground text-center">
-              {th ? '🎯 เส้นประ = เป้าหมายปีปัจจุบัน · แท่ง = การปล่อยจริงรายปี' : '🎯 Dashed = current-year target · bars = actual yearly emissions'}
+              {th ? '🎯 เส้นประแนวนอน = เพดานเป้าหมายรวมปีปัจจุบัน · แท่งซ้อน = การปล่อยจริงรายปีแยกตาม Scope' : '🎯 Dashed horizontal line = current-year target cap · stacked bars = actual yearly emissions by scope'}
             </p>
           </CardContent>
         </Card>
