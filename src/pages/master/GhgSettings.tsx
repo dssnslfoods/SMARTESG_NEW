@@ -434,11 +434,13 @@ export default function GhgSettings() {
     } finally { setBusy(null); }
   };
 
-  // Per-row: pull the reference-suggested EF into this activity's fields (draft).
+  // Per-row: pull the closest reference EF into this activity's fields (draft).
+  // Uses the best match at ANY confidence (the user opts in explicitly here),
+  // unlike the auto-prefill/Restore which only apply confident (≥60%) matches.
   const suggestRow = (m: Metric) => {
-    const match = applicableMatch(m);
+    const match = bestRefMatch(m);
     if (!m.code || !match || match.ref.factor == null) {
-      toast({ variant: 'destructive', title: th ? 'ไม่มีค่าอ้างอิงที่ใกล้เคียงพอ' : 'No confident reference match' });
+      toast({ variant: 'destructive', title: th ? 'ไม่มีรายการอ้างอิงให้จับคู่' : 'No reference item to match' });
       return;
     }
     setEfDraft(p => ({
@@ -670,24 +672,36 @@ export default function GhgSettings() {
                       </thead>
                       <tbody className="divide-y">
                         {acts.map(m => {
-                          const { current, match, value, unit, scope } = efFor(m);
+                          const { current, value, unit, scope } = efFor(m);
                           const code = m.code!;
-                          const pct = match ? Math.round(match.score * 100) : 0;
-                          const matchColor = pct >= 85 ? 'text-emerald-600' : pct >= 60 ? 'text-amber-600' : 'text-slate-400';
+                          // Closest reference at ANY confidence — shown with provenance + tooltip.
+                          const refMatch = bestRefMatch(m);
+                          const pct = refMatch ? Math.round(refMatch.score * 100) : 0;
+                          const matchColor = pct === 100 ? 'text-emerald-600' : pct >= 60 ? 'text-amber-600' : 'text-rose-500';
+                          const refName = refMatch ? (refMatch.ref.activity_name_th || refMatch.ref.activity_name_en || refMatch.ref.activity_code) : '';
+                          const refTip = refMatch
+                            ? `${th ? 'จับคู่จาก' : 'Matched from'}: ${refName} (${refMatch.ref.activity_code})\n`
+                              + `Scope ${refMatch.ref.scope ?? '—'} · ${refMatch.ref.factor ?? '—'} ${refMatch.ref.unit ?? ''}\n`
+                              + `${th ? 'ที่มา' : 'Source'}: ${refMatch.ref.source ?? '—'}\n`
+                              + `${th ? 'ความใกล้เคียง' : 'Confidence'}: ${pct === 100 ? (th ? 'ตรงรหัส 100%' : 'exact code 100%') : pct + '%'}`
+                              + (pct < 60 ? `\n⚠ ${th ? 'ความใกล้เคียงต่ำ — ตรวจให้ดีก่อนใช้' : 'low confidence — verify before use'}` : '')
+                            : '';
                           const mapped = !!target && mappings.some(x => x.target_code === target.code && x.source_code === code);
                           return (
                             <tr key={m.metric_id} className="text-slate-700 align-top">
                               <td className="py-2 px-3">
                                 <span className="font-medium">{m.metric_name}</span>
                                 <span className="block text-[10px] text-muted-foreground/60 font-mono">{code}{m.unit ? ` · ${m.unit}` : ''}</span>
-                                {match ? (
-                                  <span className="block text-[10px] mt-0.5">
-                                    <span className="text-muted-foreground/70">⤷ {th ? 'อ้างอิง' : 'ref'}: </span>
-                                    <span className={`font-semibold ${matchColor}`}>{pct === 100 ? (th ? 'ตรงรหัส' : 'code match') : `${pct}%`}</span>
-                                    {match.ref.factor != null && <span className="text-muted-foreground"> · {match.ref.factor} {match.ref.unit}</span>}
+                                {refMatch ? (
+                                  <span className="block text-[10px] mt-0.5 cursor-help" title={refTip}>
+                                    <span className="text-muted-foreground/70">⤷ {th ? 'ใกล้เคียง' : 'ref'}: </span>
+                                    <span className="text-slate-600">{refName}</span>{' '}
+                                    <span className={`font-semibold ${matchColor}`}>{pct === 100 ? (th ? 'ตรงรหัส' : 'code') : `${pct}%`}</span>
+                                    {refMatch.ref.factor != null && <span className="text-muted-foreground"> · {refMatch.ref.factor} {refMatch.ref.unit}</span>}
+                                    {pct < 60 && <span className="text-rose-500"> ⚠</span>}
                                   </span>
                                 ) : refs.length > 0 && (
-                                  <span className="block text-[10px] mt-0.5 text-muted-foreground/40 italic">⤷ {th ? 'ไม่พบที่ใกล้เคียง' : 'no close match'}</span>
+                                  <span className="block text-[10px] mt-0.5 text-muted-foreground/40 italic">⤷ {th ? 'ไม่มีรายการอ้างอิงให้จับคู่' : 'no reference to match'}</span>
                                 )}
                               </td>
                               <td className="py-2 px-2">
@@ -733,9 +747,9 @@ export default function GhgSettings() {
                                     : current && <Badge variant="outline" className="text-[9px] border-emerald-300 text-emerald-700 bg-emerald-50">{th ? 'บันทึก' : 'saved'}</Badge>}
                                   <Button
                                     size="sm" variant="outline"
-                                    className="h-7 px-2 border-amber-300 text-amber-600 hover:bg-amber-50 disabled:opacity-40"
-                                    disabled={!match}
-                                    title={match ? (th ? 'ใช้ค่าอ้างอิงที่แนะนำ' : 'Use suggested reference value') : (th ? 'ไม่มีค่าอ้างอิงที่ใกล้เคียงพอ' : 'No confident reference match')}
+                                    className={`h-7 px-2 disabled:opacity-40 ${pct > 0 && pct < 60 ? 'border-rose-300 text-rose-500 hover:bg-rose-50' : 'border-amber-300 text-amber-600 hover:bg-amber-50'}`}
+                                    disabled={!refMatch}
+                                    title={refMatch ? `${th ? 'ใช้ค่าอ้างอิงนี้' : 'Use this reference value'}\n${refTip}` : (th ? 'ไม่มีรายการอ้างอิงให้จับคู่' : 'No reference to match')}
                                     onClick={() => suggestRow(m)}
                                   >
                                     <Sparkles className="h-3 w-3" />
