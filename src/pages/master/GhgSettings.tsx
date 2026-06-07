@@ -15,7 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Cloud, Loader2, Factory, Save, Upload, Download, FileSpreadsheet, RotateCcw } from 'lucide-react';
+import { Cloud, Loader2, Factory, Save, Upload, Download, FileSpreadsheet, RotateCcw, Sparkles, Zap } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Metric { metric_id: string; metric_name: string; unit: string | null; code: string | null; calc_mode: string; theme_id: string; }
@@ -433,6 +433,47 @@ export default function GhgSettings() {
     } finally { setBusy(null); }
   };
 
+  // Per-row: pull the reference-suggested EF into this activity's fields (draft).
+  const suggestRow = (m: Metric) => {
+    const match = applicableMatch(m);
+    if (!m.code || !match || match.ref.factor == null) {
+      toast({ variant: 'destructive', title: th ? 'ไม่มีค่าอ้างอิงที่ใกล้เคียงพอ' : 'No confident reference match' });
+      return;
+    }
+    setEfDraft(p => ({
+      ...p,
+      [m.code!]: {
+        value: String(match.ref.factor),
+        unit: match.ref.unit ?? (m.unit ? `kgCO2e/${m.unit}` : ''),
+        scope: String(match.ref.scope ?? 1),
+      },
+    }));
+  };
+
+  // Turn ON auto-calc for every activity that has a saved EF and a scope target.
+  const setAutoAll = async () => {
+    if (!tenantId) return;
+    const items = activityMetrics
+      .map(m => ({ m, target: targetByScope.get(groupScopeOf(m)) }))
+      .filter(({ m, target }) => m.code && target && factorByCode.has(m.code!));
+    if (items.length === 0) {
+      toast({ variant: 'destructive', title: th ? 'ไม่มีกิจกรรมที่บันทึก EF + มีตัวชี้วัด GHG' : 'No activities with a saved EF and a scope GHG metric' });
+      return;
+    }
+    setBusy('auto-all');
+    try {
+      const rows = items.map(({ m, target }) => ({ tenant_id: tenantId, target_code: target!.code, source_code: m.code }));
+      const { error } = await supabase.from('ghg_calc_mapping').upsert(rows, { onConflict: 'tenant_id,target_code,source_code' });
+      if (error) throw error;
+      const targetIds = [...new Set(items.map(i => i.target!.metric_id))];
+      await supabase.from('esg_metric').update({ calc_mode: 'auto' }).in('metric_id', targetIds);
+      await fetchAll();
+      toast({ title: th ? `เปิดคำนวณอัตโนมัติ ${rows.length} กิจกรรมแล้ว` : `Enabled auto for ${rows.length} activities` });
+    } catch (e: any) {
+      toast({ title: th ? 'ผิดพลาด' : 'Error', description: e.message, variant: 'destructive' });
+    } finally { setBusy(null); }
+  };
+
   // Load the reference-library defaults into the editable fields (as drafts).
   // Does NOT save — the user reviews and Saves (per row or "Save all").
   const restoreDefaults = () => {
@@ -538,6 +579,15 @@ export default function GhgSettings() {
                 ? 'ตารางด้านล่างคือ “กิจกรรมของระบบ” ระบบจะ guide ค่า EF จากคลังอ้างอิงที่นำเข้า (จับคู่ด้วยชื่อใกล้เคียงที่สุด) — ค่าที่เป็น “suggested” ยังไม่ถูกใช้ ต้องกด Save ก่อน · ค่าที่ “saved” เท่านั้นที่ระบบใช้คำนวณ GHG'
                 : 'The table below lists your system activities. The system guides each EF from the imported reference library (closest-name match) — “suggested” values are NOT used until you Save; only “saved” values feed the GHG calc.'}
             </p>
+            <Button
+              size="sm" variant="outline"
+              className="h-8 gap-1.5 text-xs shrink-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              disabled={busy === 'auto-all'}
+              onClick={setAutoAll}
+            >
+              {busy === 'auto-all' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+              {th ? 'เปิดอัตโนมัติทั้งหมด' : 'Auto all'}
+            </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs shrink-0" disabled={refs.length === 0}>
@@ -680,6 +730,15 @@ export default function GhgSettings() {
                                   {isDirty(m)
                                     ? <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 bg-amber-50">{current ? (th ? 'แก้ไข' : 'edited') : (th ? 'แนะนำ' : 'sugg.')}</Badge>
                                     : current && <Badge variant="outline" className="text-[9px] border-emerald-300 text-emerald-700 bg-emerald-50">{th ? 'บันทึก' : 'saved'}</Badge>}
+                                  <Button
+                                    size="sm" variant="outline"
+                                    className="h-7 px-2 border-amber-300 text-amber-600 hover:bg-amber-50 disabled:opacity-40"
+                                    disabled={!match}
+                                    title={match ? (th ? 'ใช้ค่าอ้างอิงที่แนะนำ' : 'Use suggested reference value') : (th ? 'ไม่มีค่าอ้างอิงที่ใกล้เคียงพอ' : 'No confident reference match')}
+                                    onClick={() => suggestRow(m)}
+                                  >
+                                    <Sparkles className="h-3 w-3" />
+                                  </Button>
                                   <Button size="sm" className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white" disabled={busy === 'save-' + code} onClick={() => saveActivityFactor(m)}>
                                     {busy === 'save-' + code ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                                   </Button>
