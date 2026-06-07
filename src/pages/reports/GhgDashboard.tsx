@@ -97,7 +97,7 @@ export default function GhgDashboard() {
   const monthlyChart = data.monthly.map(m => ({ ...m, label: m.month.slice(2) }));
   const yearlyChart = data.yearly.map(y => ({
     year: String(y.year),
-    total: y.total,
+    scope1: y.scope1, scope2: y.scope2, scope3: y.scope3,
     target: y.year === data.year && totalTarget > 0 ? totalTarget : null,
   }));
 
@@ -195,7 +195,7 @@ export default function GhgDashboard() {
           <CardHeader className="pb-1">
             <CardTitle className="text-sm flex items-center gap-1.5">
               <TrendingDown className="h-3.5 w-3.5 text-emerald-500" />{th ? 'เส้นทางสู่ Net Zero (รายปี)' : 'Net-Zero Trajectory (yearly)'}
-              <span className="ml-auto"><InfoTip text={th ? 'แท่ง = การปล่อยรวมจริงรายปี (ทุก Scope) · เส้นประ = เป้าหมายปีปัจจุบัน — แท่งควรลดลงเข้าหาเส้นเป้าเพื่อมุ่งสู่ Net Zero' : 'Bars = actual total emissions per year (all scopes); dashed line = current-year target. Bars should trend down toward the target.'} /></span>
+              <span className="ml-auto"><InfoTip text={th ? 'แท่งซ้อนรายปี แยกสีตาม Scope (แดง=1 เหลือง=2 น้ำเงิน=3) · ความสูงรวม = การปล่อยรวมทั้งปี · เส้นประ = เป้าหมายรวมปีปัจจุบัน — แท่งควรลดลงเข้าหาเส้นเป้าเพื่อมุ่งสู่ Net Zero' : 'Yearly stacked bars by scope (red=1, amber=2, blue=3); total height = total emissions · dashed line = current-year total target. Bars should trend down toward the target.'} /></span>
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-2 pb-4">
@@ -206,8 +206,11 @@ export default function GhgDashboard() {
                   <XAxis dataKey="year" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => fmt(v)} />
                   <ReTooltip formatter={(v: number, n: string) => [`${fmt(v)} tCO₂e`, n]} />
-                  <Bar dataKey="total" name={th ? 'ปล่อยจริง' : 'Actual'} fill="#0f766e" radius={[6, 6, 0, 0]} maxBarSize={56} />
-                  <Line dataKey="target" name={th ? 'เป้าหมาย' : 'Target'} stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 4 }} connectNulls />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="scope1" name="Scope 1" stackId="y" fill={S1} maxBarSize={56} />
+                  <Bar dataKey="scope2" name="Scope 2" stackId="y" fill={S2} maxBarSize={56} radius={has3 ? undefined : [6, 6, 0, 0]} />
+                  {has3 && <Bar dataKey="scope3" name="Scope 3" stackId="y" fill={S3} maxBarSize={56} radius={[6, 6, 0, 0]} />}
+                  <Line dataKey="target" name={th ? 'เป้าหมาย' : 'Target'} stroke="#0f766e" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 4 }} connectNulls />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
