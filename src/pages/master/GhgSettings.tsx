@@ -248,7 +248,8 @@ export default function GhgSettings() {
       for (const r of aoa.slice(headerIdx + 1)) {
         const code = String(r[cAct] ?? '').trim().toUpperCase();
         const factor = Number(r[cFactor]);
-        if (!code || !Number.isFinite(factor)) { skipped++; continue; }
+        // Valid codes only (UPPER_SNAKE_CASE) — skips note/README/instruction rows.
+        if (!/^[A-Z0-9_]+$/.test(code) || !Number.isFinite(factor)) { skipped++; continue; }
         if (seen.has(code)) { skipped++; continue; } // de-dupe within the file
         seen.add(code);
         const scope = cScope >= 0 ? (parseInt(String(r[cScope]), 10) || 1) : 1;
