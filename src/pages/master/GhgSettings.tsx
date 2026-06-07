@@ -151,6 +151,14 @@ export default function GhgSettings() {
     return best ? { ref: best, score: bestScore } : null;
   };
 
+  // Only a confident match (exact code or ≥ MATCH_MIN name similarity) is allowed
+  // to pre-fill a suggested EF — weak matches would otherwise inject wrong values.
+  const MATCH_MIN = 0.6;
+  const applicableMatch = (m: Metric) => {
+    const x = bestRefMatch(m);
+    return x && x.score >= MATCH_MIN ? x : null;
+  };
+
   // Emission-generating ACTIVITIES (sources): Environment-dimension metrics that
   // have a code and aren't themselves a GHG output (CO₂e) metric.
   const activityMetrics = useMemo(
@@ -292,7 +300,7 @@ export default function GhgSettings() {
   // the value guided from the closest reference-library match.
   const efFor = (m: Metric) => {
     const current = m.code ? factorByCode.get(m.code) ?? null : null;
-    const match = bestRefMatch(m);
+    const match = applicableMatch(m); // only confident matches pre-fill values
     const draft = m.code ? efDraft[m.code] : undefined;
     const value = draft?.value ?? (current ? String(current.factor_value) : (match?.ref.factor != null ? String(match.ref.factor) : ''));
     const unit = draft?.unit ?? (current?.factor_unit ?? match?.ref.unit ?? (m.unit ? `kgCO2e/${m.unit}` : ''));
@@ -367,7 +375,7 @@ export default function GhgSettings() {
   const groupScopeOf = (m: Metric): number => {
     const cur = m.code ? factorByCode.get(m.code) : null;
     if (cur) return cur.scope || 1;
-    return bestRefMatch(m)?.ref.scope ?? 1;
+    return applicableMatch(m)?.ref.scope ?? 1;
   };
 
   // Per-activity auto/manual: map (or unmap) the activity to its scope's GHG
@@ -431,7 +439,7 @@ export default function GhgSettings() {
     const next: Record<string, { value: string; unit: string; scope: string }> = {};
     let n = 0;
     activityMetrics.forEach(m => {
-      const match = bestRefMatch(m);
+      const match = applicableMatch(m);
       if (m.code && match && match.ref.factor != null) {
         next[m.code] = {
           value: String(match.ref.factor),
