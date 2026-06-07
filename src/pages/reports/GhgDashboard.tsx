@@ -205,7 +205,7 @@ export default function GhgDashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                   <XAxis dataKey="year" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => fmt(v)} />
-                  <ReTooltip formatter={(v: number, n: string) => [`${fmt(v)} tCO₂e`, n === 'target' ? (th ? 'เป้าหมาย' : 'Target') : (th ? 'ปล่อยจริง' : 'Actual')]} />
+                  <ReTooltip formatter={(v: number, n: string) => [`${fmt(v)} tCO₂e`, n]} />
                   <Bar dataKey="total" name={th ? 'ปล่อยจริง' : 'Actual'} fill="#0f766e" radius={[6, 6, 0, 0]} maxBarSize={56} />
                   <Line dataKey="target" name={th ? 'เป้าหมาย' : 'Target'} stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 4 }} connectNulls />
                 </ComposedChart>
