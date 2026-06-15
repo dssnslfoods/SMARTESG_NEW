@@ -250,8 +250,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(null);
         return { error: null, inactive: true };
       }
+
+      // Record the successful login (tenant_id/user_id default server-side).
+      // Fire-and-forget — never block sign-in on analytics.
+      supabase
+        .from('login_event')
+        .insert({ user_id: data.user.id, user_agent: navigator.userAgent })
+        .then(({ error: logErr }) => {
+          if (logErr) console.warn('login_event insert failed:', logErr.message);
+        });
     }
-    
+
     return { error: null };
   };
 

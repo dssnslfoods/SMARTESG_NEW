@@ -47,6 +47,7 @@ import {
   CalendarDays,
   Send,
   FileEdit,
+  LogIn,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, differenceInDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -92,6 +93,7 @@ export default function AdminAnalyticsDashboard() {
   // Raw data
   const [allMetricValues, setAllMetricValues] = useState<MetricValueRecord[]>([]);
   const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
+  const [loginEvents, setLoginEvents] = useState<{ user_id: string; logged_in_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -106,6 +108,14 @@ export default function AdminAnalyticsDashboard() {
 
   const fetchRawData = async () => {
     try {
+      // Login history (tenant-scoped via RLS) for the analytics cards.
+      const { data: logins } = await supabase
+        .from('login_event')
+        .select('user_id, logged_in_at')
+        .order('logged_in_at', { ascending: false })
+        .limit(10000);
+      setLoginEvents((logins ?? []) as { user_id: string; logged_in_at: string }[]);
+
       // Use optimized fetcher with larger batch size for 100K+ records
       const metricValues = await fetchMetricValuesWithTimestamp({
         pageSize: FETCH_CONFIG.PAGE_SIZE,
@@ -183,6 +193,29 @@ export default function AdminAnalyticsDashboard() {
 
     return filtered;
   }, [allMetricValues, selectedUser, dateFrom, dateTo, selectedHourRange]);
+
+  // Login analytics — same User / date / hour filters, on logged_in_at.
+  const loginStats = useMemo(() => {
+    let logs = [...loginEvents];
+    if (selectedUser !== 'all') logs = logs.filter(l => l.user_id === selectedUser);
+    if (dateFrom || dateTo) {
+      logs = logs.filter(l => {
+        const d = new Date(l.logged_in_at);
+        if (dateFrom && dateTo) return isWithinInterval(d, { start: startOfDay(dateFrom), end: endOfDay(dateTo) });
+        if (dateFrom) return d >= startOfDay(dateFrom);
+        if (dateTo) return d <= endOfDay(dateTo);
+        return true;
+      });
+    }
+    if (selectedHourRange !== 'all') {
+      const [s, e] = selectedHourRange.split('-').map(Number);
+      logs = logs.filter(l => { const h = new Date(l.logged_in_at).getHours(); return h >= s && h <= e; });
+    }
+    const total = logs.length;
+    const uniqueUsers = new Set(logs.map(l => l.user_id)).size;
+    const last = logs.reduce<string | null>((mx, l) => (!mx || l.logged_in_at > mx ? l.logged_in_at : mx), null);
+    return { total, uniqueUsers, last };
+  }, [loginEvents, selectedUser, dateFrom, dateTo, selectedHourRange]);
 
   // Calculate analytics from filtered data (matches Data Entry page calculation)
   const analytics = useMemo(() => {
@@ -604,6 +637,40 @@ export default function AdminAnalyticsDashboard() {
             <div className="text-lg sm:text-xl font-bold text-gray-900 truncate">{analytics.peakDay?.date || '-'}</div>
             <div className="text-xs text-gray-400 mt-1">
               {analytics.peakDay ? `${analytics.peakDay.count} ${language === 'th' ? 'รายการ' : 'entries'}` : ''}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Logins */}
+        <Card className="bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs sm:text-sm text-gray-500">{language === 'th' ? 'การเข้าสู่ระบบ' : 'Logins'}</span>
+              <div className="h-8 w-8 rounded-xl bg-teal-100 flex items-center justify-center">
+                <LogIn className="h-4 w-4 text-teal-600" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{loginStats.total.toLocaleString()}</div>
+            <div className="text-xs text-gray-400 mt-1">
+              {loginStats.uniqueUsers} {language === 'th' ? 'ผู้ใช้' : 'users'}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Last Login */}
+        <Card className="bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-200/50 shadow-xl shadow-gray-900/5 hover:shadow-2xl transition-all duration-300">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs sm:text-sm text-gray-500">{language === 'th' ? 'เข้าสู่ระบบล่าสุด' : 'Last Login'}</span>
+              <div className="h-8 w-8 rounded-xl bg-cyan-100 flex items-center justify-center">
+                <Clock className="h-4 w-4 text-cyan-600" />
+              </div>
+            </div>
+            <div className="text-base sm:text-lg font-bold text-gray-900 truncate">
+              {loginStats.last ? format(parseISO(loginStats.last), 'd MMM yyyy') : '-'}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              {loginStats.last ? format(parseISO(loginStats.last), 'HH:mm') : ''}
             </div>
           </CardContent>
         </Card>
