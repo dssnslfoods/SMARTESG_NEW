@@ -565,6 +565,15 @@ export default function Governance() {
 
   const tableYears = useMemo(() => isAllTime ? yearsWithData : (prevYear ? [selectedYear, prevYear] : [selectedYear]), [isAllTime, yearsWithData, selectedYear, prevYear]);
 
+  const fsCard = "flex flex-col min-h-0 overflow-hidden bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl";
+  const normalCard = "bg-card/70 backdrop-blur-xl border-border/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-3xl";
+  const chartCardCls = isFullscreen ? fsCard : normalCard;
+  const fsHeader = "flex flex-row items-center gap-2 py-2 px-3 shrink-0";
+  const normalHeader = "flex flex-row items-center gap-3";
+  const chartHeaderCls = isFullscreen ? fsHeader : normalHeader;
+  const chartContentCls = isFullscreen ? "flex-1 min-h-0 p-2" : "p-6 pt-0";
+  const chartHeight = isFullscreen ? 200 : 300;
+
   if (loading) {
     return <ReportsLoadingSkeleton />;
   }
@@ -770,10 +779,10 @@ export default function Governance() {
       )}
 
       {/* Charts Grid */}
-      <div className={isFullscreen ? "flex-1 overflow-hidden grid grid-cols-2 grid-rows-2 gap-2 min-h-0" : "grid grid-cols-1 lg:grid-cols-2 gap-6"}>
+      <div className={isFullscreen ? "flex-1 overflow-y-auto grid grid-cols-2 gap-2 min-h-0" : "grid grid-cols-1 lg:grid-cols-2 gap-6"}>
         {/* Chart 1: Monthly Incident Trend */}
-        <Card className={`bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl ${isFullscreen ? "flex flex-col min-h-0 overflow-hidden" : "hover:shadow-2xl transition-all duration-300 rounded-3xl"}`}>
-          <CardHeader className={`flex flex-row items-center gap-2 ${isFullscreen ? "py-2 px-3 shrink-0" : "gap-3"}`}>
+        <Card className={chartCardCls}>
+          <CardHeader className={chartHeaderCls}>
             <div className="p-2 bg-primary/10 rounded-xl">
               <Activity className="h-4 w-4 text-primary" />
             </div>
@@ -781,11 +790,11 @@ export default function Governance() {
               {language === "th" ? "แนวโน้มเหตุการณ์รายเดือน" : "Monthly Incident Trend"}
             </CardTitle>
           </CardHeader>
-          <CardContent className={isFullscreen ? "flex-1 min-h-0 p-2" : "p-6 pt-0"}>
+          <CardContent className={chartContentCls}>
             {!hasData ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
             ) : (
-              <ChartScrollWrapper dataLength={monthlyIncidentData.length} minBarWidth={52} height={300}>
+              <ChartScrollWrapper dataLength={monthlyIncidentData.length} minBarWidth={52} height={chartHeight}>
                 <ComposedChart data={monthlyIncidentData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
@@ -802,8 +811,8 @@ export default function Governance() {
         </Card>
 
         {/* Chart 2: Incidents by Site */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
+        <Card className={chartCardCls}>
+          <CardHeader className={chartHeaderCls}>
             <div className="p-2 bg-primary/10 rounded-xl">
               <BarChart3 className="h-4 w-4 text-primary" />
             </div>
@@ -811,11 +820,11 @@ export default function Governance() {
               {language === "th" ? "เหตุการณ์แยกตามสถานที่" : "Incidents by Site"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={chartContentCls}>
             {incidentsBySite.length === 0 ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={chartHeight}>
                 <BarChart data={incidentsBySite} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
@@ -831,8 +840,8 @@ export default function Governance() {
         </Card>
 
         {/* Chart 3: Theme Distribution (Pie) */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
+        <Card className={chartCardCls}>
+          <CardHeader className={chartHeaderCls}>
             <div className="p-2 bg-primary/10 rounded-xl">
               <Scale className="h-4 w-4 text-primary" />
             </div>
@@ -840,38 +849,36 @@ export default function Governance() {
               {language === "th" ? "สัดส่วนข้อมูลตาม Theme" : "Data Distribution by Theme"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={chartContentCls}>
             {themeDistribution.length === 0 ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
             ) : (
-              <div className="flex flex-col lg:flex-row items-center gap-4">
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie
-                      data={themeDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={4}
-                      dataKey="records"
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                    >
-                      {themeDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={glassTooltipStyle} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              <ResponsiveContainer width="100%" height={isFullscreen ? 180 : 280}>
+                <PieChart>
+                  <Pie
+                    data={themeDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={isFullscreen ? 40 : 60}
+                    outerRadius={isFullscreen ? 70 : 100}
+                    paddingAngle={4}
+                    dataKey="records"
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  >
+                    {themeDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={glassTooltipStyle} />
+                </PieChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
 
         {/* Chart 4: Cumulative Incidents */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
+        <Card className={chartCardCls}>
+          <CardHeader className={chartHeaderCls}>
             <div className="p-2 bg-primary/10 rounded-xl">
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
@@ -879,11 +886,11 @@ export default function Governance() {
               {language === "th" ? "เหตุการณ์สะสมรายเดือน" : "Cumulative Incidents"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={chartContentCls}>
             {!hasData ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
             ) : (
-              <ChartScrollWrapper dataLength={cumulativeData.length} minBarWidth={52} height={300}>
+              <ChartScrollWrapper dataLength={cumulativeData.length} minBarWidth={52} height={chartHeight}>
                 <AreaChart data={cumulativeData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
@@ -900,8 +907,8 @@ export default function Governance() {
 
         {/* Chart 5: YoY Comparison — only when a specific year is selected */}
         {!isAllTime && prevYear && yoyComparisonData.length > 0 && (
-          <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-3xl">
-            <CardHeader className="flex flex-row items-center gap-3">
+          <Card className={chartCardCls}>
+            <CardHeader className={chartHeaderCls}>
               <div className="p-2 bg-primary/10 rounded-xl">
                 <BarChart3 className="h-4 w-4 text-primary" />
               </div>
@@ -909,8 +916,8 @@ export default function Governance() {
                 {language === "th" ? `เปรียบเทียบ ${prevYear} vs ${selectedYear}` : `${prevYear} vs ${selectedYear} Comparison`}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+            <CardContent className={chartContentCls}>
+              <ResponsiveContainer width="100%" height={chartHeight}>
                 <BarChart data={yoyComparisonData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
@@ -926,8 +933,8 @@ export default function Governance() {
         )}
 
         {/* Chart 6: Governance Radar */}
-        <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-3xl">
-          <CardHeader className="flex flex-row items-center gap-3">
+        <Card className={chartCardCls}>
+          <CardHeader className={chartHeaderCls}>
             <div className="p-2 bg-primary/10 rounded-xl">
               <Shield className="h-4 w-4 text-primary" />
             </div>
@@ -935,11 +942,11 @@ export default function Governance() {
               {language === "th" ? "ภาพรวมธรรมาภิบาล" : "Governance Overview"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={chartContentCls}>
             {!hasRadarData ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลเพียงพอ" : "Insufficient data"} />
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={chartHeight}>
                 <RadarChart data={radarData}>
                   <PolarGrid stroke="hsl(var(--border))" />
                   <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
