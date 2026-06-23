@@ -568,11 +568,8 @@ export default function Governance() {
   const fsCard = "flex flex-col min-h-0 overflow-hidden bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-2xl";
   const normalCard = "bg-card/70 backdrop-blur-xl border-border/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-3xl";
   const chartCardCls = isFullscreen ? fsCard : normalCard;
-  const fsHeader = "flex flex-row items-center gap-2 py-2 px-3 shrink-0";
-  const normalHeader = "flex flex-row items-center gap-3";
-  const chartHeaderCls = isFullscreen ? fsHeader : normalHeader;
+  const chartHeaderCls = isFullscreen ? "flex flex-row items-center gap-2 py-2 px-3 shrink-0" : "flex flex-row items-center gap-3";
   const chartContentCls = isFullscreen ? "flex-1 min-h-0 p-2" : "p-6 pt-0";
-  const chartHeight = isFullscreen ? 200 : 300;
 
   if (loading) {
     return <ReportsLoadingSkeleton />;
@@ -778,8 +775,8 @@ export default function Governance() {
         </Card>
       )}
 
-      {/* Charts Grid */}
-      <div className={isFullscreen ? "flex-1 overflow-y-auto grid grid-cols-2 gap-2 min-h-0" : "grid grid-cols-1 lg:grid-cols-2 gap-6"}>
+      {/* Charts Grid — fullscreen: exactly 4 charts in 2×2 filling the screen */}
+      <div className={isFullscreen ? "flex-1 grid grid-cols-2 grid-rows-2 gap-2 min-h-0 overflow-hidden" : "grid grid-cols-1 lg:grid-cols-2 gap-6"}>
         {/* Chart 1: Monthly Incident Trend */}
         <Card className={chartCardCls}>
           <CardHeader className={chartHeaderCls}>
@@ -793,8 +790,21 @@ export default function Governance() {
           <CardContent className={chartContentCls}>
             {!hasData ? (
               <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+            ) : isFullscreen ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={monthlyIncidentData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                  <Tooltip contentStyle={glassTooltipStyle} labelFormatter={(label) => `📅 ${label}`} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="governance" name={language === "th" ? "กำกับดูแล" : "Governance"} fill="hsl(262 83% 58%)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="corruption" name={language === "th" ? "ทุจริต" : "Corruption"} fill="hsl(0 84% 60%)" radius={[4, 4, 0, 0]} />
+                  <Line type="monotone" dataKey="total" name={language === "th" ? "รวม" : "Total"} stroke="hsl(var(--foreground))" strokeWidth={2} dot={{ r: 3 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
             ) : (
-              <ChartScrollWrapper dataLength={monthlyIncidentData.length} minBarWidth={52} height={chartHeight}>
+              <ChartScrollWrapper dataLength={monthlyIncidentData.length} minBarWidth={52} height={300}>
                 <ComposedChart data={monthlyIncidentData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
@@ -810,165 +820,210 @@ export default function Governance() {
           </CardContent>
         </Card>
 
-        {/* Chart 2: Incidents by Site */}
+        {/* Chart 2: Governance Radar (fullscreen) / Incidents by Site (normal) */}
         <Card className={chartCardCls}>
           <CardHeader className={chartHeaderCls}>
             <div className="p-2 bg-primary/10 rounded-xl">
-              <BarChart3 className="h-4 w-4 text-primary" />
+              {isFullscreen ? <Shield className="h-4 w-4 text-primary" /> : <BarChart3 className="h-4 w-4 text-primary" />}
             </div>
             <CardTitle className="text-base font-medium">
-              {language === "th" ? "เหตุการณ์แยกตามสถานที่" : "Incidents by Site"}
+              {isFullscreen
+                ? (language === "th" ? "ภาพรวมธรรมาภิบาล" : "Governance Overview")
+                : (language === "th" ? "เหตุการณ์แยกตามสถานที่" : "Incidents by Site")}
             </CardTitle>
           </CardHeader>
           <CardContent className={chartContentCls}>
-            {incidentsBySite.length === 0 ? (
-              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+            {isFullscreen ? (
+              !hasRadarData ? (
+                <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลเพียงพอ" : "Insufficient data"} />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={radarData}>
+                    <PolarGrid stroke="hsl(var(--border))" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                    <PolarRadiusAxis tick={{ fontSize: 10 }} />
+                    <Radar name={language === "th" ? "ค่าตัวชี้วัด" : "Metric Value"} dataKey="value" stroke="hsl(262 83% 58%)" fill="hsl(262 83% 58%)" fillOpacity={0.3} strokeWidth={2} />
+                    <Tooltip contentStyle={glassTooltipStyle} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              )
             ) : (
-              <ResponsiveContainer width="100%" height={chartHeight}>
-                <BarChart data={incidentsBySite} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={glassTooltipStyle} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="governance" name={language === "th" ? "กำกับดูแล" : "Governance"} stackId="a" fill="hsl(262 83% 58%)" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="corruption" name={language === "th" ? "ทุจริต" : "Corruption"} stackId="a" fill="hsl(0 84% 60%)" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              incidentsBySite.length === 0 ? (
+                <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={incidentsBySite} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={glassTooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="governance" name={language === "th" ? "กำกับดูแล" : "Governance"} stackId="a" fill="hsl(262 83% 58%)" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="corruption" name={language === "th" ? "ทุจริต" : "Corruption"} stackId="a" fill="hsl(0 84% 60%)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )
             )}
           </CardContent>
         </Card>
 
-        {/* Chart 3: Theme Distribution (Pie) */}
+        {/* Chart 3: Cumulative Incidents (fullscreen) / Theme Distribution Pie (normal) */}
         <Card className={chartCardCls}>
           <CardHeader className={chartHeaderCls}>
             <div className="p-2 bg-primary/10 rounded-xl">
-              <Scale className="h-4 w-4 text-primary" />
+              {isFullscreen ? <TrendingUp className="h-4 w-4 text-primary" /> : <Scale className="h-4 w-4 text-primary" />}
             </div>
             <CardTitle className="text-base font-medium">
-              {language === "th" ? "สัดส่วนข้อมูลตาม Theme" : "Data Distribution by Theme"}
+              {isFullscreen
+                ? (language === "th" ? "เหตุการณ์สะสมรายเดือน" : "Cumulative Incidents")
+                : (language === "th" ? "สัดส่วนข้อมูลตาม Theme" : "Data Distribution by Theme")}
             </CardTitle>
           </CardHeader>
           <CardContent className={chartContentCls}>
-            {themeDistribution.length === 0 ? (
-              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+            {isFullscreen ? (
+              !hasData ? (
+                <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={cumulativeData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={glassTooltipStyle} labelFormatter={(label) => `📅 ${label}`} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Area type="monotone" dataKey="govCumulative" name={language === "th" ? "กำกับดูแล (สะสม)" : "Governance (Cum.)"} stroke="hsl(262 83% 58%)" fill="hsl(262 83% 58%)" fillOpacity={0.2} strokeWidth={2} />
+                    <Area type="monotone" dataKey="corruptCumulative" name={language === "th" ? "ทุจริต (สะสม)" : "Corruption (Cum.)"} stroke="hsl(0 84% 60%)" fill="hsl(0 84% 60%)" fillOpacity={0.2} strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )
             ) : (
-              <ResponsiveContainer width="100%" height={isFullscreen ? 180 : 280}>
-                <PieChart>
-                  <Pie
-                    data={themeDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={isFullscreen ? 40 : 60}
-                    outerRadius={isFullscreen ? 70 : 100}
-                    paddingAngle={4}
-                    dataKey="records"
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                  >
-                    {themeDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={glassTooltipStyle} />
-                </PieChart>
-              </ResponsiveContainer>
+              themeDistribution.length === 0 ? (
+                <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie data={themeDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={4} dataKey="records"
+                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
+                      {themeDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={glassTooltipStyle} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )
             )}
           </CardContent>
         </Card>
 
-        {/* Chart 4: Cumulative Incidents */}
+        {/* Chart 4: Incidents by Site (fullscreen) / Cumulative Incidents (normal) */}
         <Card className={chartCardCls}>
           <CardHeader className={chartHeaderCls}>
             <div className="p-2 bg-primary/10 rounded-xl">
-              <TrendingUp className="h-4 w-4 text-primary" />
+              {isFullscreen ? <BarChart3 className="h-4 w-4 text-primary" /> : <TrendingUp className="h-4 w-4 text-primary" />}
             </div>
             <CardTitle className="text-base font-medium">
-              {language === "th" ? "เหตุการณ์สะสมรายเดือน" : "Cumulative Incidents"}
+              {isFullscreen
+                ? (language === "th" ? "เหตุการณ์แยกตามสถานที่" : "Incidents by Site")
+                : (language === "th" ? "เหตุการณ์สะสมรายเดือน" : "Cumulative Incidents")}
             </CardTitle>
           </CardHeader>
           <CardContent className={chartContentCls}>
-            {!hasData ? (
-              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+            {isFullscreen ? (
+              incidentsBySite.length === 0 ? (
+                <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={incidentsBySite} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={glassTooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="governance" name={language === "th" ? "กำกับดูแล" : "Governance"} stackId="a" fill="hsl(262 83% 58%)" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="corruption" name={language === "th" ? "ทุจริต" : "Corruption"} stackId="a" fill="hsl(0 84% 60%)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )
             ) : (
-              <ChartScrollWrapper dataLength={cumulativeData.length} minBarWidth={52} height={chartHeight}>
-                <AreaChart data={cumulativeData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={glassTooltipStyle} labelFormatter={(label) => `📅 ${label}`} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Area type="monotone" dataKey="govCumulative" name={language === "th" ? "กำกับดูแล (สะสม)" : "Governance (Cum.)"} stroke="hsl(262 83% 58%)" fill="hsl(262 83% 58%)" fillOpacity={0.2} strokeWidth={2} />
-                  <Area type="monotone" dataKey="corruptCumulative" name={language === "th" ? "ทุจริต (สะสม)" : "Corruption (Cum.)"} stroke="hsl(0 84% 60%)" fill="hsl(0 84% 60%)" fillOpacity={0.2} strokeWidth={2} />
-                </AreaChart>
-              </ChartScrollWrapper>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Chart 5: YoY Comparison — only when a specific year is selected */}
-        {!isAllTime && prevYear && yoyComparisonData.length > 0 && (
-          <Card className={chartCardCls}>
-            <CardHeader className={chartHeaderCls}>
-              <div className="p-2 bg-primary/10 rounded-xl">
-                <BarChart3 className="h-4 w-4 text-primary" />
-              </div>
-              <CardTitle className="text-base font-medium">
-                {language === "th" ? `เปรียบเทียบ ${prevYear} vs ${selectedYear}` : `${prevYear} vs ${selectedYear} Comparison`}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className={chartContentCls}>
-              <ResponsiveContainer width="100%" height={chartHeight}>
-                <BarChart data={yoyComparisonData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={glassTooltipStyle} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="previous" name={`${prevYear}`} fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} opacity={0.6} />
-                  <Bar dataKey="current" name={`${selectedYear}`} fill="hsl(262 83% 58%)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Chart 6: Governance Radar */}
-        <Card className={chartCardCls}>
-          <CardHeader className={chartHeaderCls}>
-            <div className="p-2 bg-primary/10 rounded-xl">
-              <Shield className="h-4 w-4 text-primary" />
-            </div>
-            <CardTitle className="text-base font-medium">
-              {language === "th" ? "ภาพรวมธรรมาภิบาล" : "Governance Overview"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className={chartContentCls}>
-            {!hasRadarData ? (
-              <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลเพียงพอ" : "Insufficient data"} />
-            ) : (
-              <ResponsiveContainer width="100%" height={chartHeight}>
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <PolarRadiusAxis tick={{ fontSize: 10 }} />
-                  <Radar
-                    name={language === "th" ? "ค่าตัวชี้วัด" : "Metric Value"}
-                    dataKey="value"
-                    stroke="hsl(262 83% 58%)"
-                    fill="hsl(262 83% 58%)"
-                    fillOpacity={0.3}
-                    strokeWidth={2}
-                  />
-                  <Tooltip contentStyle={glassTooltipStyle} />
-                </RadarChart>
-              </ResponsiveContainer>
+              !hasData ? (
+                <EmptyState message={language === "th" ? "ยังไม่มีข้อมูล" : "No data available"} />
+              ) : (
+                <ChartScrollWrapper dataLength={cumulativeData.length} minBarWidth={52} height={300}>
+                  <AreaChart data={cumulativeData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={glassTooltipStyle} labelFormatter={(label) => `📅 ${label}`} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Area type="monotone" dataKey="govCumulative" name={language === "th" ? "กำกับดูแล (สะสม)" : "Governance (Cum.)"} stroke="hsl(262 83% 58%)" fill="hsl(262 83% 58%)" fillOpacity={0.2} strokeWidth={2} />
+                    <Area type="monotone" dataKey="corruptCumulative" name={language === "th" ? "ทุจริต (สะสม)" : "Corruption (Cum.)"} stroke="hsl(0 84% 60%)" fill="hsl(0 84% 60%)" fillOpacity={0.2} strokeWidth={2} />
+                  </AreaChart>
+                </ChartScrollWrapper>
+              )
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Summary Table */}
-      <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-3xl">
+      {/* Extra charts — normal mode only (YoY + Radar) */}
+      {!isFullscreen && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {!isAllTime && prevYear && yoyComparisonData.length > 0 && (
+            <Card className={normalCard}>
+              <CardHeader className="flex flex-row items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-xl">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                </div>
+                <CardTitle className="text-base font-medium">
+                  {language === "th" ? `เปรียบเทียบ ${prevYear} vs ${selectedYear}` : `${prevYear} vs ${selectedYear} Comparison`}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 pt-0">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={yoyComparisonData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={glassTooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="previous" name={`${prevYear}`} fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} opacity={0.6} />
+                    <Bar dataKey="current" name={`${selectedYear}`} fill="hsl(262 83% 58%)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+          <Card className={normalCard}>
+            <CardHeader className="flex flex-row items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-xl">
+                <Shield className="h-4 w-4 text-primary" />
+              </div>
+              <CardTitle className="text-base font-medium">
+                {language === "th" ? "ภาพรวมธรรมาภิบาล" : "Governance Overview"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0">
+              {!hasRadarData ? (
+                <EmptyState message={language === "th" ? "ยังไม่มีข้อมูลเพียงพอ" : "Insufficient data"} />
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <RadarChart data={radarData}>
+                    <PolarGrid stroke="hsl(var(--border))" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <PolarRadiusAxis tick={{ fontSize: 10 }} />
+                    <Radar name={language === "th" ? "ค่าตัวชี้วัด" : "Metric Value"} dataKey="value" stroke="hsl(262 83% 58%)" fill="hsl(262 83% 58%)" fillOpacity={0.3} strokeWidth={2} />
+                    <Tooltip contentStyle={glassTooltipStyle} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Summary Table — normal mode only */}
+      {!isFullscreen && <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl rounded-3xl">
         <CardHeader className="flex flex-row items-center gap-3">
           <div className="p-2 bg-primary/10 rounded-xl">
             <FileCheck className="h-4 w-4 text-primary" />
@@ -1042,7 +1097,7 @@ export default function Governance() {
             </Table>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }
