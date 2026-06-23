@@ -853,7 +853,7 @@ export default function ESGOverview() {
           <Badge variant="outline" className="ml-auto text-xs">
             {isAllTime
               ? (language === "th" ? `ทุกปี (${tableYears.join(", ")})` : `All years (${tableYears.join(", ")})`)
-              : `${selectedYear} vs ${prevYear}`}
+              : prevYear ? `${selectedYear} vs ${prevYear}` : `${selectedYear}`}
           </Badge>
         </CardHeader>
         <CardContent>

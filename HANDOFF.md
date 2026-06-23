@@ -1,327 +1,438 @@
-# ESG Hub — AI Handoff Document
+# SMARTESG — AI Agent Handoff Document
 
-> **Purpose:** เอกสารส่งต่อสำหรับ AI agent / นักพัฒนา ที่จะมาดูแล/พัฒนาระบบต่อ
-> ให้เข้าใจสถาปัตยกรรม โดเมน และข้อกำหนดสำคัญทั้งหมดได้ภายใน 10 นาที
-> **Last updated:** 2026-05-15
+> **Product**: ESG Smart Performance
+> **Company**: D2Infinite Co., Ltd.
+> **Production URL**: https://smartesg-af75b.web.app
+> **Repository**: github.com/dssnslfoods/SMARTESG_NEW (branch: `main`)
+> **Local Path**: `/Users/golf/Desktop/Projects/SMARTESG/SMARTESG_NEW`
+> **Last Updated**: 2026-06-18
 
 ---
 
-## 1. ภาพรวมระบบ (What is this?)
+## 1. What Is This System?
 
-**ESG Hub** = ระบบบันทึก/รายงานข้อมูล ESG (Environmental, Social, Governance) ระดับองค์กร
-- **ผู้ใช้หลัก:** บริษัท + ไซต์ปฏิบัติงานหลายแห่ง บันทึกตัวชี้วัด ESG รายเดือน
-- **ภาษา:** Bilingual ไทย/อังกฤษ (UI labels), schema field เป็น English snake_case
-- **Output:** Dashboard, รายงาน ESG (Environmental / Social / Governance / Overview), TV fullscreen mode, Excel export, Audit log
-- **Live URL:** https://vital-esg-hub.lovable.app
-- **Custom domain:** https://esgnsl.def2design.com
+SMARTESG is a **multi-tenant SaaS web application** for collecting, managing, and reporting ESG (Environmental, Social, Governance) data. It follows the **GHG Protocol** for greenhouse gas emissions and supports bilingual UI (Thai/English).
+
+**Core workflow**: Admin sets up master data (companies, sites, dimensions, themes, metrics, targets) → Staff enters data per site/period → System aggregates and displays dashboards/reports → Executive reviews ESG performance.
 
 ---
 
 ## 2. Tech Stack
 
-| Layer | Stack |
-|---|---|
-| Frontend | React 18 + Vite 5 + TypeScript 5 + Tailwind v3 |
-| UI Kit | shadcn/ui (Radix), lucide-react icons |
-| Animation | framer-motion, custom `iosPageEnter` |
-| Backend | Supabase (Postgres + Auth + Edge Functions + RLS) |
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18 + TypeScript + Vite |
+| UI | Tailwind CSS + shadcn/ui + Radix UI + lucide-react |
 | Charts | Recharts |
-| Excel | SheetJS (`xlsx`) — client-side, zero-DB |
-| State | React Context (Auth, Language, Notifications, ReportSections, TVMode) |
+| State | TanStack React Query v5 |
+| Routing | React Router v6 |
+| Backend | Supabase (PostgreSQL + PostgREST + Auth) |
+| Hosting | Firebase Hosting |
+| Project ID (Firebase) | `smartesg-af75b` |
+| Project ID (Supabase) | `zwzdhbttmtbkjyegsmzz` |
 
-> **No Next.js / no SSR.** Client-side React only.
-
----
-
-## 3. Design System (CRITICAL — must follow)
-
-**Liquid Glass (iOS 26):**
-- `backdrop-blur-xl saturate-200` + `bg-white/70` + `border-white/40` + `rounded-3xl`
-- Page transitions: `className="ios-page-enter"` (defined in `index.css`)
-- Never use raw color classes like `bg-blue-500` — use **semantic tokens** in `index.css` and `tailwind.config.ts`
-- Colors are HSL only
-
-**Component rules:**
-- **Never wrap pages in `MainLayout`** — layout is applied at router level
-- Radix `Select` placeholder for "All" must use `value="__all__"` (empty string is forbidden)
-- Use `KPICard` component with semantic variants for dashboard tiles
-- Loading bars: use `<LoadingProgress />` for fetch progress
+> **No SSR / No Next.js.** Client-side React SPA only.
 
 ---
 
-## 4. Roles & RBAC (5 levels)
+## 3. Multi-Tenant Architecture
 
-| Role | Capabilities |
-|---|---|
-| **admin** | Full CRUD on everything; only one who can manage `app_setting`, `audit_log`, `user_roles` deletion |
-| **executive** | Read-only — sees ALL `metric_value` regardless of status; views dashboards/reports |
-| **supervisor** | Like admin EXCEPT cannot delete `user_roles`, cannot manage `app_setting`/`audit_log` |
-| **staff** | CRUD only own data (`submitted_by = auth.uid()`); sees only own `site_id`; insert allowed if `status ∈ {draft, submitted}` |
-| **guest** | Default for new signups; sees only `metric_value` with `status='approved'`; sidebar shows visual-only links |
+### Tenants
 
-**Auth flow:**
-- New signup → trigger creates `app_user_profile` (full_name) + `user_roles` row with `'guest'` + `is_active=true` (default)
-- Inactive users (`is_active=false`) are gated by `is_user_active(uid)` in nearly every RLS policy
-- Admin promotes via `user_roles` upsert (one role per user in practice — see `user-role-integrity` memory)
+| Tenant | ID | Notes |
+|--------|----|-------|
+| **NSL Foods PCL** | `7ab7fb63-0592-46d1-ae6d-e89449240599` | **PRODUCTION DATA — DO NOT MODIFY** |
+| DEMO PLC | `82bd1890-90d9-436d-8e60-d0e827d8be75` | Safe for testing/development |
 
-**Role gatekeeper functions (security definer):**
-- `has_role(uid, role)` — single source of truth, used in all policies
-- `is_user_active(uid)` — checks `app_user_profile.is_active`
-- `get_user_site(uid)`, `get_user_company(uid)` — for staff site-scoping
+### CRITICAL RULE
+
+**Never modify, delete, or affect NSL Foods PCL data.** All changes must be tenant-scoped. Always verify tenant isolation before and after any database operation.
+
+### How Tenant Isolation Works
+
+1. **`current_tenant_id()`** — PL/pgSQL STABLE SECURITY DEFINER function that reads the user's `tenant_id` from `app_user_profile`. Uses GUC cache (`app._tid_cache` via `set_config`) for performance.
+2. **Row-Level Security (RLS)** — Every table with tenant data has RLS policies that filter by `current_tenant_id()`. Policies use `(select auth.uid())` wrapped in InitPlan for performance.
+3. **Helper functions** (all SECURITY DEFINER):
+   - `is_super_admin(uuid)` — checks `super_admin` table
+   - `has_role(uuid, app_role)` — checks `user_roles` table
+   - `is_user_active(uuid)` — checks `app_user_profile.is_active`
 
 ---
 
-## 5. Database Schema (11 tables, all RLS-protected)
+## 4. Database Schema
 
-```text
-auth.users (Supabase managed)
-   ↓ trigger: handle_new_user + handle_new_user_role
-app_user_profile (user_id PK, company_id, site_id, is_active, full_name)
-user_roles (user_id, role enum) — UNIQUE(user_id, role)
+### Core Tables
 
-company (company_id PK)
-   ↓
-site (site_id PK, company_id)
-   ↓
-esg_dimension → esg_theme → esg_metric (text PKs, no FK constraints)
-                                ↓
-reporting_period (period_id "YYYY-MM", year, month, month_name)
-                                ↓
-metric_value (value_id PK, metric_id, site_id, period_id,
-              value, status, submitted_by, ...)
-              UNIQUE (site_id, period_id, metric_id) ← upsert key
+| Table | Purpose |
+|-------|---------|
+| `tenant` | Tenant registry (name, slug, plan) |
+| `app_user_profile` | User profile (tenant_id, company_id, site_id, is_active, must_change_password) |
+| `user_roles` | One role per user (admin/supervisor/executive/staff/guest/super_admin) |
+| `super_admin` | Super admin registry (cross-tenant access) |
+| `company` | Companies within a tenant |
+| `site` | Sites within a company (has company_id FK) |
+| `esg_dimension` | ESG dimensions (Environmental, Social, Governance) |
+| `esg_theme` | Themes within dimensions |
+| `esg_metric` | Metrics within themes — has `aggregation` (sum/avg) and `calc_mode` (manual/auto) |
+| `metric_value` | Actual data entries (value per metric/site/period). Unique on (site_id, period_id, metric_id) |
+| `metric_target` | Target values per metric/year |
+| `reporting_period` | Reporting periods (year/month/quarter) |
 
-audit_log (log_id, actor_user_id, action, entity_type, entity_id, before/after jsonb)
-app_setting (key PK, value, updated_by) — admin-only writable
+### Permission Tables
+
+| Table | Purpose |
+|-------|---------|
+| `menu_permission` | Per-role menu visibility (tenant-scoped) |
+| `tenant_menu_allowlist` | Tenant-level menu feature gating |
+| `tenant_feature` | Feature flags per tenant (e.g., `ghg_auto_calc`) |
+| `data_entry_permission` | Per-role CRUD capabilities: can_create, create_scope (all/own_company/own_site), edit_scope (all/own/none), delete_scope (all/own/none) |
+
+### GHG Tables
+
+| Table | Purpose |
+|-------|---------|
+| `emission_factor` | Active emission factors used in GHG calculations. Has activity_name_th/en, reference_detail, effective_year, active |
+| `emission_factor_reference` | Reference library imported from Excel (suggestion source only, not used in calculations) |
+| `ghg_calc_mapping` | Maps activity metrics to GHG target metrics for auto-calculation |
+
+### Analytics & System Tables
+
+| Table | Purpose |
+|-------|---------|
+| `login_event` | Records each successful login (user_id, timestamp, user_agent) |
+| `audit_log` | System-wide audit trail |
+| `app_setting` | Tenant-scoped application settings (key-value) |
+
+### Key Database Functions (RPCs)
+
+| Function | Purpose |
+|----------|---------|
+| `current_tenant_id()` | Returns authenticated user's tenant_id (GUC-cached, SECURITY DEFINER) |
+| `get_dashboard_metric_stats()` | Server-side aggregated counters for dashboard cards (SECURITY INVOKER, respects RLS) |
+| `get_executive_summary(p_year int, p_company_id text, p_site_id text)` | Scope-filtered executive dashboard data. **All params are `text` type, not uuid** |
+| `get_ghg_summary()` | GHG dashboard data with Scope 1/2/3 breakdown. Returns `has_scope3` flag |
+| `backfill_ghg_emissions()` | Computes GHG from historical activity data (ON CONFLICT DO NOTHING, safe to re-run) |
+| `recompute_ghg_target()` | Recalculates aggregated GHG targets from component metrics |
+| `seed_new_tenant()` | Initializes a new tenant with default master data |
+| `get_or_create_period()` | Gets or creates a reporting period record |
+| `get_platform_overview()` | Super-admin platform-wide statistics |
+| `get_tenant_activity_list()` | Tenant activity feed for super-admin dashboard |
+
+---
+
+## 5. User Roles & Permissions
+
+### Roles
+1. **super_admin** — Cross-tenant access, platform management (bypasses all route guards)
+2. **admin** — Full tenant access, all menus, all settings
+3. **supervisor** — Master data management, data entry, limited reports
+4. **executive** — Reports/dashboards, KPI targets, read-only
+5. **staff** — Data entry only (scoped by company/site assignment)
+6. **guest** — View-only dashboard and ESG Key Issues
+
+### Permission Layers (4 layers, all must pass)
+1. **Route Guard** (`ProtectedRoute` in App.tsx) — React Router level, checks `canAccess(allowedRoles)`
+2. **Menu Visibility** (`canSeeMenu()` in MenuPermissionsContext) — Controls sidebar rendering, checks `menu_permission` + `tenant_menu_allowlist`
+3. **Feature Flags** (`hasFeature()` in MenuPermissionsContext) — Tenant-level feature gating via `tenant_feature` table
+4. **Data Entry Permissions** — Per-role CRUD matrix from `data_entry_permission` table, enforced in DataEntry.tsx
+
+### Feature-Gated Menus (FEATURE_GATED map in Sidebar)
+```
+reports/ghg         → requires feature 'ghg_auto_calc'
+master/ghg-settings → requires feature 'ghg_auto_calc'
 ```
 
-**Important conventions:**
-- All master data uses **text IDs with prefix conventions** (see `auto-id-generation-v3` memory)
-- `metric_value.status` is strictly `'draft'` or `'submitted'` (older code may show `'approved'` in RLS — keep but no UI sets it)
-- `metric_value` upserts on `(site_id, period_id, metric_id)` — never insert duplicates
-- `period_id` format: `YYYY-MM` (e.g. `2026-04`)
-
 ---
 
-## 6. Key Files & Folders
+## 6. Frontend Architecture
 
-```text
+### Directory Structure
+```
 src/
-├── App.tsx                       — routing + role-gated routes
-├── pages/
-│   ├── Auth.tsx                  — fullscreen login (see login-page-v2-6 memory)
-│   ├── Dashboard.tsx             — main KPI dashboard
-│   ├── DataEntry.tsx             — primary CRUD page (filters, paging from app_setting)
-│   ├── UserManagement.tsx        — admin/supervisor user mgmt
-│   ├── AuditLog.tsx              — admin-only audit viewer
-│   ├── BackupData.tsx            — Excel-based 11-col import/export
-│   ├── master/
-│   │   ├── CompanyManagement.tsx
-│   │   ├── SiteManagement.tsx
-│   │   ├── DimensionManagement.tsx
-│   │   ├── ThemeManagement.tsx
-│   │   ├── MetricManagement.tsx
-│   │   ├── PeriodManagement.tsx
-│   │   └── SystemSettings.tsx    — admin-only: page size + period filter config
-│   └── reports/
-│       ├── ESGOverview.tsx
-│       ├── Environmental.tsx
-│       ├── Social.tsx            — incl. LTIFR formula
-│       └── Governance.tsx
-├── components/
-│   ├── layout/ {Sidebar, Header, MainLayout (do NOT use), NotificationBell}
-│   ├── dashboard/AdminAnalyticsDashboard.tsx
-│   ├── reports/ {TrendAnalytics, FullscreenButton, TVNavBar, ...}
-│   └── ui/ (shadcn — kpi-card, loading-progress, status-badge are custom)
+├── App.tsx                    # Routes + context providers (lazy-loaded pages)
+├── main.tsx                   # Entry point, wraps App in ErrorBoundary
+├── contexts/
+│   ├── AuthContext.tsx         # Auth state, signIn/signOut, profile sessionStorage cache (30min TTL)
+│   ├── MenuPermissionsContext.tsx  # canSeeMenu(), hasFeature()
+│   ├── LanguageContext.tsx     # Thai/English toggle
+│   ├── BrandingContext.tsx     # Tenant branding (logo, colors)
+│   ├── ReportSectionsContext.tsx   # Report section config
+│   ├── NotificationsContext.tsx    # In-app notifications
+│   └── TVModeContext.tsx       # TV display / digital signage mode
 ├── hooks/
-│   ├── useAuditLog.ts            — wraps create_audit_log RPC
-│   ├── useOptimizedData.ts       — 1000-row bypass via offset loop
-│   ├── useDeleteValidation.ts    — blocks deletes when dependencies exist
-│   └── useRealtimeNotifications.ts
-├── contexts/ {Auth, Language, Notifications, ReportSections, TVMode}
+│   ├── useOptimizedData.ts    # Dashboard data with RPC-based stats
+│   ├── useAuditLog.ts         # Audit logging helper
+│   ├── useDeleteValidation.ts # Pre-delete dependency check
+│   └── usePlanLimits.ts       # Plan-based feature limits
 ├── lib/
-│   ├── dataFetcher.ts            — paginated fetch for 100k+ rows
-│   ├── excelExport.ts            — bilingual headers
-│   └── i18n.ts
+│   ├── menuConfig.ts          # Single source of truth for all menu items + default permissions
+│   ├── dataFetcher.ts         # Supabase paginated query helpers
+│   ├── i18n.ts                # Translation utilities
+│   └── excelExport.ts         # Excel export helper
+├── pages/
+│   ├── Auth.tsx               # Login page (no tenant name shown pre-auth)
+│   ├── Dashboard.tsx          # Admin analytics dashboard OR executive dashboard (by role)
+│   ├── DataEntry.tsx          # Filter-first, search-on-demand data entry
+│   ├── ESGKeyIssues.tsx       # ESG materiality matrix with Company/Site/Year scope filters
+│   ├── HelpCenter.tsx         # Permission-aware bilingual user manual
+│   ├── master/
+│   │   ├── GhgSettings.tsx    # GHG config: EF reference library, scope 1/2/3 groups, auto/manual toggle, suggest/backfill
+│   │   ├── DataEntryPermission.tsx  # Per-role CRUD capability matrix editor
+│   │   ├── TargetManagement.tsx     # KPI target setting per metric/year
+│   │   ├── MenuPermission.tsx       # Menu visibility per role
+│   │   └── ... (Company, Site, Dimension, Theme, Metric, Period, SystemSettings)
+│   ├── reports/
+│   │   ├── GhgDashboard.tsx   # GHG dashboard with Scope 1/2/3, tooltips, target reference lines
+│   │   ├── ESGOverview.tsx    # Aggregated ESG overview
+│   │   └── Environmental.tsx, Social.tsx, Governance.tsx
+│   └── super/                 # Super-admin only pages
+│       ├── TenantManagement.tsx
+│       ├── TenantMenuAccess.tsx
+│       └── PlanManagement.tsx
+├── components/
+│   ├── ErrorBoundary.tsx      # Global error boundary — auto-reloads on stale chunk-load errors
+│   ├── ProtectedRoute.tsx     # Route guard (role check)
+│   ├── layout/                # Sidebar, Header
+│   ├── dashboard/
+│   │   ├── ExecutiveDashboard.tsx      # Executive view with Company/Site/Year scope filters
+│   │   └── AdminAnalyticsDashboard.tsx # Admin analytics with login tracking cards
+│   └── ui/                    # shadcn/ui components
 └── integrations/supabase/
-    ├── client.ts                 ⚠️ AUTO-GENERATED — never edit
-    └── types.ts                  ⚠️ AUTO-GENERATED — never edit
-
-supabase/
-├── config.toml                   — only edit function-specific blocks
-├── migrations/                   — append-only, never edit existing
-└── functions/                    — Edge Functions (Deno)
-    ├── create-user/              — admin creates user via service role
-    ├── delete-user/
-    ├── update-user-email/
-    ├── update-password/          — admin password reset
-    └── get-user-email/
+    ├── client.ts              # Supabase client instance
+    └── types.ts               # Auto-generated TypeScript types
 ```
 
+### Key Frontend Patterns
+
+1. **Lazy Loading** — All pages except Auth/ResetPassword/NotFound use `React.lazy()` for code splitting
+2. **Error Boundary** — Global `ErrorBoundary` in main.tsx detects chunk-load failures (stale JS after deploy) and auto-reloads once (guarded by sessionStorage timestamp to prevent loops)
+3. **Session Cache** — AuthContext caches profile/role in sessionStorage (30-min TTL) to skip 3-query round-trip on page refresh. Invalidated on sign-out and on explicit sign-in (skipCache: true)
+4. **React Query** — staleTime: 5min, gcTime: 10min, refetchOnWindowFocus: false, retry: 1
+5. **PostgREST Pagination** — All list queries use pagination loops (PAGE_SIZE=1000) to overcome PostgREST's default 1000-row limit. Every loop fetches until `data.length < PAGE_SIZE`
+6. **Filter-First Pattern** — DataEntry loads master data on mount (lightweight), fetches records only on search button click (hasSearched state flag)
+7. **Server-Side Stats** — Dashboard top cards use `get_dashboard_metric_stats()` RPC instead of streaming all rows to count client-side (was the root cause of staff dashboard being slower than admin)
+
 ---
 
-## 7. Edge Functions
+## 7. GHG Protocol Implementation
 
-All require `SUPABASE_SERVICE_ROLE_KEY` (already set as secret). Pattern:
-1. CORS headers + OPTIONS preflight
-2. Create admin client with service role
+### Scopes
+- **Scope 1**: Direct emissions (fuel combustion, company vehicles, refrigerants)
+- **Scope 2**: Indirect emissions from purchased electricity
+- **Scope 3**: Other indirect emissions (upstream transport, business travel, waste)
+
+### Calculation Formula
+```
+Activity Data × Emission Factor ÷ 1000 = tCO₂e
+```
+
+### Auto-Calc Flow
+1. Admin configures activities in GHG Settings, grouped by Scope
+2. Each activity has Auto/Manual toggle
+3. Auto mode: `ghg_calc_mapping` links activity metric → GHG target metric
+4. `esg_metric.calc_mode` = 'auto' marks the metric for automatic GHG calculation
+5. `backfill_ghg_emissions()` retroactively computes GHG from historical activity data (safe, ON CONFLICT DO NOTHING)
+
+### Emission Factor Reference Library
+- Imported from Excel → `emission_factor_reference` table
+- Used for **suggestions only** (fuzzy Levenshtein matching)
+- Threshold: ratio >= 0.6 for auto-apply; any% for manual "Suggest" button click
+- Low-confidence matches shown with warning icon and tooltip
+- Active factors in `emission_factor` table are what the GHG calc actually uses
+- Users must explicitly **Save** suggested values — suggestions alone are NOT applied
+
+### GHG Dashboard (GhgDashboard.tsx)
+- KPI cards for Scope 1/2/3 totals
+- Donut chart (scope breakdown), monthly trend (YTD current year only), by-site bars
+- Net-Zero Trajectory: stacked bars by scope + horizontal ReferenceLine for target
+- Monthly average target line (annual target ÷ 12)
+- Color scheme: Scope 1 = red (#ef4444), Scope 2 = amber (#f59e0b), Scope 3 = blue (#3b82f6)
+- `has_scope3` flag from `get_ghg_summary()` RPC drives adaptive layout (hides Scope 3 UI when no data)
+- InfoTip (hover i icon) on every card with bilingual explanation
+
+---
+
+## 8. Deployment Workflow
+
+### Build & Deploy
+```bash
+cd /Users/golf/Desktop/Projects/SMARTESG/SMARTESG_NEW
+npm run build                    # Vite production build → dist/
+firebase deploy --only hosting   # Deploy to Firebase Hosting
+```
+
+### Git
+```bash
+git add -A
+git commit -m "description"
+git push origin main
+```
+
+- Work directly on `main` branch (no branching strategy)
+- Deploy Firebase + commit/push after each change
+- No CI/CD pipeline — manual deploy only
+
+### Important Deploy Notes
+- After deploy, users may have stale JS chunks cached. The `ErrorBoundary` auto-reloads on chunk-load errors (one-time, guarded by sessionStorage timestamp).
+- `index.html`: `Cache-Control: no-cache, no-store, must-revalidate`
+- Static assets (js/css/fonts/images): `Cache-Control: public, max-age=31536000, immutable`
+- **Never use `manualChunks` in vite.config.ts** — caused circular dependency crash with recharts/d3 (entire app went blank in production)
+
+---
+
+## 9. Bilingual Support (Thai/English)
+
+- `LanguageContext` provides `language` state and `setLanguage()` toggle
+- Most pages have inline Thai/English labels (conditional rendering, not a full i18n framework)
+- `src/lib/i18n.ts` provides translation utilities
+- Menu items: `label` (EN) + `labelTh` (TH) in `menuConfig.ts`
+- Help Center: fully bilingual content per guide entry
+- Database fields: some tables have both `_th` and `_en` name columns (e.g., emission_factor)
+
+---
+
+## 10. Edge Functions (Supabase / Deno)
+
+Located in `supabase/functions/`. All use service role key, pattern:
+1. CORS headers + OPTIONS preflight handling
+2. Create admin Supabase client with service role
 3. Validate inputs
-4. Call `supabaseAdmin.auth.admin.*`
-5. Return JSON
+4. Call `supabaseAdmin.auth.admin.*` methods
+5. Return JSON response
 
-**Auto-deployed** — do not tell user to deploy manually.
-
----
-
-## 8. Performance Patterns (must follow)
-
-- **1000-row Supabase limit:** ALWAYS use offset loop via `lib/dataFetcher.ts` for tables >1k rows (esp. `metric_value`)
-- **KPI counts:** use `.select('*', { count: 'exact', head: true })` to avoid pulling rows
-- **Dashboard aggregation:** continuous timeline charts span multiple years — see `dashboard-aggregation-logic` memory
-- **Loading UX:** show `<LoadingProgress />` whenever fetching >1k rows
+| Function | Purpose |
+|----------|---------|
+| `create-user` | Admin creates a new user |
+| `delete-user` | Admin deletes a user |
+| `update-user-email` | Admin updates user email |
+| `update-password` | Admin resets user password |
+| `get-user-email` | Retrieve user email by ID |
 
 ---
 
-## 9. Data Entry Page (most complex page)
+## 11. Known Constraints & Gotchas
 
-`src/pages/DataEntry.tsx` features:
-- Page size: configurable via `app_setting.data_entry_page_size` (admin sets in System Settings)
-- Period filter: configurable mode `recent | from | all` via 5 `app_setting` keys
-- Drafts (`status='draft'`) ALWAYS visible regardless of period filter
-- Default sort: `updated_at DESC`
-- Site dropdown is constrained by selected company (filter validation)
-- Filter-drop diagnostic indicator shows why a row is hidden
-- Admin can edit submitted records (administrative override)
-- Independent month/year selectors (separated lookups, not one combo)
-- Active periods card displays the currently filtered window for transparency
-
----
-
-## 10. Reports & Dashboards
-
-- **TrendAnalytics:** unified engine for all report tabs (E/S/G); labels are localized via i18n
-- **TV Fullscreen mode:** triggered by `FullscreenButton`, uses `TVModeContext` + `TVNavBar` for digital signage
-- **Excel export:** `excelExport.ts` produces bilingual headers; client-side, no DB roundtrip
-- **LTIFR formula:** `(lost_time_injuries × 1,000,000) / total_hours_worked` — implemented in Social report
-- **Number formatting:** all numeric displays use `toLocaleString()` for thousands separators
+1. **PostgREST 1000-row limit** — Always paginate with loops (fetch until `data.length < PAGE_SIZE`)
+2. **RLS InitPlan optimization** — All `auth.uid()`/`auth.role()`/`auth.jwt()` in RLS policies MUST be wrapped in `(select ...)` for performance
+3. **RPC parameter types** — `get_executive_summary` uses `text` params, not `uuid`, because all IDs in schema are `text`
+4. **Metric aggregation** — `esg_metric.aggregation` = 'sum' (default) or 'avg' — controls how multi-site values roll up
+5. **Login tracking** — Fire-and-forget insert to `login_event` on sign-in; never blocks auth flow
+6. **Fuzzy matching** — Levenshtein ratio >= 0.6 for auto-apply; any% for manual Suggest. Below threshold shows warning icon
+7. **No test suite** — No automated tests; all testing is manual in browser
+8. **Radix Select** — For "All" placeholder, use `value="__all__"` (empty string forbidden in Radix)
+9. **Infinite recursion in RLS** — Never query the same table inside its own RLS policy; use a SECURITY DEFINER function instead
+10. **metric_value upsert** — Uses unique constraint on `(site_id, period_id, metric_id)` — never insert duplicates
 
 ---
 
-## 11. Audit Logging
+## 12. Audit Logging
 
-Every CRUD on master data + `metric_value` should call:
+CRUD operations on master data and `metric_value` should call:
 ```ts
 const { logActivity } = useAuditLog();
 await logActivity({
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'SUBMIT',
   entityType: 'metric_value',
   entityId: row.value_id,
-  beforeData: oldRow,   // jsonb
-  afterData: newRow,    // jsonb
+  beforeData: oldRow,
+  afterData: newRow,
 });
 ```
-Backend RPC `create_audit_log` writes with `auth.uid()` as `actor_user_id`.
 
 ---
 
-## 12. Notifications
+## 13. Common Tasks for AI Agent
 
-`NotificationsContext` + `useRealtimeNotifications` hook subscribes to Supabase Realtime channels.
-Toast triggers on: new submission, status change, master data updates.
-**To enable realtime on a new table:** `ALTER PUBLICATION supabase_realtime ADD TABLE public.<table>;`
+### Adding a new menu item
+1. Add entry to `MENU_ITEMS` in `src/lib/menuConfig.ts` (key, label, labelTh, section)
+2. Add lazy import + `<Route>` in `src/App.tsx` (with ProtectedRoute wrapper)
+3. Add sidebar entry in `src/components/layout/Sidebar.tsx`
+4. Set default permissions in `DEFAULT_PERMISSIONS` in `menuConfig.ts`
+
+### Adding a new database table
+1. Create table in Supabase SQL editor with `tenant_id` column
+2. Add RLS policies using `current_tenant_id()` pattern
+3. Wrap all `auth.uid()` calls in `(select ...)` — InitPlan optimization
+4. Add FK covering indexes if the table has foreign keys
+5. **Verify NSL Foods data is unchanged after migration**
+
+### Adding a new metric
+1. Insert into `esg_metric` with correct dimension_id, theme_id, aggregation, calc_mode
+2. If GHG-related, create `ghg_calc_mapping` linking activity → GHG target metric
+3. Add target in `metric_target` if needed
+
+### Checking tenant isolation (run after any DB change)
+```sql
+SELECT p.tenant_id, t.tenant_name, COUNT(*)
+FROM metric_value mv
+JOIN app_user_profile p ON p.user_id = mv.created_by
+JOIN tenant t ON t.id = p.tenant_id
+GROUP BY p.tenant_id, t.tenant_name;
+-- NSL Foods should have 2291 metric_values (as of 2026-06-18)
+```
 
 ---
 
-## 13. App Setting Keys (admin-configurable)
+## 14. Supabase RLS Policy Pattern
+
+```sql
+-- Standard SELECT policy
+CREATE POLICY "tenant_isolation_select" ON public.table_name
+  FOR SELECT USING (
+    tenant_id = current_tenant_id()
+    OR (select is_super_admin((select auth.uid())))
+  );
+
+-- Standard INSERT policy
+CREATE POLICY "tenant_isolation_insert" ON public.table_name
+  FOR INSERT WITH CHECK (
+    tenant_id = current_tenant_id()
+  );
+```
+
+Always use `(select auth.uid())` (not bare `auth.uid()`) in RLS policies.
+
+---
+
+## 15. App Setting Keys (admin-configurable via System Settings)
 
 | Key | Purpose | Values |
-|---|---|---|
-| `data_entry_page_size` | Rows per page on Data Entry | `10/15/25/50/100/200` |
-| `data_entry_filter_mode` | Period filter strategy | `recent` / `from` / `all` |
-| `data_entry_recent_months` | N months back from latest data | `1..24` |
-| `data_entry_from_year` | Cutoff year | e.g. `2025` |
-| `data_entry_from_month` | Cutoff month | `1..12` |
-
-Loaded on `DataEntry` mount via `.in('key', [...])` against `app_setting`.
+|-----|---------|--------|
+| `data_entry_page_size` | Rows per page on Data Entry | 10/15/25/50/100/200 |
+| `data_entry_filter_mode` | Period filter strategy | recent / from / all |
+| `data_entry_recent_months` | N months back from latest data | 1..24 |
+| `data_entry_from_year` | Cutoff year | e.g. 2025 |
+| `data_entry_from_month` | Cutoff month | 1..12 |
 
 ---
 
-## 14. Bootstrap a Fresh Backend (External Supabase)
+## 16. DO NOT (Hard Rules)
 
-1. Create new Supabase project
-2. Run `/mnt/documents/schema_external_supabase.sql` in SQL Editor
-3. Configure Auth providers (Email + Google) in dashboard
-4. Sign up the first user via app
-5. Run bootstrap section #9 in the SQL file:
-   ```sql
-   UPDATE public.app_user_profile SET is_active=true WHERE user_id='<UID>';
-   INSERT INTO public.user_roles (user_id, role) VALUES ('<UID>','admin')
-     ON CONFLICT (user_id, role) DO NOTHING;
-   ```
-6. Update frontend `.env`:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_PUBLISHABLE_KEY`
-   - `VITE_SUPABASE_PROJECT_ID`
-7. Seed master data: company → site → dimension → theme → metric → period
+- Do not modify NSL Foods PCL data under any circumstances
+- Do not use `manualChunks` in vite.config.ts (causes recharts crash)
+- Do not edit existing Supabase migrations — always create new ones
+- Do not store roles in `app_user_profile` — use `user_roles` table only
+- Do not use bare `auth.uid()` in RLS policies — always wrap in `(select ...)`
+- Do not skip the PostgREST pagination loop for any table that could exceed 1000 rows
+- Do not add `--no-verify` or skip git hooks
 
 ---
 
-## 15. DO NOT (hard rules)
+## 17. Environment & Credentials
 
-- ❌ Edit `src/integrations/supabase/{client,types}.ts` — auto-generated
-- ❌ Edit `.env` manually — Supabase integration manages it
-- ❌ Edit existing migrations — always create a new one
-- ❌ Wrap pages in `MainLayout` (already at router level)
-- ❌ Store roles in `app_user_profile` — must use `user_roles` (privilege escalation risk)
-- ❌ Use raw color classes (`bg-blue-500`) — use semantic tokens
-- ❌ CHECK constraints with time logic (`expire_at > now()`) — use validation triggers
-- ❌ Anonymous sign-ups — always email/password + Google
-- ❌ Auto-confirm email unless explicitly requested
-- ❌ Touch reserved schemas (`auth`, `storage`, `realtime`, `vault`)
-- ❌ Use empty string `""` for Radix Select items — use `__all__`
+- **Supabase URL**: `https://zwzdhbttmtbkjyegsmzz.supabase.co`
+- **Supabase anon key**: Located in `src/integrations/supabase/client.ts`
+- **Firebase project**: `smartesg-af75b` (configured in `.firebaserc`)
+- **Node.js**: Requires Node 18+
+- **Package manager**: npm
 
 ---
 
-## 16. Common Gotchas
+## 18. Contact
 
-- **"infinite recursion in policy":** never query the same table inside its own RLS — use a security definer function
-- **Missing data in dashboard:** check 1000-row limit first; use offset loop pattern
-- **RLS blocks legitimate user:** check `is_user_active(uid)` returns true; check role assignment
-- **Date format mismatch:** `period_id` is `YYYY-MM` text, not a date — sort lexicographically
-- **Empty state in DataEntry:** check `app_setting.data_entry_filter_mode` — may be filtering out rows; drafts are always shown
+- **Owner**: Golf (arpaket@gmail.com)
+- **Company**: D2Infinite Co., Ltd.
 
 ---
 
-## 17. Memory System
-
-The project uses a `mem://` memory index with 40+ entries documenting specific decisions.
-**Always check `mem://index.md` first** before making decisions about:
-- UI patterns (loading-progress-ux, kpi-card-variants, role-visual-hierarchy-v2)
-- Workflows (workflow-and-safeguards-v9, administrative-edit-rights)
-- Auth (rbac-roles-v3, supervisor-permissions-v8, password-management-v11)
-- Reporting (trend-analytics-engine-v6, comprehensive-esg-reporting-suite)
-
-Memory rules are **enforced** — violating one is a regression.
-
----
-
-## 18. Useful Tools When Continuing
-
-- `supabase--migration` — schema changes only (DDL)
-- `supabase--insert` — DML (INSERT/UPDATE/DELETE)
-- `supabase--read_query` — debugging SELECT
-- `supabase--linter` — RLS sanity check
-- `security--run_security_scan` — full security audit
-
----
-
-## 19. File Index
-
-| File | Purpose |
-|---|---|
-| `/mnt/documents/schema_external_supabase.sql` | Self-contained SQL to recreate the entire backend |
-| `/mnt/documents/HANDOFF.md` | This document |
-
----
-
-**End of handoff.** Start by reading: `mem://index.md` → `src/App.tsx` → `src/pages/DataEntry.tsx` → this doc.
+**Getting started**: Read `src/App.tsx` (routes + providers) → `src/lib/menuConfig.ts` (all menus) → `src/contexts/AuthContext.tsx` (auth flow) → `src/pages/DataEntry.tsx` (most complex page) → this document.

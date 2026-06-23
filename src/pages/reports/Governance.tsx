@@ -898,8 +898,8 @@ export default function Governance() {
           </CardContent>
         </Card>
 
-        {/* Chart 5: YoY Comparison */}
-        {yoyComparisonData.length > 0 && (
+        {/* Chart 5: YoY Comparison — only when a specific year is selected */}
+        {!isAllTime && prevYear && yoyComparisonData.length > 0 && (
           <Card className="bg-card/70 backdrop-blur-xl border-border/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-3xl">
             <CardHeader className="flex flex-row items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-xl">
@@ -972,7 +972,9 @@ export default function Governance() {
           <Badge variant="outline" className="ml-auto text-xs">
             {isAllTime
               ? (language === "th" ? `ทุกปี (${tableYears.join(", ")})` : `All years (${tableYears.join(", ")})`)
-              : `${selectedYear} vs ${prevYear}`}
+              : prevYear
+                ? `${selectedYear} vs ${prevYear}`
+                : `${selectedYear}`}
           </Badge>
         </CardHeader>
         <CardContent>

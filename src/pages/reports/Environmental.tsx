@@ -1044,7 +1044,9 @@ export default function Environmental() {
               <p className="text-xs text-muted-foreground">
                 {isAllTime
                   ? (language === "th" ? `เปรียบเทียบทุกปี (${tableYears.join(", ")})` : `All years comparison (${tableYears.join(", ")})`)
-                  : (language === "th" ? `เปรียบเทียบ ${selectedYear} vs ${prevYear}` : `${selectedYear} vs ${prevYear} comparison`)}
+                  : prevYear
+                    ? (language === "th" ? `เปรียบเทียบ ${selectedYear} vs ${prevYear}` : `${selectedYear} vs ${prevYear} comparison`)
+                    : (language === "th" ? `ปี ${selectedYear}` : `Year ${selectedYear}`)}
               </p>
             </div>
           </CardHeader>
