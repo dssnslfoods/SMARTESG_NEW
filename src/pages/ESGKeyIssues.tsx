@@ -769,9 +769,10 @@ function MetricHero({
     // rate/percentage metrics (aggregation='avg'), sum for flow metrics.
     const cyValues = values.filter((v) => v.period?.year === currentYear);
     const cySum = cyValues.reduce((s, v) => s + Number(v.value), 0);
+    const cyNonZero = cyValues.filter((v) => Number(v.value) !== 0);
     const currentYearTotal =
-      metric.aggregation === 'avg' && cyValues.length > 0
-        ? cySum / cyValues.length
+      metric.aggregation === 'avg' && cyNonZero.length > 0
+        ? cyNonZero.reduce((s, v) => s + Number(v.value), 0) / cyNonZero.length
         : cySum;
     return {
       total,
@@ -864,15 +865,15 @@ function MetricHero({
     values.forEach((v) => {
       const year = v.period?.year;
       if (!year) return;
-      sumMap.set(year, (sumMap.get(year) ?? 0) + Number(v.value));
+      const val = Number(v.value);
+      if (isAvg && val === 0) return;
+      sumMap.set(year, (sumMap.get(year) ?? 0) + val);
       cntMap.set(year, (cntMap.get(year) ?? 0) + 1);
     });
     const sortedYears = Array.from(sumMap.keys()).sort((a, b) => a - b);
     const recentYears = sortedYears.length > 3 ? sortedYears.slice(-3) : sortedYears;
     return recentYears.map((year) => {
       const cnt = cntMap.get(year) ?? 0;
-      // Average for rate/percentage metrics, sum for flow metrics — so the bar
-      // is comparable to the target line (e.g. ~92% vs target 92, not 1,100%).
       const actual = isAvg && cnt > 0 ? (sumMap.get(year) ?? 0) / cnt : (sumMap.get(year) ?? 0);
       const t = targetByYear.get(year);
       let status: 'on-track' | 'off-track' | 'no-target' = 'no-target';
