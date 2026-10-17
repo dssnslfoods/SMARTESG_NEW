@@ -111,7 +111,8 @@ export default function MaintenancePanel() {
       setSelected(new Set(rows.filter(r => r.is_allowed).map(r => r.user_id)));
     } catch (err) {
       console.error('list_maintenance_admin_candidates failed:', err);
-      toast({ variant: 'destructive', title: th ? 'โหลดรายชื่อผู้ใช้ไม่สำเร็จ' : 'Failed to load user list' });
+      const e = err as { code?: string; message?: string };
+      toast({ variant: 'destructive', title: th ? 'โหลดรายชื่อผู้ใช้ไม่สำเร็จ' : 'Failed to load user list', description: [e?.code, e?.message].filter(Boolean).join(' · ') });
     } finally {
       setLoadingList(false);
     }
@@ -174,7 +175,12 @@ export default function MaintenancePanel() {
       toast({ title: th ? `บันทึกรายชื่อแล้ว (${data ?? 0} คน)` : `Allow-list saved (${data ?? 0} users)` });
     } catch (err) {
       console.error('set_maintenance_allowed_users failed:', err);
-      toast({ variant: 'destructive', title: th ? 'บันทึกรายชื่อไม่สำเร็จ' : 'Failed to save allow-list' });
+      const e = err as { code?: string; message?: string; details?: string; hint?: string };
+      toast({
+        variant: 'destructive',
+        title: th ? 'บันทึกรายชื่อไม่สำเร็จ' : 'Failed to save allow-list',
+        description: [e?.code, e?.message, e?.details, e?.hint].filter(Boolean).join(' · ') || String(err),
+      });
     } finally {
       setSavingList(false);
     }
