@@ -68,7 +68,7 @@ export default function SystemSettings() {
     ];
     const { error } = await supabase
       .from("app_setting")
-      .upsert(rows, { onConflict: "key" });
+      .upsert(rows, { onConflict: "tenant_id,key" });
     setSaving(false);
     if (error) {
       toast({
