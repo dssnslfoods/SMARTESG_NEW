@@ -191,7 +191,7 @@ export default function DataEntry() {
   const canEditRecord = (v: MetricValue) =>
     dePerm.edit_scope === 'all' || (dePerm.edit_scope === 'own' && v.submitted_by === user?.id);
   const canDeleteRecord = (v: MetricValue) =>
-    dePerm.delete_scope === 'all' || (dePerm.delete_scope === 'own' && v.submitted_by === user?.id);
+    dePerm.delete_scope === 'all' || (dePerm.delete_scope === 'own' && v.submitted_by === user?.id && v.status !== 'approved');
 
   // Confirm-update dialog for supervisor/admin
   const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);

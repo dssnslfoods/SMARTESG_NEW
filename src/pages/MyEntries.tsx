@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuditLog } from '@/hooks/useAuditLog';
+import { invalidateMetricValueCache } from '@/hooks/useOptimizedData';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -13,7 +15,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { StatusBadge, statusLabel, type MetricStatus } from '@/components/ui/status-badge';
 import { EntryEditDialog, type EditableEntry } from '@/components/approvals/EntryEditDialog';
 import {
-  ListChecks, Clock, Inbox, CheckCircle2, AlertTriangle, RefreshCw, Loader2, Calendar, Pencil, Plus,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  ListChecks, Clock, Inbox, CheckCircle2, AlertTriangle, RefreshCw, Loader2, Calendar, Pencil, Plus, Trash2,
 } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -44,8 +50,9 @@ type StatusFilter = '' | MetricStatus;
 
 export default function MyEntries() {
   const { t, language } = useLanguage();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
+  const { logActivity } = useAuditLog();
 
   const [rows, setRows] = useState<MyRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +60,16 @@ export default function MyEntries() {
   const [filterPeriod, setFilterPeriod] = useState<string>('');
   const [reviewerNames, setReviewerNames] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<EditableEntry | null>(null);
+  const [deleting, setDeleting] = useState<MyRow | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  // Honour the role's delete scope from Data Entry Permissions ('none' hides the button).
+  const [canDelete, setCanDelete] = useState(true);
+
+  useEffect(() => {
+    if (!role || role === 'admin' || role === 'super_admin') return;
+    supabase.from('data_entry_permission').select('delete_scope').eq('role', role).maybeSingle()
+      .then(({ data }) => { if (data) setCanDelete(data.delete_scope !== 'none'); });
+  }, [role]);
 
   const fetchRows = useCallback(async () => {
     if (!user?.id) return;
@@ -98,6 +115,31 @@ export default function MyEntries() {
   }, [user?.id]);
 
   useEffect(() => { fetchRows(); }, [fetchRows]);
+
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    try {
+      // .select() returns the deleted rows — RLS silently skips rows the caller
+      // may not delete, so an empty result means nothing was removed.
+      const { data, error } = await supabase.from('metric_value').delete().eq('value_id', deleting.value_id).select('value_id');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error(language === 'th' ? 'ไม่สามารถลบรายการนี้ได้ (อาจถูกอนุมัติไปแล้ว)' : 'This entry cannot be deleted (it may have been approved)');
+      }
+      await logActivity({ action: 'DELETE', entityType: 'metric_value', entityId: deleting.value_id, beforeData: deleting });
+      invalidateMetricValueCache();
+      toast({ title: language === 'th' ? 'ลบรายการแล้ว' : 'Entry deleted' });
+      setDeleting(null);
+      fetchRows();
+    } catch (e) {
+      toast({ variant: 'destructive', title: t('error'), description: (e as Error).message });
+      setDeleting(null);
+      fetchRows();
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const counts = useMemo(() => {
@@ -298,13 +340,22 @@ export default function MyEntries() {
                         </TableCell>
                         <TableCell className="text-right">
                           {editable ? (
-                            <Button size="sm" variant={r.status === 'rejected' ? 'destructive' : 'ghost'} className="h-8 rounded-lg"
-                              onClick={() => setEditing(r)}>
-                              <Pencil className="h-3.5 w-3.5 mr-1" />
-                              {r.status === 'rejected'
-                                ? (language === 'th' ? 'แก้ไขและส่งใหม่' : 'Fix & resubmit')
-                                : (language === 'th' ? 'แก้ไข' : 'Edit')}
-                            </Button>
+                            <div className="flex justify-end gap-1">
+                              <Button size="sm" variant={r.status === 'rejected' ? 'destructive' : 'ghost'} className="h-8 rounded-lg"
+                                onClick={() => setEditing(r)}>
+                                <Pencil className="h-3.5 w-3.5 mr-1" />
+                                {r.status === 'rejected'
+                                  ? (language === 'th' ? 'แก้ไขและส่งใหม่' : 'Fix & resubmit')
+                                  : (language === 'th' ? 'แก้ไข' : 'Edit')}
+                              </Button>
+                              {canDelete && (
+                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg text-red-600 hover:bg-red-100 hover:text-red-700"
+                                  title={language === 'th' ? 'ลบรายการ' : 'Delete entry'}
+                                  onClick={() => setDeleting(r)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-[11px] text-muted-foreground/60 italic">{language === 'th' ? 'อนุมัติแล้ว' : 'approved'}</span>
                           )}
@@ -321,6 +372,44 @@ export default function MyEntries() {
 
       {/* In-place edit — rejected → fix & resubmit, draft/pending → adjust */}
       <EntryEditDialog entry={editing} onClose={() => setEditing(null)} onSaved={fetchRows} />
+
+      {/* Delete confirmation — own, not-yet-approved entries only */}
+      <AlertDialog open={!!deleting} onOpenChange={o => { if (!o && !deleteBusy) setDeleting(null); }}>
+        <AlertDialogContent className="glass-card-solid rounded-2xl max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-700">
+              <Trash2 className="h-5 w-5" />
+              {language === 'th' ? 'ลบรายการนี้?' : 'Delete this entry?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                {deleting && (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-2">
+                    <div className="font-medium text-gray-800">{deleting.metric?.metric_name ?? deleting.metric_id}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {deleting.site?.site_name ?? deleting.site_id} · {deleting.period ? `${deleting.period.month_name} ${deleting.period.year}` : deleting.period_id}
+                      {' · '}<span className="font-mono">{Number(deleting.value).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+                <p>
+                  {language === 'th'
+                    ? 'การลบไม่สามารถย้อนกลับได้ (มีบันทึกใน Audit Log) หากต้องการแก้ค่า ให้ใช้ปุ่ม "แก้ไข" แทน'
+                    : 'This cannot be undone (it is recorded in the Audit Log). To change the value, use “Edit” instead.'}
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy} className="rounded-xl">{language === 'th' ? 'ยกเลิก' : 'Cancel'}</AlertDialogCancel>
+            <AlertDialogAction onClick={e => { e.preventDefault(); void confirmDelete(); }} disabled={deleteBusy}
+              className="rounded-xl bg-red-600 hover:bg-red-700 text-white">
+              {deleteBusy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {language === 'th' ? 'ลบรายการ' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
