@@ -6,6 +6,7 @@ import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import { PageTransition } from './PageTransition';
 import { useTVMode } from '@/contexts/TVModeContext';
 import { TrialBanner } from '@/components/plan/TrialBanner';
+import { MaintenanceBanner } from '@/components/maintenance/MaintenanceBanner';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -34,6 +35,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onMenuToggle={() => setMobileMenuOpen(true)} />
+        <MaintenanceBanner />
         <TrialBanner />
         <main className="flex-1 overflow-y-auto bg-gradient-subtle">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 sm:py-8">
