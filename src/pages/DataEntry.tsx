@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +40,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { StatusBadge, statusLabel } from "@/components/ui/status-badge";
 import { Plus, Edit, Trash2, Save, FileText, Building2, MapPin, Calendar, BarChart3, CheckSquare, Square, X, Leaf, TrendingUp, Clock, Filter, AlertTriangle, Database, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -108,6 +109,9 @@ interface MetricValue {
   remark: string | null;
   submitted_by: string | null;
   created_at: string;
+  rejection_reason?: string | null;
+  rejected_at?: string | null;
+  approved_at?: string | null;
 }
 
 interface FormData {
@@ -123,6 +127,7 @@ interface FormData {
 
 export default function DataEntry() {
   const { t, language } = useLanguage();
+  const [searchParams] = useSearchParams();
   const { user, role, profile } = useAuth();
   const { toast } = useToast();
   const { logActivity } = useAuditLog();
@@ -139,7 +144,7 @@ export default function DataEntry() {
   const [totalDbCount, setTotalDbCount] = useState<number>(0); // Actual count in database
   // Server-side summary counters (shown in the top cards even before records
   // are loaded), so the dashboard never shows 0 while the table is on demand.
-  const [summary, setSummary] = useState({ total: 0, draft: 0, submitted: 0 });
+  const [summary, setSummary] = useState({ total: 0, draft: 0, submitted: 0, approved: 0, rejected: 0, my_rejected: 0 });
   const [loading, setLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number | null }>({ loaded: 0, total: null });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -156,7 +161,8 @@ export default function DataEntry() {
   // Legacy fallback = historical behaviour, used only if a row is missing so an
   // existing role is never accidentally locked out before its row is seeded.
   const LEGACY_PERM: Record<string, { can_create: boolean; create_scope: string; edit_scope: string; delete_scope: string }> = {
-    supervisor: { can_create: true,  create_scope: 'all',      edit_scope: 'all',  delete_scope: 'all'  },
+    supervisor_global: { can_create: true,  create_scope: 'all',      edit_scope: 'all',  delete_scope: 'all'  },
+    supervisor_local:  { can_create: true,  create_scope: 'all',      edit_scope: 'all',  delete_scope: 'all'  },
     executive:  { can_create: false, create_scope: 'all',      edit_scope: 'none', delete_scope: 'none' },
     staff:      { can_create: true,  create_scope: 'own_site', edit_scope: 'own',  delete_scope: 'own'  },
     guest:      { can_create: false, create_scope: 'all',      edit_scope: 'none', delete_scope: 'none' },
@@ -291,6 +297,9 @@ export default function DataEntry() {
         total: Number(s?.total ?? 0),
         draft: Number(s?.draft ?? 0),
         submitted: Number(s?.submitted ?? 0),
+        approved: Number(s?.approved ?? 0),
+        rejected: Number(s?.rejected ?? 0),
+        my_rejected: Number(s?.my_rejected ?? 0),
       });
     } catch (e) {
       console.error('Error fetching summary:', e);
@@ -358,7 +367,7 @@ export default function DataEntry() {
         let q = supabase
           .from('metric_value')
           .select(
-            'value_id, metric_id, site_id, period_id, value, status, data_source, remark, submitted_by, created_at',
+            'value_id, metric_id, site_id, period_id, value, status, data_source, remark, submitted_by, created_at, rejection_reason, rejected_at, approved_at',
             from === 0 ? { count: 'exact' } : undefined,
           );
 
@@ -387,6 +396,9 @@ export default function DataEntry() {
           remark: v.remark,
           submitted_by: v.submitted_by,
           created_at: v.created_at,
+          rejection_reason: v.rejection_reason,
+          rejected_at: v.rejected_at,
+          approved_at: v.approved_at,
         }));
         setLoadProgress(prev => ({ ...prev, loaded: all.length }));
 
@@ -450,6 +462,28 @@ export default function DataEntry() {
     ? sites.filter(s => s.company_id === formCompany)
     : sites;
 
+  // Deep link from "My Entries": /data-entry?edit=<value_id> opens that row
+  // for editing once the master lists are in (metric/theme lookups need them).
+  // NOTE: the param is stripped with history.replaceState, not setSearchParams —
+  // a router navigation would remount the page (PageTransition) and close the dialog.
+  const editParam = searchParams.get('edit');
+  const editHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!editParam || metrics.length === 0 || periods.length === 0) return;
+    if (editHandledRef.current === editParam) return;
+    editHandledRef.current = editParam;
+    (async () => {
+      const { data } = await supabase
+        .from('metric_value')
+        .select('value_id, metric_id, site_id, period_id, value, status, data_source, remark, submitted_by, created_at, rejection_reason, rejected_at, approved_at')
+        .eq('value_id', editParam)
+        .maybeSingle();
+      if (data) handleEdit(data as MetricValue);
+      window.history.replaceState(null, '', window.location.pathname);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, metrics.length, periods.length]);
+
   const handleEdit = (value: MetricValue) => {
     const metric = metrics.find(m => m.metric_id === value.metric_id);
     const theme = themes.find(t => t.theme_id === metric?.theme_id);
@@ -472,7 +506,8 @@ export default function DataEntry() {
       value: value.value,
       data_source: value.data_source || '',
       remark: value.remark || '',
-      status: value.status,
+      // approved / rejected rows go back through approval once edited
+      status: value.status === 'approved' || value.status === 'rejected' ? 'submitted' : value.status,
     });
     setIsDialogOpen(true);
   };
@@ -746,7 +781,7 @@ export default function DataEntry() {
     }
 
     if (existingRecord && !editingValue) {
-      const canUpdate = role === 'admin' || role === 'supervisor' || role === 'super_admin';
+      const canUpdate = role === 'admin' || role === 'supervisor_global' || role === 'supervisor_local' || role === 'super_admin';
 
       if (!canUpdate) {
         // staff / executive / guest → block entirely
@@ -1088,22 +1123,7 @@ export default function DataEntry() {
     }
   };
 
-  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case 'submitted':
-        return 'secondary';
-      default:
-        return 'outline';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, { th: string; en: string }> = {
-      draft: { th: 'ร่าง', en: 'Draft' },
-      submitted: { th: 'ส่งแล้ว', en: 'Submitted' },
-    };
-    return labels[status]?.[language === 'th' ? 'th' : 'en'] || status;
-  };
+  const getStatusLabel = (status: string) => statusLabel(status, language === 'th' ? 'th' : 'en');
 
   if (loading) {
     return (
@@ -1167,7 +1187,7 @@ export default function DataEntry() {
       )}
 
       {/* Summary Cards - Glass Style */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <Card className="glass-card relative cursor-pointer hover:scale-[1.02] transition-all duration-300 overflow-hidden group">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-400 to-violet-500" />
           <CardHeader className="pb-2">
@@ -1223,12 +1243,49 @@ export default function DataEntry() {
               <div className="p-1.5 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
                 <TrendingUp className="h-4 w-4 text-blue-600" />
               </div>
-              {language === 'th' ? 'ส่งแล้ว' : 'Submitted'}
+              {getStatusLabel('submitted')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-gray-800">{summary.submitted.toLocaleString()}</p>
-            <p className="text-xs text-blue-600 mt-1">{language === 'th' ? 'เสร็จสิ้น' : 'completed'}</p>
+            <p className="text-xs text-blue-600 mt-1">{language === 'th' ? 'รอหัวหน้าสาขาตรวจสอบ' : 'awaiting supervisor review'}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card relative cursor-pointer hover:scale-[1.02] transition-all duration-300 overflow-hidden group">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-green-500" />
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2 text-gray-600">
+              <div className="p-1.5 bg-emerald-100 rounded-lg group-hover:bg-emerald-200 transition-colors">
+                <CheckSquare className="h-4 w-4 text-emerald-600" />
+              </div>
+              {getStatusLabel('approved')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-gray-800">{summary.approved.toLocaleString()}</p>
+            <p className="text-xs text-emerald-600 mt-1">{language === 'th' ? 'แสดงบน dashboard' : 'shown on dashboards'}</p>
+          </CardContent>
+        </Card>
+
+        <Card className={`glass-card relative cursor-pointer hover:scale-[1.02] transition-all duration-300 overflow-hidden group ${summary.my_rejected > 0 ? 'ring-2 ring-red-300' : ''}`}
+          onClick={() => setFilterStatus('rejected')}>
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-400 to-rose-500" />
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2 text-gray-600">
+              <div className="p-1.5 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+              </div>
+              {getStatusLabel('rejected')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-gray-800">{summary.rejected.toLocaleString()}</p>
+            <p className="text-xs text-red-600 mt-1">
+              {summary.my_rejected > 0
+                ? (language === 'th' ? `ของคุณ ${summary.my_rejected} รายการ — ต้องแก้ไข` : `${summary.my_rejected} of yours — need correction`)
+                : (language === 'th' ? 'ต้องแก้ไขและส่งใหม่' : 'need correction & resubmit')}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -1396,8 +1453,10 @@ export default function DataEntry() {
                 </SelectTrigger>
                 <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
                   <SelectItem value="__all__">{language === 'th' ? 'ทั้งหมด' : 'All'}</SelectItem>
-                  <SelectItem value="draft">{language === 'th' ? 'ร่าง' : 'Draft'}</SelectItem>
-                  <SelectItem value="submitted">{language === 'th' ? 'ส่งแล้ว' : 'Submitted'}</SelectItem>
+                  <SelectItem value="draft">{getStatusLabel('draft')}</SelectItem>
+                  <SelectItem value="submitted">{getStatusLabel('submitted')}</SelectItem>
+                  <SelectItem value="approved">{getStatusLabel('approved')}</SelectItem>
+                  <SelectItem value="rejected">{getStatusLabel('rejected')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1606,15 +1665,14 @@ export default function DataEntry() {
                         {value.value.toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <Badge 
-                          className={`rounded-full px-3 ${
-                            value.status === 'submitted' 
-                              ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
-                              : 'bg-amber-100 text-amber-700 border-amber-200'
-                          }`}
-                        >
-                          {getStatusLabel(value.status)}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <StatusBadge status={value.status} className="w-fit" />
+                          {value.status === 'rejected' && value.rejection_reason && (
+                            <span className="text-[11px] text-red-700 max-w-[220px] whitespace-pre-wrap" title={value.rejection_reason}>
+                              {value.rejection_reason}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -1896,7 +1954,7 @@ export default function DataEntry() {
             </div>
 
             {existingMatch && !editingValue && (() => {
-              const canUpdate = role === 'admin' || role === 'supervisor' || role === 'super_admin';
+              const canUpdate = role === 'admin' || role === 'supervisor_global' || role === 'supervisor_local' || role === 'super_admin';
               return canUpdate ? (
                 // supervisor / admin — warn but allow update after confirm
                 <div className="rounded-xl border border-amber-300 bg-amber-50/70 px-4 py-3">
@@ -1929,6 +1987,25 @@ export default function DataEntry() {
                 </div>
               );
             })()}
+            {editingValue?.status === 'rejected' && (
+              <div className="rounded-xl border border-red-300 bg-red-50/80 px-4 py-3 space-y-1">
+                <div className="flex items-center gap-2 text-red-800 text-sm font-semibold">
+                  <AlertTriangle className="h-4 w-4" />
+                  {language === 'th' ? 'รายการนี้ถูกปฏิเสธ — กรุณาแก้ไขแล้วส่งอนุมัติอีกครั้ง' : 'This entry was rejected — please correct it and resubmit'}
+                </div>
+                <p className="text-sm text-red-700 whitespace-pre-wrap">
+                  <span className="font-medium">{t('rejectionReason')}:</span> {editingValue.rejection_reason || '-'}
+                </p>
+              </div>
+            )}
+            {editingValue?.status === 'approved' && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50/70 px-4 py-2 text-xs text-amber-800">
+                {language === 'th'
+                  ? 'รายการนี้อนุมัติแล้ว — การแก้ไขจะส่งกลับไปรออนุมัติใหม่'
+                  : 'This entry is approved — saving changes sends it back for re-approval'}
+              </div>
+            )}
+
 
             {editingValue && (
               <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
@@ -2009,11 +2086,16 @@ export default function DataEntry() {
                   </SelectTrigger>
                   <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
                     <SelectItem value="draft">{language === 'th' ? 'ร่าง' : 'Draft'}</SelectItem>
-                    <SelectItem value="submitted">{language === 'th' ? 'ส่ง' : 'Submit'}</SelectItem>
+                    <SelectItem value="submitted">
+                      {editingValue && (editingValue.status === 'rejected' || editingValue.status === 'approved')
+                        ? t('resubmit')
+                        : (language === 'th' ? 'ส่งอนุมัติ' : 'Submit for approval')}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
               );
             })()}
 
@@ -2051,7 +2133,7 @@ export default function DataEntry() {
               disabled={
                 // Block staff when an existing record is detected
                 !!(existingMatch && !editingValue &&
-                  role !== 'admin' && role !== 'supervisor' && role !== 'super_admin')
+                  role !== 'admin' && role !== 'supervisor_global' && role !== 'supervisor_local' && role !== 'super_admin')
               }
               className="gap-2 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 rounded-xl border-0 disabled:opacity-40 disabled:cursor-not-allowed"
             >

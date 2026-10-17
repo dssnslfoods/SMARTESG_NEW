@@ -171,6 +171,7 @@ When an agent finishes a change, verify:
 - `supabase/config.toml` `project_id`, SMTP credentials, sender email
 - `firebase.json` / `.firebaserc` deployment targets
 - Auth-related Edge Functions (`create-user`, `delete-user`, `update-password`)
+  - _2026-10-17: role checks in these functions were extended to accept `supervisor_global` / `supervisor_local` (authorised as part of the supervisor-split change); **redeploy them** with `supabase functions deploy`_
 - Audit log table or trigger logic
 - Anything in `supabase/templates/`
 

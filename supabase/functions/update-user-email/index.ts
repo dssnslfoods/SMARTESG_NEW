@@ -50,7 +50,7 @@ serve(async (req) => {
     const { data: superAdminRow } = await supabaseAdmin
       .from("super_admin").select("user_id").eq("user_id", caller.id).maybeSingle();
     const isAdmin = roleData?.role === "admin";
-    const isSupervisor = roleData?.role === "supervisor";
+    const isSupervisor = roleData?.role === "supervisor_global" || roleData?.role === "supervisor_local";
     const isSuperAdmin = roleData?.role === "super_admin" || !!superAdminRow;
 
     if (!isAdmin && !isSupervisor && !isSuperAdmin) {

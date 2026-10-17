@@ -220,8 +220,8 @@ export default function AdminAnalyticsDashboard() {
   // Calculate analytics from filtered data (matches Data Entry page calculation)
   const analytics = useMemo(() => {
     const totalEntries = filteredData.length;
-    // Match Data Entry: status === 'submitted' only
-    const totalSubmitted = filteredData.filter(mv => mv.status === 'submitted').length;
+    // Only approved rows count as reported data (approval workflow)
+    const totalSubmitted = filteredData.filter(mv => mv.status === 'approved').length;
     // Match Data Entry: status === 'draft' only
     const totalDrafted = filteredData.filter(mv => mv.status === 'draft').length;
 

@@ -271,35 +271,35 @@ export function calculateStats(
   total: number;
   draft: number;
   submitted: number;
+  approved: number;
+  rejected: number;
   myDrafts: number;
   mySubmitted: number;
+  myRejected: number;
 } {
-  let draft = 0;
-  let submitted = 0;
-  let myDrafts = 0;
-  let mySubmitted = 0;
+  let draft = 0, submitted = 0, approved = 0, rejected = 0;
+  let myDrafts = 0, mySubmitted = 0, myRejected = 0;
 
   for (const item of data) {
-    if (item.status === 'draft') {
-      draft++;
-      if (userId && item.submitted_by === userId) {
-        myDrafts++;
-      }
-    } else if (item.status === 'submitted') {
-      submitted++;
+    const mine = !!userId && item.submitted_by === userId;
+    switch (item.status) {
+      case 'draft':     draft++;     if (mine) myDrafts++;   break;
+      case 'submitted': submitted++; break;
+      case 'approved':  approved++;  break;
+      case 'rejected':  rejected++;  if (mine) myRejected++; break;
     }
-    
-    if (userId && item.submitted_by === userId) {
-      mySubmitted++;
-    }
+    if (mine) mySubmitted++;
   }
 
   return {
     total: data.length,
     draft,
     submitted,
+    approved,
+    rejected,
     myDrafts,
     mySubmitted,
+    myRejected,
   };
 }
 

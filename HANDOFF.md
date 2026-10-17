@@ -67,7 +67,8 @@ SMARTESG is a **multi-tenant SaaS web application** for collecting, managing, an
 |-------|---------|
 | `tenant` | Tenant registry (name, slug, plan) |
 | `app_user_profile` | User profile (tenant_id, company_id, site_id, is_active, must_change_password) |
-| `user_roles` | One role per user (admin/supervisor/executive/staff/guest/super_admin) |
+| `user_roles` | One role per user (admin/supervisor_global/supervisor_local/executive/staff/guest/super_admin) |
+| `supervisor_site` | supervisor_local ↔ site(s) they may approve (many-to-many) |
 | `super_admin` | Super admin registry (cross-tenant access) |
 | `company` | Companies within a tenant |
 | `site` | Sites within a company (has company_id FK) |
@@ -125,10 +126,24 @@ SMARTESG is a **multi-tenant SaaS web application** for collecting, managing, an
 ### Roles
 1. **super_admin** — Cross-tenant access, platform management (bypasses all route guards)
 2. **admin** — Full tenant access, all menus, all settings
-3. **supervisor** — Master data management, data entry, limited reports
-4. **executive** — Reports/dashboards, KPI targets, read-only
-5. **staff** — Data entry only (scoped by company/site assignment)
-6. **guest** — View-only dashboard and ESG Key Issues
+3. **supervisor_global** — Tenant-wide overview: master data, data entry, reports. **No approval rights**
+4. **supervisor_local** — Same as global **plus** approves/rejects `metric_value` rows for the sites assigned in `supervisor_site` (fallback: own profile site). Sees the **Approvals** menu
+5. **executive** — Reports/dashboards, KPI targets, read-only
+6. **staff** — Data entry only (scoped by company/site assignment); rejected rows come back with a reason to fix + resubmit
+7. **guest** — View-only dashboard and ESG Key Issues
+
+### Approval Workflow (`metric_value.status`)
+```
+draft → submitted ──approve (supervisor_local / admin)──▶ approved ──▶ dashboards & reports
+             ▲            └──reject + mandatory reason──▶ rejected
+             └──────────── staff edits & resubmits ◀────────┘
+```
+- **Only `approved` rows** are counted by dashboards, reports, `get_executive_summary`, `get_ghg_summary`, ESG Key Issues.
+- Approve/reject go through RPC **`review_metric_values(p_value_ids text[], p_action, p_reason)`** (SECURITY DEFINER). It checks `can_review_site(uid, site_id)`, requires a reason on reject, writes `APPROVE`/`REJECT` audit-log rows.
+- Trigger **`trg_metric_value_status_guard`** blocks any direct write of `approved`/`rejected` outside the RPC (admin/super_admin excepted). Editing an approved row drops it back to `submitted`; leaving approved/rejected clears `approved_*`. `rejection_reason` is kept until the next approval.
+- GHG auto-calculated rows inherit the weakest status of their inputs (draft > rejected > submitted > approved).
+- `get_dashboard_metric_stats()` also returns `approved`, `rejected`, `my_rejected`, `pending_review` (rows waiting for the caller).
+- Migration `20261017100100_approval_workflow.sql` auto-approved all pre-existing `submitted` rows and converted every `supervisor` to `supervisor_local` (own site seeded into `supervisor_site`).
 
 ### Permission Layers (4 layers, all must pass)
 1. **Route Guard** (`ProtectedRoute` in App.tsx) — React Router level, checks `canAccess(allowedRoles)`

@@ -31,7 +31,7 @@ ESG Smart Performance คือ multi-tenant web application สำหรับ�
 
 1. **Admin** กำหนด master data (Company, Site, Period, Dimension/Theme/Metric)
 2. **Staff** บันทึกค่า metric ตามรอบ (รายเดือน) ของ site ที่ตนรับผิดชอบ
-3. **Supervisor/Executive** ตรวจสอบ + อนุมัติข้อมูล
+3. **Supervisor Local** ตรวจสอบ + อนุมัติ/ปฏิเสธข้อมูลของสาขาที่ดูแล (ปฏิเสธต้องใส่เหตุผล → Staff แก้ไขแล้วส่งใหม่) · เฉพาะข้อมูลที่อนุมัติแล้วจึงขึ้น Dashboard
 4. ระบบสรุปรายงาน ESG รายเดือน/ปี ส่งออกได้เป็น Excel / PDF
 5. ทุกการแก้ไขถูกบันทึกใน **Audit Log** (immutable history)
 
@@ -117,7 +117,8 @@ ESG Smart Performance คือ multi-tenant web application สำหรับ�
 |---|---|
 | **admin** | จัดการ user + master data + อนุมัติ + ดูทั้งหมด + ลบข้อมูล |
 | **executive** | ดู dashboard + รายงานทั้งบริษัทในเครือ |
-| **supervisor** | จัดการ metric ของบริษัทที่รับผิดชอบ + อนุมัติ |
+| **supervisor_global** | คุมภาพรวมทั้ง tenant: ข้อมูลหลัก, กรอก/แก้ข้อมูล, รายงาน (ไม่อนุมัติ) |
+| **supervisor_local** | เหมือน global + อนุมัติ/ปฏิเสธข้อมูลของสาขาที่ได้รับมอบหมาย (หลายสาขาได้) |
 | **staff** | บันทึกข้อมูล metric ของ site ที่กำหนด |
 | **guest** | placeholder ก่อนได้รับ role |
 

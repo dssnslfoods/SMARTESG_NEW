@@ -49,7 +49,7 @@ import { UserManagementLoadingSkeleton } from '@/components/ui/loading-skeleton'
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { QuotaBar } from '@/components/plan/QuotaBar';
 
-type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest' | 'super_admin';
+type AppRole = 'admin' | 'executive' | 'supervisor_global' | 'supervisor_local' | 'staff' | 'guest' | 'super_admin';
 
 interface UserWithRole {
   user_id: string;
@@ -77,7 +77,8 @@ const roleColors: Record<AppRole, string> = {
   super_admin: 'bg-gradient-to-r from-amber-500 to-orange-600 text-white',
   admin: 'bg-destructive text-destructive-foreground',
   executive: 'bg-primary text-primary-foreground',
-  supervisor: 'bg-accent text-accent-foreground border border-border',
+  supervisor_global: 'bg-accent text-accent-foreground border border-border',
+  supervisor_local: 'bg-violet-100 text-violet-700 border border-violet-200',
   staff: 'bg-secondary text-secondary-foreground',
   guest: 'bg-muted text-muted-foreground',
 };
@@ -92,6 +93,10 @@ export default function UserManagement() {
   const [superAdminIds, setSuperAdminIds] = useState<Set<string>>(new Set());
   const [companies, setCompanies] = useState<Company[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
+  // supervisor_local → sites they may approve (supervisor_site table)
+  const [supervisorSites, setSupervisorSites] = useState<Record<string, string[]>>({});
+  const [editSiteIds, setEditSiteIds] = useState<string[]>([]);
+  const [newSiteIds, setNewSiteIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
@@ -137,7 +142,8 @@ export default function UserManagement() {
   // Check if current user is admin or supervisor (can manage others)
   const isManager =
     currentUserRole === 'admin' ||
-    currentUserRole === 'supervisor' ||
+    currentUserRole === 'supervisor_global' ||
+    currentUserRole === 'supervisor_local' ||
     currentUserRole === 'super_admin';
   // Check if current user is staff or executive (can only manage self)
   const isSelfOnly = currentUserRole === 'executive' || currentUserRole === 'staff';
@@ -156,13 +162,17 @@ export default function UserManagement() {
 
   const fetchData = async () => {
     try {
-      const [profilesRes, rolesRes, companiesRes, sitesRes, superAdminRes] = await Promise.all([
+      const [profilesRes, rolesRes, companiesRes, sitesRes, superAdminRes, supSitesRes] = await Promise.all([
         supabase.from('app_user_profile').select('*'),
         supabase.from('user_roles').select('*'),
         supabase.from('company').select('company_id, company_name'),
         supabase.from('site').select('site_id, site_name, company_id'),
         supabase.from('super_admin').select('user_id'),
+        supabase.from('supervisor_site').select('user_id, site_id'),
       ]);
+      const supMap: Record<string, string[]> = {};
+      (supSitesRes.data ?? []).forEach((r: any) => { (supMap[r.user_id] ??= []).push(r.site_id); });
+      setSupervisorSites(supMap);
 
       const profiles = profilesRes.data || [];
       const roles = rolesRes.data || [];
@@ -202,7 +212,7 @@ export default function UserManagement() {
     }
 
     // Staff, Supervisor, Executive roles require company and site
-    const rolesRequiringCompanySite = ['staff', 'supervisor', 'executive'];
+    const rolesRequiringCompanySite = ['staff', 'supervisor_global', 'supervisor_local', 'executive'];
     if (rolesRequiringCompanySite.includes(newUser.role) && (!newUser.companyId || !newUser.siteId)) {
       toast({
         variant: 'destructive',
@@ -240,6 +250,14 @@ export default function UserManagement() {
           .eq('user_id', data.userId);
       }
 
+      // supervisor_local → approval scope (own site always included)
+      if (data?.userId && newUser.role === 'supervisor_local') {
+        const ids = [...new Set([...newSiteIds, ...(newUser.siteId ? [newUser.siteId] : [])])];
+        if (ids.length) {
+          await supabase.from('supervisor_site').insert(ids.map(site_id => ({ user_id: data.userId, site_id })));
+        }
+      }
+
       toast({
         title: t('success'),
         description: language === 'th' ? 'เพิ่มผู้ใช้สำเร็จ' : 'User added successfully',
@@ -254,6 +272,7 @@ export default function UserManagement() {
         companyId: '',
         siteId: '',
       });
+      setNewSiteIds([]);
       fetchData();
     } catch (error: any) {
       // Translate common error messages
@@ -287,7 +306,7 @@ export default function UserManagement() {
     if (!editingUser) return;
     
     // Staff, Supervisor, Executive roles require company and site
-    const rolesRequiringCompanySite = ['staff', 'supervisor', 'executive'];
+    const rolesRequiringCompanySite = ['staff', 'supervisor_global', 'supervisor_local', 'executive'];
     if (editingUser.role && rolesRequiringCompanySite.includes(editingUser.role) && 
         (!editingUser.company_id || !editingUser.site_id)) {
       toast({
@@ -340,6 +359,26 @@ export default function UserManagement() {
         if (roleError) throw roleError;
       }
 
+      // Sync supervisor_site to the checked list (cleared when no longer supervisor_local)
+      {
+        const wanted = editingUser.role === 'supervisor_local'
+          ? [...new Set([...editSiteIds, ...(editingUser.site_id ? [editingUser.site_id] : [])])]
+          : [];
+        const current = supervisorSites[editingUser.user_id] ?? [];
+        const toAdd = wanted.filter(id => !current.includes(id));
+        const toDel = current.filter(id => !wanted.includes(id));
+        if (toDel.length) {
+          const { error } = await supabase.from('supervisor_site')
+            .delete().eq('user_id', editingUser.user_id).in('site_id', toDel);
+          if (error) throw error;
+        }
+        if (toAdd.length) {
+          const { error } = await supabase.from('supervisor_site')
+            .insert(toAdd.map(site_id => ({ user_id: editingUser.user_id, site_id })));
+          if (error) throw error;
+        }
+      }
+
       toast({
         title: t('success'),
         description: language === 'th' ? 'อัปเดตผู้ใช้สำเร็จ' : 'User updated successfully',
@@ -364,9 +403,10 @@ export default function UserManagement() {
     // If trying to deactivate, check if this is the last active supervisor
     if (currentStatus) {
       const targetUser = users.find(u => u.user_id === userId);
-      if (targetUser?.role === 'supervisor') {
-        // Count active supervisors
-        const activeSupervisors = users.filter(u => u.role === 'supervisor' && u.is_active);
+      const isSup = (r: AppRole | null) => r === 'supervisor_global' || r === 'supervisor_local';
+      if (isSup(targetUser?.role ?? null)) {
+        // Count active supervisors (either kind)
+        const activeSupervisors = users.filter(u => isSup(u.role) && u.is_active);
         if (activeSupervisors.length <= 1) {
           toast({
             variant: 'destructive',
@@ -647,7 +687,7 @@ export default function UserManagement() {
   const visibleUsers = (
     isSelfOnly
       ? users.filter(u => u.user_id === currentUser?.id)
-      : currentUserRole === 'supervisor'
+      : (currentUserRole === 'supervisor_global' || currentUserRole === 'supervisor_local')
         ? users.filter(u => u.role !== 'admin')
         : users
   )
@@ -770,7 +810,8 @@ export default function UserManagement() {
                     {(currentUserRole === 'admin' || currentUserRole === 'super_admin') && (
                       <SelectItem value="executive">{t('executive')}</SelectItem>
                     )}
-                    <SelectItem value="supervisor">{t('supervisor')}</SelectItem>
+                    <SelectItem value="supervisor_global">{t('supervisor_global')}</SelectItem>
+                    <SelectItem value="supervisor_local">{t('supervisor_local')}</SelectItem>
                     <SelectItem value="staff">{t('staff')}</SelectItem>
                     <SelectItem value="guest">{t('guest')}</SelectItem>
                   </SelectContent>
@@ -813,6 +854,43 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {newUser.role === 'supervisor_local' && (
+                <div className="space-y-2 rounded-xl border border-violet-200 bg-violet-50/50 p-3">
+                  <Label className="text-violet-800">{t('reviewableSites')}</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    {language === 'th'
+                      ? 'เลือกได้หลายสาขา — สาขาหลักของผู้ใช้จะถูกรวมโดยอัตโนมัติ'
+                      : 'Pick any number of sites — the user\'s own site is always included'}
+                  </p>
+                  <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
+                    {companies.map(c => {
+                      const cs = sites.filter(s => s.company_id === c.company_id);
+                      if (!cs.length) return null;
+                      return (
+                        <div key={c.company_id}>
+                          <div className="text-[11px] font-semibold text-gray-500 mt-1">{c.company_name}</div>
+                          {cs.map(s => {
+                            const locked = s.site_id === newUser.siteId;
+                            const checked = locked || newSiteIds.includes(s.site_id);
+                            return (
+                              <label key={s.site_id} className="flex items-center gap-2 text-sm py-0.5 cursor-pointer">
+                                <Checkbox
+                                  checked={checked}
+                                  disabled={locked}
+                                  onCheckedChange={(v) => setNewSiteIds(prev =>
+                                    v ? [...new Set([...prev, s.site_id])] : prev.filter(id => id !== s.site_id))}
+                                />
+                                <span className={locked ? 'text-muted-foreground' : ''}>{s.site_name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <Button onClick={handleAddUser} className="w-full" disabled={addingUser}>
                 {addingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {language === 'th' ? 'เพิ่มผู้ใช้' : 'Add User'}
@@ -959,7 +1037,17 @@ export default function UserManagement() {
                         {companies.find((c) => c.company_id === user.company_id)?.company_name || '-'}
                       </TableCell>
                       <TableCell className="hidden lg:table-cell text-xs sm:text-sm">
-                        {sites.find((s) => s.site_id === user.site_id)?.site_name || '-'}
+                        {user.role === 'supervisor_local' && (supervisorSites[user.user_id]?.length ?? 0) > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {supervisorSites[user.user_id].map(id => (
+                              <Badge key={id} variant="outline" className="rounded-md bg-violet-50 text-violet-700 border-violet-200 text-[11px]">
+                                {sites.find(s => s.site_id === id)?.site_name || id}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          sites.find((s) => s.site_id === user.site_id)?.site_name || '-'
+                        )}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         <div className="flex items-center gap-2">
@@ -996,6 +1084,7 @@ export default function UserManagement() {
                               className="h-8 w-8 sm:h-9 sm:w-9 p-0"
                               onClick={async () => {
                                 setEditingUser(user);
+                                setEditSiteIds(supervisorSites[user.user_id] ?? []);
                                 setIsDialogOpen(true);
                                 setLoadingEmail(true);
                                 try {
@@ -1137,7 +1226,8 @@ export default function UserManagement() {
                       {(currentUserRole === 'admin' || currentUserRole === 'super_admin') && (
                         <SelectItem value="executive">{t('executive')}</SelectItem>
                       )}
-                      <SelectItem value="supervisor">{t('supervisor')}</SelectItem>
+                      <SelectItem value="supervisor_global">{t('supervisor_global')}</SelectItem>
+                      <SelectItem value="supervisor_local">{t('supervisor_local')}</SelectItem>
                       <SelectItem value="staff">{t('staff')}</SelectItem>
                       <SelectItem value="guest">{t('guest')}</SelectItem>
                     </SelectContent>
@@ -1185,6 +1275,43 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {editingUser.role === 'supervisor_local' && (
+                <div className="space-y-2 rounded-xl border border-violet-200 bg-violet-50/50 p-3">
+                  <Label className="text-violet-800">{t('reviewableSites')}</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    {language === 'th'
+                      ? 'เลือกได้หลายสาขา — สาขาหลักของผู้ใช้จะถูกรวมโดยอัตโนมัติ'
+                      : 'Pick any number of sites — the user\'s own site is always included'}
+                  </p>
+                  <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
+                    {companies.map(c => {
+                      const cs = sites.filter(s => s.company_id === c.company_id);
+                      if (!cs.length) return null;
+                      return (
+                        <div key={c.company_id}>
+                          <div className="text-[11px] font-semibold text-gray-500 mt-1">{c.company_name}</div>
+                          {cs.map(s => {
+                            const locked = s.site_id === editingUser.site_id;
+                            const checked = locked || editSiteIds.includes(s.site_id);
+                            return (
+                              <label key={s.site_id} className="flex items-center gap-2 text-sm py-0.5 cursor-pointer">
+                                <Checkbox
+                                  checked={checked}
+                                  disabled={locked}
+                                  onCheckedChange={(v) => setEditSiteIds(prev =>
+                                    v ? [...new Set([...prev, s.site_id])] : prev.filter(id => id !== s.site_id))}
+                                />
+                                <span className={locked ? 'text-muted-foreground' : ''}>{s.site_name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {isManager && (
                 <div className="flex items-center justify-between">
                   <Label>{language === 'th' ? 'สถานะใช้งาน' : 'Active Status'}</Label>

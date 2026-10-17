@@ -2,8 +2,8 @@
 // Single source of truth for all sidebar menu items and their default permissions.
 // Used by MenuPermissionsContext (runtime) and MenuPermission page (management UI).
 
-export type AppRole = 'admin' | 'supervisor' | 'executive' | 'staff' | 'guest' | 'super_admin';
-export const NON_ADMIN_ROLES: AppRole[] = ['supervisor', 'executive', 'staff', 'guest'];
+export type AppRole = 'admin' | 'supervisor_global' | 'supervisor_local' | 'executive' | 'staff' | 'guest' | 'super_admin';
+export const NON_ADMIN_ROLES: AppRole[] = ['supervisor_global', 'supervisor_local', 'executive', 'staff', 'guest'];
 
 export interface MenuItemConfig {
   key: string;            // matches DB menu_key and href (without leading /)
@@ -17,6 +17,8 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { key: 'dashboard',             label: 'Dashboard',       labelTh: 'แดชบอร์ด',         section: 'main' },
   { key: 'esg-key-issues',        label: 'ESG Key Issues',  labelTh: 'ESG Key Issues',    section: 'main' },
   { key: 'data-entry',            label: 'Data Entry',      labelTh: 'บันทึกข้อมูล',      section: 'main' },
+  { key: 'approvals',             label: 'Approvals',       labelTh: 'อนุมัติข้อมูล',     section: 'main' },
+  { key: 'my-entries',            label: 'My Entries',      labelTh: 'รายการของฉัน',      section: 'main' },
   { key: 'reports',               label: 'Reports',         labelTh: 'รายงาน',            section: 'main' },
   { key: 'reports/environmental', label: 'Environmental',   labelTh: 'สิ่งแวดล้อม',       section: 'main' },
   { key: 'reports/social',        label: 'Social',          labelTh: 'สังคม',             section: 'main' },
@@ -47,28 +49,30 @@ export const MENU_ITEMS: MenuItemConfig[] = [
 // ── Fallback defaults (used when DB hasn't loaded yet) ─────────────────────
 // admin always has access to everything — not listed here.
 export const DEFAULT_PERMISSIONS: Record<string, AppRole[]> = {
-  'dashboard':              ['supervisor', 'executive', 'guest'],
-  'esg-key-issues':         ['supervisor', 'executive', 'staff', 'guest'],
-  'data-entry':             ['supervisor', 'staff'],
+  'dashboard':              ['supervisor_global', 'supervisor_local', 'executive', 'guest'],
+  'esg-key-issues':         ['supervisor_global', 'supervisor_local', 'executive', 'staff', 'guest'],
+  'data-entry':             ['supervisor_global', 'supervisor_local', 'staff'],
+  'approvals':              ['supervisor_local'],
+  'my-entries':             ['staff', 'supervisor_global', 'supervisor_local'],
   'reports':                ['executive'],
   'reports/environmental':  ['executive'],
   'reports/social':         ['executive'],
   'reports/governance':     ['executive'],
   'reports/ghg':            ['executive'],
   'reports/esg-overview':   ['executive'],
-  'master/companies':       ['supervisor'],
-  'master/sites':           ['supervisor'],
-  'master/periods':         ['supervisor'],
-  'master/dimensions':      ['supervisor'],
-  'master/themes':          ['supervisor'],
-  'master/metrics':         ['supervisor'],
-  'master/targets':         ['supervisor', 'executive', 'staff'],
+  'master/companies':       ['supervisor_global', 'supervisor_local'],
+  'master/sites':           ['supervisor_global', 'supervisor_local'],
+  'master/periods':         ['supervisor_global', 'supervisor_local'],
+  'master/dimensions':      ['supervisor_global', 'supervisor_local'],
+  'master/themes':          ['supervisor_global', 'supervisor_local'],
+  'master/metrics':         ['supervisor_global', 'supervisor_local'],
+  'master/targets':         ['supervisor_global', 'supervisor_local', 'executive', 'staff'],
   'master/ghg-settings':    [],
   'master/menu-permissions':[],
   'master/data-entry-permissions':[],
-  'master/settings':        [],
-  'users':                  ['supervisor', 'executive', 'staff', 'guest'],
+  'master/settings':        ['supervisor_global', 'supervisor_local'],
+  'users':                  ['supervisor_global', 'supervisor_local', 'executive', 'staff', 'guest'],
   'audit-log':              [],
   'backup-data':            [],
-  'help-center':            ['supervisor'],
+  'help-center':            ['supervisor_global', 'supervisor_local'],
 };

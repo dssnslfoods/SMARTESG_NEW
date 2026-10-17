@@ -374,8 +374,8 @@ const GUIDES: Guide[] = [
       'กำหนดบริษัทและสถานที่ (จำเป็นสำหรับ Staff เพื่อให้เห็นสถานที่ของตน)',
       'ใช้ปุ่มในแถวเพื่อแก้ไขโปรไฟล์ รีเซ็ตรหัสผ่าน (🔑) หรือปิดใช้งานผู้ใช้',
     ],
-    tipTh: 'บทบาท: Admin (จัดการทั้งหมด) · Supervisor (อนุมัติ/จัดการข้อมูล) · Staff (กรอกข้อมูล) · Executive (ดูรายงาน) · Guest (ดูอย่างเดียว)',
-    tipEn: 'Roles: Admin (manage everything) · Supervisor (approve/manage data) · Staff (enter data) · Executive (view reports) · Guest (read-only).',
+    tipTh: 'บทบาท: Admin (จัดการทั้งหมด) · Supervisor Global (คุมภาพรวม/กรอกข้อมูล) · Supervisor Local (อนุมัติข้อมูลของสาขาที่ดูแล) · Staff (กรอกข้อมูล) · Executive (ดูรายงาน) · Guest (ดูอย่างเดียว)',
+    tipEn: 'Roles: Admin (manage everything) · Supervisor Global (overview/data entry) · Supervisor Local (approves entries for assigned sites) · Staff (enter data) · Executive (view reports) · Guest (read-only).',
   },
   {
     key: 'audit-log', section: 'admin', icon: History,

@@ -102,7 +102,7 @@ serve(async (req) => {
     const { data: superAdminRow } = await supabaseAdmin
       .from("super_admin").select("user_id").eq("user_id", caller.id).maybeSingle();
     const isAdmin = callerRole === "admin";
-    const isSupervisor = callerRole === "supervisor";
+    const isSupervisor = callerRole === "supervisor_global" || callerRole === "supervisor_local";
     const isSuperAdmin = callerRole === "super_admin" || !!superAdminRow;
 
     let allowed = false;

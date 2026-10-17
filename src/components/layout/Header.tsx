@@ -24,9 +24,13 @@ const roleConfig = {
     label: 'Executive',
     className: 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0 shadow-lg shadow-emerald-500/25'
   },
-  supervisor: { 
-    label: 'Supervisor',
+  supervisor_global: { 
+    label: 'Supervisor (Global)',
     className: 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-lg shadow-amber-500/25'
+  },
+  supervisor_local: { 
+    label: 'Supervisor (Local)',
+    className: 'bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0 shadow-lg shadow-violet-500/25'
   },
   staff: { 
     label: 'Staff',

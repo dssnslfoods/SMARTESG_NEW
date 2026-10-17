@@ -107,7 +107,7 @@ export default function TargetManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightMetricId = searchParams.get('metric');
 
-  const isManager = role === 'admin' || role === 'supervisor';
+  const isManager = role === 'admin' || role === 'supervisor_global' || role === 'supervisor_local';
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchData = async () => {

@@ -50,7 +50,7 @@ serve(async (req) => {
       .from("super_admin").select("user_id").eq("user_id", authUserId).maybeSingle();
 
     const allowed =
-      (roleData && ["admin", "supervisor", "super_admin"].includes(roleData.role)) || !!superAdminRow;
+      (roleData && ["admin", "supervisor_global", "supervisor_local", "super_admin"].includes(roleData.role)) || !!superAdminRow;
     if (!allowed) {
       return new Response(
         JSON.stringify({ success: false, error: "Forbidden: Only admin, supervisor and super admin can delete users" }),
@@ -90,11 +90,11 @@ serve(async (req) => {
     }
 
     // Check if this is the last supervisor - prevent deletion
-    if (targetRoleData?.role === "supervisor") {
+    if (targetRoleData?.role === "supervisor_global" || targetRoleData?.role === "supervisor_local") {
       const { count: supervisorCount } = await supabaseAdmin
         .from("user_roles")
         .select("*", { count: "exact", head: true })
-        .eq("role", "supervisor");
+        .in("role", ["supervisor_global", "supervisor_local"]);
 
       if (supervisorCount !== null && supervisorCount <= 1) {
         return new Response(

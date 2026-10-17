@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import SuperAdminPanel from '@/components/dashboard/SuperAdminPanel';
+import MaintenancePanel from '@/components/super/MaintenancePanel';
 import ExecutiveDashboard from '@/components/dashboard/ExecutiveDashboard';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +30,8 @@ import {
   MapPin,
   Activity,
   Clock,
+  AlertCircle,
+  ClipboardCheck,
   FileInput,
   CheckSquare,
   BarChart3,
@@ -51,7 +55,7 @@ import { useOptimizedMetricValues, invalidateMetricValueCache } from '@/hooks/us
 import { FETCH_CONFIG } from '@/lib/dataFetcher';
 
 interface DetailData {
-  type: 'companies' | 'sites' | 'metrics' | 'pending' | 'drafts' | 'submitted';
+  type: 'companies' | 'sites' | 'metrics' | 'pending' | 'drafts' | 'submitted' | 'rejected';
   title: string;
   items: any[];
 }
@@ -105,6 +109,10 @@ export default function Dashboard() {
     submittedCount: metricStats.submittedCount,
     myDrafts: metricStats.myDrafts,
     mySubmitted: metricStats.mySubmitted,
+    approvedCount: metricStats.approvedCount,
+    rejectedCount: metricStats.rejectedCount,
+    myRejected: metricStats.myRejected,
+    pendingReview: metricStats.pendingReview,
   }), [masterStats, metricStats]);
 
   const handleRefresh = useCallback(async () => {
@@ -174,7 +182,7 @@ export default function Dashboard() {
         }));
 
         // Sort by role order: admin, executive, supervisor, staff, guest
-        const roleOrder = ['admin', 'executive', 'supervisor', 'staff', 'guest'];
+        const roleOrder = ['admin', 'executive', 'supervisor_global', 'supervisor_local', 'staff', 'guest'];
         const sortedRoles = rolesWithProfile.sort((a, b) => {
           const orderA = roleOrder.indexOf(a.role);
           const orderB = roleOrder.indexOf(b.role);
@@ -236,6 +244,17 @@ export default function Dashboard() {
             .from('metric_value')
             .select('*, metric:metric_id(metric_name), site:site_id(site_name)')
             .eq('submitted_by', user?.id || '')
+            .limit(50);
+          items = data || [];
+          break;
+        }
+        case 'rejected': {
+          const { data } = await supabase
+            .from('metric_value')
+            .select('*, metric:metric_id(metric_name), site:site_id(site_name)')
+            .eq('status', 'rejected')
+            .eq('submitted_by', user?.id || '')
+            .order('rejected_at', { ascending: false })
             .limit(50);
           items = data || [];
           break;
@@ -331,6 +350,7 @@ export default function Dashboard() {
       case 'pending':
       case 'drafts':
       case 'submitted':
+      case 'rejected':
         return (
           <Table>
             <TableHeader>
@@ -339,6 +359,9 @@ export default function Dashboard() {
                 <TableHead>{language === 'th' ? 'ไซต์' : 'Site'}</TableHead>
                 <TableHead>{language === 'th' ? 'ค่า' : 'Value'}</TableHead>
                 <TableHead>{language === 'th' ? 'สถานะ' : 'Status'}</TableHead>
+                {detailData.type === 'rejected' && (
+                  <TableHead>{t('rejectionReason')}</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -347,11 +370,10 @@ export default function Dashboard() {
                   <TableCell className="font-medium">{item.metric?.metric_name || '-'}</TableCell>
                   <TableCell>{item.site?.site_name || '-'}</TableCell>
                   <TableCell>{typeof item.value === 'number' ? item.value.toLocaleString() : item.value}</TableCell>
-                  <TableCell>
-                    <Badge variant={item.status === 'approved' ? 'default' : item.status === 'submitted' ? 'secondary' : 'outline'}>
-                      {item.status}
-                    </Badge>
-                  </TableCell>
+                  <TableCell><StatusBadge status={item.status} /></TableCell>
+                  {detailData.type === 'rejected' && (
+                    <TableCell className="text-sm text-red-700 max-w-[260px] whitespace-pre-wrap">{item.rejection_reason || '-'}</TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -379,7 +401,7 @@ export default function Dashboard() {
       icon: MapPin,
       iconBg: 'bg-emerald-100',
       iconColor: 'text-emerald-600',
-      roles: ['admin', 'executive', 'supervisor'],
+      roles: ['admin', 'executive', 'supervisor_global', 'supervisor_local'],
       detailType: 'sites' as const,
     },
     {
@@ -388,7 +410,7 @@ export default function Dashboard() {
       icon: Activity,
       iconBg: 'bg-purple-100',
       iconColor: 'text-purple-600',
-      roles: ['admin', 'executive', 'supervisor'],
+      roles: ['admin', 'executive', 'supervisor_global', 'supervisor_local'],
       detailType: 'metrics' as const,
     },
   ];
@@ -429,6 +451,7 @@ export default function Dashboard() {
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
       {/* ── Super-admin only: cross-tenant platform overview ─────────────── */}
+      {isSuperAdmin && <MaintenancePanel />}
       {isSuperAdmin && <SuperAdminPanel />}
 
       {/* Page Header */}
@@ -467,9 +490,52 @@ export default function Dashboard() {
           ))}
       </div>
 
+      {/* Reviewer card — entries waiting for this user's approval */}
+      {(role === 'supervisor_local' || role === 'admin') && (stats.pendingReview ?? 0) > 0 && (
+        <Link to="/approvals" className="block">
+          <Card className="glass-card cursor-pointer transition-all duration-300 hover:scale-[1.01] group border-amber-200">
+            <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium text-amber-700 line-clamp-1">
+                {language === 'th' ? 'รายการรออนุมัติจากคุณ' : 'Entries awaiting your approval'}
+              </CardTitle>
+              <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                <ClipboardCheck className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+              </div>
+            </CardHeader>
+            <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+              <div className="flex items-center justify-between">
+                <div className="text-2xl sm:text-3xl font-bold text-amber-700">{(stats.pendingReview ?? 0).toLocaleString()}</div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
+
       {/* Staff-specific cards */}
       {role === 'staff' && (
-        <div className="grid gap-3 sm:gap-4 grid-cols-2">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-3">
+          {(stats.myRejected ?? 0) > 0 && (
+            <Card
+              className="glass-card cursor-pointer transition-all duration-300 hover:scale-[1.02] group border-red-200 col-span-2 lg:col-span-1"
+              onClick={() => fetchDetailData('rejected', language === 'th' ? 'รายการที่ถูกปฏิเสธ — ต้องแก้ไข' : 'Rejected — needs correction')}
+            >
+              <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium text-red-700 line-clamp-1">
+                  {language === 'th' ? 'ถูกปฏิเสธ — ต้องแก้ไข' : 'Rejected — needs fix'}
+                </CardTitle>
+                <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+                </div>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl sm:text-3xl font-bold text-red-700">{(stats.myRejected ?? 0).toLocaleString()}</div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <Card 
             className="glass-card cursor-pointer transition-all duration-300 hover:scale-[1.02] group"
             onClick={() => fetchDetailData('drafts', language === 'th' ? 'รายการร่างของฉัน' : 'My Drafts')}
@@ -563,7 +629,7 @@ export default function Dashboard() {
                               <span className="sm:hidden">E</span>
                             </Badge>
                           )}
-                          {item.role === 'supervisor' && (
+                          {(item.role === 'supervisor_global' || item.role === 'supervisor_local') && (
                             <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 gap-1 sm:gap-1.5 text-xs rounded-full shadow-sm">
                               <UserCheck className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                               <span className="hidden sm:inline">{item.role}</span>

@@ -55,7 +55,7 @@ serve(async (req) => {
       .maybeSingle();
 
     const isAdmin = roleData?.role === "admin";
-    const isSupervisor = roleData?.role === "supervisor";
+    const isSupervisor = roleData?.role === "supervisor_global" || roleData?.role === "supervisor_local";
     const isSuperAdmin = roleData?.role === "super_admin" || !!superAdminRow;
 
     if (!isAdmin && !isSupervisor && !isSuperAdmin) {

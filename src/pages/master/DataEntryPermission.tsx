@@ -32,7 +32,8 @@ type PermState = Record<string, RolePerm>;
 // Defaults mirror the app's historical behaviour (used as a fallback if a role
 // row hasn't been seeded yet). Admin is always full and is not stored here.
 export const DEFAULT_DATA_ENTRY_PERMS: Record<string, RolePerm> = {
-  supervisor: { can_create: true,  create_scope: 'all',      edit_scope: 'all',  delete_scope: 'all'  },
+  supervisor_global: { can_create: true,  create_scope: 'all',      edit_scope: 'all',  delete_scope: 'all'  },
+  supervisor_local:  { can_create: true,  create_scope: 'all',      edit_scope: 'all',  delete_scope: 'all'  },
   executive:  { can_create: false, create_scope: 'all',      edit_scope: 'none', delete_scope: 'none' },
   staff:      { can_create: true,  create_scope: 'own_site', edit_scope: 'own',  delete_scope: 'own'  },
   guest:      { can_create: false, create_scope: 'all',      edit_scope: 'none', delete_scope: 'none' },
@@ -40,7 +41,8 @@ export const DEFAULT_DATA_ENTRY_PERMS: Record<string, RolePerm> = {
 
 const ROLE_LABELS: Record<AppRole, { en: string; th: string; color: string }> = {
   admin:      { en: 'Admin',      th: 'ผู้ดูแล',      color: 'bg-red-100 text-red-700 border-red-200' },
-  supervisor: { en: 'Supervisor', th: 'หัวหน้างาน',   color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  supervisor_global: { en: 'Supervisor (Global)', th: 'หัวหน้างาน (ภาพรวม)', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  supervisor_local:  { en: 'Supervisor (Local)',  th: 'หัวหน้างาน (สาขา)',   color: 'bg-violet-100 text-violet-700 border-violet-200' },
   executive:  { en: 'Executive',  th: 'ผู้บริหาร',     color: 'bg-blue-100 text-blue-700 border-blue-200' },
   staff:      { en: 'Staff',      th: 'พนักงาน',       color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   guest:      { en: 'Guest',      th: 'ผู้เยี่ยมชม',   color: 'bg-gray-100 text-gray-600 border-gray-200' },

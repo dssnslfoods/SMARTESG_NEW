@@ -1,10 +1,11 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMaintenance } from '@/contexts/MaintenanceContext';
 import { MainLayout } from './layout/MainLayout';
 import { Loader2 } from 'lucide-react';
 
-type AppRole = 'admin' | 'executive' | 'supervisor' | 'staff' | 'guest' | 'super_admin';
+type AppRole = 'admin' | 'executive' | 'supervisor_global' | 'supervisor_local' | 'staff' | 'guest' | 'super_admin';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -13,9 +14,10 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, role, loading, profile, roleLoaded } = useAuth();
+  const maintenance = useMaintenance();
 
   // Wait for both auth and role to be loaded
-  if (loading || (user && !roleLoaded)) {
+  if (loading || (user && !roleLoaded) || (user && !maintenance.loaded)) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -25,6 +27,11 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Maintenance mode: only super admins and allow-listed admins get through.
+  if (maintenance.isEnabled && !maintenance.accessAllowed) {
+    return <Navigate to="/maintenance" replace />;
   }
 
   // Check if user has required role — super_admin bypasses every route guard

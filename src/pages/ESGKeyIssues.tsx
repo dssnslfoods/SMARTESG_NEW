@@ -201,7 +201,9 @@ const formatCompact = (n: number) => {
   if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
   if (abs >= 1e6) return (n / 1e6).toFixed(2) + 'M';
   if (abs >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-  return n.toFixed(0);
+  // Keep one decimal so averaged rates (e.g. 88.67 → 88.7) match how the
+  // Dashboard and the target mini bars render the same number.
+  return n.toLocaleString(undefined, { maximumFractionDigits: 1 });
 };
 
 // ─── Chip ─────────────────────────────────────────────────────────────────────
@@ -710,7 +712,7 @@ function MetricHero({
             site:site_id(site_id, site_name)
           `)
           .eq('metric_id', metric.metric_id)
-          .in('status', ['approved', 'submitted']);
+          .eq('status', 'approved');
         // Company/Site scope filter — only the selected sites.
         if (siteIds) {
           valuesQuery = valuesQuery.in('site_id', siteIds);
@@ -785,49 +787,60 @@ function MetricHero({
   }, [values, currentYear, metric.aggregation]);
 
   const timeSeries = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; year: number; month: number; total: number }>();
+    const isAvg = metric.aggregation === 'avg';
+    const map = new Map<string, { key: string; label: string; year: number; month: number; total: number; count: number }>();
     values.forEach((v) => {
       const y = v.period?.year ?? 0;
       const m = v.period?.month ?? 0;
       if (!y || !m) return;
+      const val = Number(v.value);
+      if (isAvg && val === 0) return;
       const key = `${y}-${String(m).padStart(2, '0')}`;
       const existing = map.get(key);
-      if (existing) existing.total += Number(v.value);
+      if (existing) { existing.total += val; existing.count += 1; }
       else
         map.set(key, {
           key,
           label: periodLabel(y, m, th),
           year: y,
           month: m,
-          total: Number(v.value),
+          total: val,
+          count: 1,
         });
     });
-    return Array.from(map.values()).sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return a.month - b.month;
-    });
-  }, [values, th]);
+    return Array.from(map.values())
+      .map((d) => ({ ...d, total: isAvg && d.count > 0 ? d.total / d.count : d.total }))
+      .sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.month - b.month;
+      });
+  }, [values, th, metric.aggregation]);
 
   const bySite = useMemo(() => {
+    const isAvg = metric.aggregation === 'avg';
     const map = new Map<string, { site_id: string; site_name: string; total: number; count: number }>();
     values.forEach((v) => {
       const id = v.site?.site_id;
       if (!id) return;
+      const val = Number(v.value);
+      if (isAvg && val === 0) return;
       const existing = map.get(id);
       if (existing) {
-        existing.total += Number(v.value);
+        existing.total += val;
         existing.count += 1;
       } else {
         map.set(id, {
           site_id: id,
           site_name: v.site?.site_name ?? id,
-          total: Number(v.value),
+          total: val,
           count: 1,
         });
       }
     });
-    return Array.from(map.values()).sort((a, b) => b.total - a.total);
-  }, [values]);
+    const arr = Array.from(map.values());
+    if (isAvg) arr.forEach((d) => { if (d.count > 0) d.total = d.total / d.count; });
+    return arr.sort((a, b) => b.total - a.total);
+  }, [values, metric.aggregation]);
 
   // Achievement = current-year actual ÷ current-year target.
   // Cumulative would be misleading because the target is per-year.
@@ -980,7 +993,7 @@ function MetricHero({
                 }
                 value={
                   metric.aggregation === 'avg'
-                    ? formatCompact(stats!.avg)
+                    ? formatCompact(stats!.currentYearTotal)
                     : formatCompact(stats!.total)
                 }
                 sublabel={unit}
@@ -1658,14 +1671,17 @@ export default function ESGKeyIssues() {
             .select('metric_id, value')
             .in('metric_id', allMetricIds)
             .in('period_id', cyPeriodIds)
-            .in('status', ['approved', 'submitted']);
+            .eq('status', 'approved');
           // Company/Site scope filter — only the selected sites. An empty array
           // (scope selected but no matching sites) correctly yields no rows.
           if (siteIds) q = q.in('site_id', siteIds);
           const { data, error } = await q.range(from, from + PAGE - 1);
           if (error) throw error;
           (data ?? []).forEach((v: any) => {
-            sumMap.set(v.metric_id, (sumMap.get(v.metric_id) ?? 0) + Number(v.value));
+            const val = Number(v.value);
+            const isAvg = (aggMap.get(v.metric_id) ?? 'sum') === 'avg';
+            if (isAvg && val === 0) return;
+            sumMap.set(v.metric_id, (sumMap.get(v.metric_id) ?? 0) + val);
             cntMap.set(v.metric_id, (cntMap.get(v.metric_id) ?? 0) + 1);
           });
           if (!data || data.length < PAGE) break;

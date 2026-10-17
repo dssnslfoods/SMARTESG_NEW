@@ -54,6 +54,10 @@ interface DataStats {
   submittedCount: number;
   myDrafts: number;
   mySubmitted: number;
+  approvedCount: number;
+  rejectedCount: number;
+  myRejected: number;
+  pendingReview: number;
 }
 
 // Global cache for shared data across components
@@ -88,6 +92,10 @@ export function useOptimizedMetricValues(
     submittedCount: 0,
     myDrafts: 0,
     mySubmitted: 0,
+    approvedCount: 0,
+    rejectedCount: 0,
+    myRejected: 0,
+    pendingReview: 0,
   });
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
@@ -138,6 +146,10 @@ export function useOptimizedMetricValues(
           submittedCount: Number((s as any)?.submitted ?? 0),
           myDrafts: Number((s as any)?.my_drafts ?? 0),
           mySubmitted: Number((s as any)?.my_submitted ?? 0),
+          approvedCount: Number((s as any)?.approved ?? 0),
+          rejectedCount: Number((s as any)?.rejected ?? 0),
+          myRejected: Number((s as any)?.my_rejected ?? 0),
+          pendingReview: Number((s as any)?.pending_review ?? 0),
         };
         setData([]);
         setStats(computed);
@@ -213,6 +225,10 @@ export function useOptimizedMetricValues(
         submittedCount: calcStats.submitted,
         myDrafts: calcStats.myDrafts,
         mySubmitted: calcStats.mySubmitted,
+        approvedCount: calcStats.approved,
+        rejectedCount: calcStats.rejected,
+        myRejected: calcStats.myRejected,
+        pendingReview: 0,
       });
       setLastRefresh(new Date());
 

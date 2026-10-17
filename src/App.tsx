@@ -12,6 +12,7 @@ import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { TVModeProvider } from "@/contexts/TVModeContext";
 import { MenuPermissionsProvider } from "@/contexts/MenuPermissionsContext";
 import { BrandingProvider } from "@/contexts/BrandingContext";
+import { MaintenanceProvider } from "@/contexts/MaintenanceContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import PasswordChangeRequired from "@/components/PasswordChangeRequired";
 
@@ -19,12 +20,15 @@ import PasswordChangeRequired from "@/components/PasswordChangeRequired";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import Maintenance from "./pages/Maintenance";
 
 // All other pages — lazy-loaded so the initial bundle stays small
 // and each route only downloads its own chunk on first visit.
 const Dashboard           = lazy(() => import("./pages/Dashboard"));
 const ESGKeyIssues        = lazy(() => import("./pages/ESGKeyIssues"));
 const DataEntry           = lazy(() => import("./pages/DataEntry"));
+const Approvals           = lazy(() => import("./pages/Approvals"));
+const MyEntries           = lazy(() => import("./pages/MyEntries"));
 const UserManagement      = lazy(() => import("./pages/UserManagement"));
 const AuditLog            = lazy(() => import("./pages/AuditLog"));
 const Reports             = lazy(() => import("./pages/Reports"));
@@ -79,6 +83,7 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <MaintenanceProvider>
       <BrandingProvider>
       <MenuPermissionsProvider>
       <LanguageProvider>
@@ -95,6 +100,7 @@ const App = () => (
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/maintenance" element={<Maintenance />} />
               <Route
                 path="/dashboard"
                 element={
@@ -106,7 +112,7 @@ const App = () => (
               <Route
                 path="/esg-key-issues"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive", "staff", "guest"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "executive", "staff", "guest"]}>
                     <ESGKeyIssues />
                   </ProtectedRoute>
                 }
@@ -114,7 +120,7 @@ const App = () => (
               <Route
                 path="/users"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive", "staff"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "executive", "staff"]}>
                     <UserManagement />
                   </ProtectedRoute>
                 }
@@ -122,15 +128,31 @@ const App = () => (
               <Route
                 path="/data-entry"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor", "staff"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "staff"]}>
                     <DataEntry />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/approvals"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_local"]}>
+                    <Approvals />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/my-entries"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "staff"]}>
+                    <MyEntries />
                   </ProtectedRoute>
                 }
               />
               <Route
                 path="/master/companies"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local"]}>
                     <CompanyManagement />
                   </ProtectedRoute>
                 }
@@ -138,7 +160,7 @@ const App = () => (
               <Route
                 path="/master/sites"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local"]}>
                     <SiteManagement />
                   </ProtectedRoute>
                 }
@@ -146,7 +168,7 @@ const App = () => (
               <Route
                 path="/master/periods"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local"]}>
                     <PeriodManagement />
                   </ProtectedRoute>
                 }
@@ -154,7 +176,7 @@ const App = () => (
               <Route
                 path="/master/dimensions"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local"]}>
                     <DimensionManagement />
                   </ProtectedRoute>
                 }
@@ -170,7 +192,7 @@ const App = () => (
               <Route
                 path="/master/themes"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local"]}>
                     <ThemeManagement />
                   </ProtectedRoute>
                 }
@@ -178,7 +200,7 @@ const App = () => (
               <Route
                 path="/master/metrics"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local"]}>
                     <MetricManagement />
                   </ProtectedRoute>
                 }
@@ -186,7 +208,7 @@ const App = () => (
               <Route
                 path="/master/targets"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive", "staff"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "executive", "staff"]}>
                     <TargetManagement />
                   </ProtectedRoute>
                 }
@@ -234,7 +256,7 @@ const App = () => (
               <Route
                 path="/master/settings"
                 element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local"]}>
                     <SystemSettings />
                   </ProtectedRoute>
                 }
@@ -242,7 +264,7 @@ const App = () => (
               <Route
                 path="/reports"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "executive"]}>
                     <Reports />
                   </ProtectedRoute>
                 }
@@ -250,7 +272,7 @@ const App = () => (
               <Route
                 path="/reports/environmental"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "executive"]}>
                     <Environmental />
                   </ProtectedRoute>
                 }
@@ -258,7 +280,7 @@ const App = () => (
               <Route
                 path="/reports/social"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "executive"]}>
                     <Social />
                   </ProtectedRoute>
                 }
@@ -266,7 +288,7 @@ const App = () => (
               <Route
                 path="/reports/governance"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "executive"]}>
                     <Governance />
                   </ProtectedRoute>
                 }
@@ -274,7 +296,7 @@ const App = () => (
               <Route
                 path="/reports/esg-overview"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "executive"]}>
                     <ESGOverview />
                   </ProtectedRoute>
                 }
@@ -282,7 +304,7 @@ const App = () => (
               <Route
                 path="/reports/ghg"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor", "executive"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local", "executive"]}>
                     <GhgDashboard />
                   </ProtectedRoute>
                 }
@@ -306,7 +328,7 @@ const App = () => (
               <Route
                 path="/help-center"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "supervisor"]}>
+                  <ProtectedRoute allowedRoles={["admin", "supervisor_global", "supervisor_local"]}>
                     <HelpCenter />
                   </ProtectedRoute>
                 }
@@ -322,6 +344,7 @@ const App = () => (
       </LanguageProvider>
       </MenuPermissionsProvider>
       </BrandingProvider>
+      </MaintenanceProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

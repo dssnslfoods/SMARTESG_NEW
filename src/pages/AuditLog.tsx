@@ -330,7 +330,7 @@ export default function AuditLog() {
   const canRestore = (log: AuditLogEntry) => {
     if (!log.before_data) return false;
     if (log.entity_type !== 'metric_value') return false;
-    if (!['admin', 'supervisor', 'super_admin'].includes(role || '')) return false;
+    if (!['admin', 'supervisor_global', 'supervisor_local', 'super_admin'].includes(role || '')) return false;
     return ['DELETE', 'UPDATE'].includes(log.action.toUpperCase());
   };
 

@@ -149,7 +149,7 @@ async function fetchEnvMetricValues(metricIds: string[]): Promise<MetricValue[]>
       .from("metric_value")
       .select("value_id, metric_id, site_id, period_id, value, status, last_updated")
       .in("metric_id", metricIds)
-      .in("status", ["submitted", "approved", "draft"])
+      .eq("status", "approved")
       .range(from, from + PAGE_SIZE - 1);
 
     if (error) throw error;
