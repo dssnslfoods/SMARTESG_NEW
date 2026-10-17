@@ -511,24 +511,6 @@ export type Database = {
           },
         ]
       }
-      maintenance_allowed_user: {
-        Row: {
-          added_at: string
-          added_by: string | null
-          user_id: string
-        }
-        Insert: {
-          added_at?: string
-          added_by?: string | null
-          user_id: string
-        }
-        Update: {
-          added_at?: string
-          added_by?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       login_event: {
         Row: {
           id: string
@@ -549,6 +531,24 @@ export type Database = {
           logged_in_at?: string
           tenant_id?: string
           user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      maintenance_allowed_user: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
           user_id?: string
         }
         Relationships: []
@@ -880,39 +880,6 @@ export type Database = {
         }
         Relationships: []
       }
-      system_maintenance: {
-        Row: {
-          enabled_at: string | null
-          enabled_by: string | null
-          expected_end_at: string | null
-          id: number
-          is_enabled: boolean
-          message_en: string | null
-          message_th: string | null
-          updated_at: string
-        }
-        Insert: {
-          enabled_at?: string | null
-          enabled_by?: string | null
-          expected_end_at?: string | null
-          id?: number
-          is_enabled?: boolean
-          message_en?: string | null
-          message_th?: string | null
-          updated_at?: string
-        }
-        Update: {
-          enabled_at?: string | null
-          enabled_by?: string | null
-          expected_end_at?: string | null
-          id?: number
-          is_enabled?: boolean
-          message_en?: string | null
-          message_th?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       supervisor_site: {
         Row: {
           created_at: string
@@ -951,6 +918,39 @@ export type Database = {
             referencedColumns: ["tenant_id"]
           },
         ]
+      }
+      system_maintenance: {
+        Row: {
+          enabled_at: string | null
+          enabled_by: string | null
+          expected_end_at: string | null
+          id: number
+          is_enabled: boolean
+          message_en: string | null
+          message_th: string | null
+          updated_at: string
+        }
+        Insert: {
+          enabled_at?: string | null
+          enabled_by?: string | null
+          expected_end_at?: string | null
+          id?: number
+          is_enabled?: boolean
+          message_en?: string | null
+          message_th?: string | null
+          updated_at?: string
+        }
+        Update: {
+          enabled_at?: string | null
+          enabled_by?: string | null
+          expected_end_at?: string | null
+          id?: number
+          is_enabled?: boolean
+          message_en?: string | null
+          message_th?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       tenant: {
         Row: {
@@ -1121,11 +1121,13 @@ export type Database = {
         Returns: Json
       }
       get_ghg_summary: { Args: never; Returns: Json }
+      get_maintenance_status: { Args: never; Returns: Json }
       get_or_create_period: {
         Args: { p_month: number; p_year: number }
         Returns: string
       }
       get_platform_overview: { Args: never; Returns: Json }
+      get_review_context: { Args: { p_value_ids: string[] }; Returns: Json }
       get_tenant_activity_list: {
         Args: never
         Returns: {
@@ -1168,31 +1170,24 @@ export type Database = {
         }
         Returns: boolean
       }
-      get_maintenance_status: { Args: never; Returns: Json }
       is_super_admin: { Args: { _user_id?: string }; Returns: boolean }
+      is_user_active: { Args: { _user_id: string }; Returns: boolean }
       list_maintenance_admin_candidates: {
         Args: never
         Returns: {
-          user_id: string
-          full_name: string | null
-          email: string | null
-          tenant_id: string | null
-          tenant_name: string | null
+          email: string
+          full_name: string
           is_allowed: boolean
+          role: string
+          tenant_id: string
+          tenant_name: string
+          user_id: string
         }[]
       }
-      maintenance_access_allowed: { Args: { _user_id?: string }; Returns: boolean }
-      set_maintenance_allowed_users: { Args: { p_user_ids: string[] }; Returns: number }
-      set_maintenance_mode: {
-        Args: {
-          p_enabled: boolean
-          p_message_th?: string | null
-          p_message_en?: string | null
-          p_expected_end_at?: string | null
-        }
-        Returns: Json
+      maintenance_access_allowed: {
+        Args: { _user_id?: string }
+        Returns: boolean
       }
-      is_user_active: { Args: { _user_id: string }; Returns: boolean }
       my_reviewable_sites: { Args: never; Returns: string[] }
       recompute_ghg_target: {
         Args: {
@@ -1205,6 +1200,19 @@ export type Database = {
       }
       review_metric_values: {
         Args: { p_action: string; p_reason?: string; p_value_ids: string[] }
+        Returns: Json
+      }
+      set_maintenance_allowed_users: {
+        Args: { p_user_ids: string[] }
+        Returns: number
+      }
+      set_maintenance_mode: {
+        Args: {
+          p_enabled: boolean
+          p_expected_end_at?: string
+          p_message_en?: string
+          p_message_th?: string
+        }
         Returns: Json
       }
       sync_trial_expired: { Args: never; Returns: undefined }

@@ -16,8 +16,9 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { ReviewContextView, LevelBadge, buildAutoReason, type ReviewContextData } from '@/components/approvals/ReviewContext';
 import {
-  ClipboardCheck, CheckCircle2, XCircle, RefreshCw, Loader2, MapPin, Calendar, Inbox, History, AlertTriangle,
+  ClipboardCheck, CheckCircle2, XCircle, RefreshCw, Loader2, MapPin, Calendar, Inbox, History, AlertTriangle, BarChart3,
 } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -63,6 +64,11 @@ export default function Approvals() {
   const [names, setNames] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // Decision-support context per value_id (get_review_context RPC)
+  const [contexts, setContexts] = useState<Record<string, ReviewContextData>>({});
+  const [compareId, setCompareId] = useState<string | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+
   // Reject dialog
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectTargets, setRejectTargets] = useState<string[]>([]);
@@ -98,7 +104,7 @@ export default function Approvals() {
         `)
         .in('site_id', filterSite ? [filterSite] : reviewableIds)
         // derived GHG rows follow their inputs — hide them (NULL-safe: .neq() alone drops NULLs)
-        .or('data_source.is.null,data_source.neq.Auto-calculated (GHG)')
+        .or('data_source.is.null,data_source.neq."Auto-calculated (GHG)"')
         .limit(1000);
 
       if (tab === 'pending') {
@@ -123,7 +129,7 @@ export default function Approvals() {
             metric:metric_id(metric_name, unit), site:site_id(site_name), period:period_id(year, month, month_name)
           `)
           .eq('status', 'rejected')
-          .or('data_source.is.null,data_source.neq.Auto-calculated (GHG)')
+          .or('data_source.is.null,data_source.neq."Auto-calculated (GHG)"')
           .in('site_id', filterSite ? [filterSite] : reviewableIds)
           .order('rejected_at', { ascending: false })
           .limit(500);
@@ -134,6 +140,14 @@ export default function Approvals() {
       }
       setRows(list);
       setSelected(new Set());
+
+      // Pre-compute deviation context for the pending queue so the table can
+      // flag suspicious values before the reviewer opens them.
+      if (tab === 'pending' && list.length > 0) {
+        void loadContexts(list.map(r => r.value_id));
+      } else {
+        setContexts({});
+      }
 
       // Resolve submitter names
       const ids = [...new Set(list.map(r => r.submitted_by).filter(Boolean))] as string[];
@@ -165,6 +179,27 @@ export default function Approvals() {
     rows.forEach(r => { if (r.period) m.set(r.period_id, `${r.period.month_name} ${r.period.year}`); });
     return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [rows]);
+
+  const loadContexts = async (ids: string[]) => {
+    try {
+      const { data, error } = await supabase.rpc('get_review_context', { p_value_ids: ids });
+      if (error) throw error;
+      const map: Record<string, ReviewContextData> = {};
+      ((data as unknown as ReviewContextData[]) ?? []).forEach(c => { map[c.value_id] = c; });
+      setContexts(prev => ({ ...prev, ...map }));
+    } catch (e) {
+      console.error('get_review_context failed', e);
+    }
+  };
+
+  const openCompare = async (id: string) => {
+    setCompareId(id);
+    if (!contexts[id]) {
+      setCompareLoading(true);
+      await loadContexts([id]);
+      setCompareLoading(false);
+    }
+  };
 
   // ── Review actions ─────────────────────────────────────────────────────────
   const runReview = async (ids: string[], action: 'approve' | 'reject', reason?: string) => {
@@ -200,7 +235,10 @@ export default function Approvals() {
 
   const openReject = (ids: string[]) => {
     setRejectTargets(ids);
-    setRejectReason('');
+    // Pre-fill the reason when the value was flagged — the supervisor can
+    // still edit it. For bulk rejects only a shared reason makes sense, so
+    // only pre-fill when exactly one row is targeted.
+    setRejectReason(ids.length === 1 ? buildAutoReason(contexts[ids[0]], language) : '');
     setRejectOpen(true);
   };
 
@@ -371,6 +409,7 @@ export default function Approvals() {
                     <TableHead>{tab === 'pending' ? (language === 'th' ? 'ส่งเมื่อ' : 'Submitted at') : (language === 'th' ? 'ตรวจเมื่อ' : 'Reviewed at')}</TableHead>
                     <TableHead>{language === 'th' ? 'สถานะ' : 'Status'}</TableHead>
                     <TableHead>{language === 'th' ? 'หมายเหตุ / เหตุผล' : 'Note / Reason'}</TableHead>
+                    {tab === 'pending' && <TableHead>{language === 'th' ? 'เทียบค่า' : 'Compare'}</TableHead>}
                     {tab === 'pending' && <TableHead className="text-right">{language === 'th' ? 'ดำเนินการ' : 'Action'}</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -390,7 +429,14 @@ export default function Approvals() {
                         {r.metric?.metric_name ?? r.metric_id}
                         {r.metric?.unit && <span className="text-xs text-muted-foreground ml-1">({r.metric.unit})</span>}
                       </TableCell>
-                      <TableCell className="text-right font-mono font-semibold">{Number(r.value).toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono font-semibold">
+                        <div className="flex flex-col items-end gap-1">
+                          <span>{Number(r.value).toLocaleString()}</span>
+                          {contexts[r.value_id] && contexts[r.value_id].level !== 'normal' && (
+                            <LevelBadge level={contexts[r.value_id].level} lang={language} compact />
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-gray-600 text-sm">{r.submitted_by ? (names[r.submitted_by] ?? '…') : '-'}</TableCell>
                       <TableCell className="text-gray-600 text-xs whitespace-nowrap">
                         {tab === 'pending' ? fmtDate(r.submitted_at ?? r.created_at) : fmtDate(r.approved_at ?? r.rejected_at)}
@@ -401,6 +447,20 @@ export default function Approvals() {
                           ? <span className="text-red-700 whitespace-pre-wrap">{r.rejection_reason}</span>
                           : <span className="text-gray-500 whitespace-pre-wrap">{r.approval_note || r.remark || '-'}</span>}
                       </TableCell>
+                      {tab === 'pending' && (
+                        <TableCell>
+                          <Button size="sm" variant="outline" onClick={() => openCompare(r.value_id)}
+                            className={`h-8 rounded-lg gap-1 ${contexts[r.value_id]?.level === 'high' ? 'border-red-300 text-red-700 hover:bg-red-50' : contexts[r.value_id]?.level === 'warn' ? 'border-amber-300 text-amber-700 hover:bg-amber-50' : ''}`}>
+                            <BarChart3 className="h-3.5 w-3.5" />
+                            {language === 'th' ? 'เปรียบเทียบ' : 'Compare'}
+                            {contexts[r.value_id]?.prev?.pct != null && (
+                              <span className="text-[10px] font-mono opacity-80">
+                                {contexts[r.value_id].prev!.pct! > 0 ? '+' : ''}{contexts[r.value_id].prev!.pct}%
+                              </span>
+                            )}
+                          </Button>
+                        </TableCell>
+                      )}
                       {tab === 'pending' && (
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
@@ -426,6 +486,51 @@ export default function Approvals() {
         </CardContent>
       </Card>
 
+      {/* Compare dialog — decision support */}
+      <Dialog open={!!compareId} onOpenChange={o => { if (!o) setCompareId(null); }}>
+        <DialogContent className="glass-card-solid rounded-2xl max-w-3xl">
+          {(() => {
+            const row = rows.find(r => r.value_id === compareId);
+            const ctx = compareId ? contexts[compareId] : undefined;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-emerald-600" />
+                    {language === 'th' ? 'เปรียบเทียบกับข้อมูลย้อนหลัง' : 'Compare with history'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {row && <>{row.site?.site_name ?? row.site_id} · {row.metric?.metric_name ?? row.metric_id} · {row.period ? `${row.period.month_name} ${row.period.year}` : row.period_id}</>}
+                  </DialogDescription>
+                </DialogHeader>
+                {compareLoading || !ctx ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" /> {language === 'th' ? 'กำลังคำนวณ...' : 'Calculating...'}
+                  </div>
+                ) : (
+                  <ReviewContextView ctx={ctx} lang={language} />
+                )}
+                {row && row.status === 'submitted' && (
+                  <DialogFooter className="gap-2">
+                    <Button variant="outline" onClick={() => setCompareId(null)} className="rounded-xl">
+                      {language === 'th' ? 'ปิด' : 'Close'}
+                    </Button>
+                    <Button variant="destructive" disabled={working} className="rounded-xl"
+                      onClick={() => { setCompareId(null); openReject([row.value_id]); }}>
+                      <XCircle className="h-4 w-4 mr-1" /> {t('reject')}
+                    </Button>
+                    <Button disabled={working} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={async () => { setCompareId(null); await runReview([row.value_id], 'approve'); }}>
+                      <CheckCircle2 className="h-4 w-4 mr-1" /> {t('approve')}
+                    </Button>
+                  </DialogFooter>
+                )}
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* Reject dialog — reason is mandatory */}
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <DialogContent className="glass-card-solid rounded-2xl max-w-md">
@@ -442,10 +547,16 @@ export default function Approvals() {
           </DialogHeader>
           <div className="space-y-2">
             <Label>{t('rejectionReason')} <span className="text-red-600">*</span></Label>
+            {rejectTargets.length === 1 && contexts[rejectTargets[0]]?.level !== undefined && contexts[rejectTargets[0]].level !== 'normal' && rejectReason && (
+              <p className="text-[11px] text-amber-700 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {language === 'th' ? 'ระบบใส่เหตุผลให้จากผลการเปรียบเทียบ — แก้ไขได้ตามต้องการ' : 'Reason pre-filled from the comparison — edit as needed'}
+              </p>
+            )}
             <Textarea
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
-              rows={4}
+              rows={6}
               autoFocus
               placeholder={language === 'th' ? 'เช่น ค่าสูงผิดปกติ กรุณาตรวจสอบหน่วยและแหล่งข้อมูล' : 'e.g. Value looks unusually high — please verify the unit and source'}
               className="rounded-xl bg-white/80 resize-none"

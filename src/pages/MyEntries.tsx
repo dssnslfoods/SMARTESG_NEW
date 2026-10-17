@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge, statusLabel, type MetricStatus } from '@/components/ui/status-badge';
+import { EntryEditDialog, type EditableEntry } from '@/components/approvals/EntryEditDialog';
 import {
   ListChecks, Clock, Inbox, CheckCircle2, AlertTriangle, RefreshCw, Loader2, Calendar, Pencil, Plus,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ interface MyRow {
   period_id: string;
   value: number;
   status: string;
+  data_source: string | null;
   remark: string | null;
   created_at: string;
   updated_at: string;
@@ -50,6 +52,7 @@ export default function MyEntries() {
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('');
   const [filterPeriod, setFilterPeriod] = useState<string>('');
   const [reviewerNames, setReviewerNames] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState<EditableEntry | null>(null);
 
   const fetchRows = useCallback(async () => {
     if (!user?.id) return;
@@ -58,7 +61,7 @@ export default function MyEntries() {
       const { data, error } = await supabase
         .from('metric_value')
         .select(`
-          value_id, metric_id, site_id, period_id, value, status, remark, created_at, updated_at,
+          value_id, metric_id, site_id, period_id, value, status, data_source, remark, created_at, updated_at,
           submitted_at, approved_at, approved_by, rejected_at, rejected_by, rejection_reason, approval_note,
           metric:metric_id(metric_name, unit),
           site:site_id(site_name),
@@ -295,13 +298,12 @@ export default function MyEntries() {
                         </TableCell>
                         <TableCell className="text-right">
                           {editable ? (
-                            <Button asChild size="sm" variant={r.status === 'rejected' ? 'destructive' : 'ghost'} className="h-8 rounded-lg">
-                              <Link to={`/data-entry?edit=${encodeURIComponent(r.value_id)}`}>
-                                <Pencil className="h-3.5 w-3.5 mr-1" />
-                                {r.status === 'rejected'
-                                  ? (language === 'th' ? 'แก้ไขและส่งใหม่' : 'Fix & resubmit')
-                                  : (language === 'th' ? 'แก้ไข' : 'Edit')}
-                              </Link>
+                            <Button size="sm" variant={r.status === 'rejected' ? 'destructive' : 'ghost'} className="h-8 rounded-lg"
+                              onClick={() => setEditing(r)}>
+                              <Pencil className="h-3.5 w-3.5 mr-1" />
+                              {r.status === 'rejected'
+                                ? (language === 'th' ? 'แก้ไขและส่งใหม่' : 'Fix & resubmit')
+                                : (language === 'th' ? 'แก้ไข' : 'Edit')}
                             </Button>
                           ) : (
                             <span className="text-[11px] text-muted-foreground/60 italic">{language === 'th' ? 'อนุมัติแล้ว' : 'approved'}</span>
@@ -316,6 +318,9 @@ export default function MyEntries() {
           )}
         </CardContent>
       </Card>
+
+      {/* In-place edit — rejected → fix & resubmit, draft/pending → adjust */}
+      <EntryEditDialog entry={editing} onClose={() => setEditing(null)} onSaved={fetchRows} />
     </div>
   );
 }
