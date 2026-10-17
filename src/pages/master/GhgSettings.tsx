@@ -15,7 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Cloud, Loader2, Factory, Save, Upload, Download, FileSpreadsheet, RotateCcw, Sparkles, Zap, Calculator } from 'lucide-react';
+import { Cloud, Loader2, Factory, Save, Upload, Download, FileSpreadsheet, RotateCcw, Sparkles, Zap, ClipboardList, Trash2 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Metric { metric_id: string; metric_name: string; unit: string | null; code: string | null; calc_mode: string; theme_id: string; }
@@ -32,6 +32,15 @@ interface EmissionFactor {
   reference_detail?: string | null; effective_year?: number | null; active?: boolean | null;
 }
 interface Mapping { mapping_id: string; target_code: string; source_code: string; }
+interface ImportPreview {
+  upserts: any[];
+  matchedCount: number;    // rows whose activity_code matches an existing system activity
+  unmatchedCount: number;  // rows with no matching system activity (reference-only)
+  unmatchedCodes: string[];
+  inserted: number;        // new to the reference library
+  updated: number;         // already in the reference library
+  skipped: number;         // invalid rows (bad code / non-numeric factor / dup)
+}
 interface RefRow {
   ref_id: string; activity_code: string; activity_name_th: string | null; activity_name_en: string | null;
   scope: number | null; factor: number | null; unit: string | null; source: string | null;
@@ -89,6 +98,7 @@ export default function GhgSettings() {
   // Per-activity editable EF draft, keyed by activity code: { value, unit, scope }
   const [efDraft, setEfDraft] = useState<Record<string, { value: string; unit: string; scope: string }>>({});
   const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAll = async () => {
@@ -172,12 +182,38 @@ export default function GhgSettings() {
     [metrics],
   );
 
+  // Reference rows whose activity_code doesn't match any current system
+  // activity — safe to delete since nothing in the Scope tables uses them.
+  const activeActivityCodes = useMemo(
+    () => new Set(activityMetrics.map(m => m.code).filter(Boolean) as string[]),
+    [activityMetrics],
+  );
+  const unusedRefs = useMemo(
+    () => refs.filter(r => !activeActivityCodes.has(r.activity_code)),
+    [refs, activeActivityCodes],
+  );
+
 
   // ── Excel: column order shared by template / export / import ────────────────
   const EF_COLUMNS = [
     'activity_code', 'activity_name_th', 'activity_name_en', 'scope', 'factor',
     'unit', 'source', 'reference_detail', 'effective_year', 'active',
   ];
+
+  // Header labels are matched leniently on import — the technical EF_COLUMNS
+  // names (Template / Export Reference) AND the human-friendly labels used by
+  // the styled "Export Activities" sheet all resolve to the same field.
+  const HEADER_ALIASES: Record<string, string> = {
+    'activity_code': 'activity_code', 'activity code': 'activity_code', 'รหัสกิจกรรม': 'activity_code',
+    'activity_name_th': 'activity_name_th', 'activity name': 'activity_name_th', 'ชื่อกิจกรรม': 'activity_name_th',
+    'activity_name_en': 'activity_name_en',
+    'unit': 'unit', 'หน่วย': 'unit',
+    'scope': 'scope', 'scope *': 'scope',
+    'factor': 'factor', 'factor (ef) *': 'factor', 'ค่า factor (ef) *': 'factor',
+    'source': 'source', 'reference_detail': 'reference_detail',
+    'effective_year': 'effective_year', 'active': 'active',
+  };
+  const normalizeHeader = (s: unknown) => HEADER_ALIASES[String(s).trim().toLowerCase()] ?? '';
 
   // Build an .xlsx workbook (README + EmissionFactors sheet) and download it.
   const buildAndDownload = async (rows: any[][], filename: string) => {
@@ -196,16 +232,141 @@ export default function GhgSettings() {
     XLSX.writeFile(wb, filename);
   };
 
+  // Shared "professional" ExcelJS export used by both Excel downloads: a dark
+  // title banner, a colored header row (amber = the recipient must fill this
+  // in, green = context/reference only), zebra striping, borders, a frozen
+  // header, and a 1/2/3 dropdown on whichever column is named "Scope *".
+  interface StyledColumn { label: string; width: number; editable?: boolean; numFmt?: string; align?: 'center'; }
+  const downloadStyledExcel = async (
+    sheetName: string, bannerTitle: string, columns: StyledColumn[], rows: any[][], filename: string,
+  ) => {
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'SMARTESG';
+    wb.created = new Date();
+    const ws = wb.addWorksheet(sheetName);
+    const THIN = { style: 'thin' as const, color: { argb: 'FFE2E8F0' } };
+    const BORDER = { top: THIN, left: THIN, bottom: THIN, right: THIN };
+
+    // Row 1: banner/title spanning every column.
+    ws.mergeCells(1, 1, 1, columns.length);
+    const title = ws.getCell(1, 1);
+    title.value = bannerTitle;
+    title.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+    title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+    title.alignment = { vertical: 'middle', horizontal: 'left' };
+    ws.getRow(1).height = 26;
+
+    // Row 2: header — amber for columns the recipient must fill in.
+    const headerRow = ws.getRow(2);
+    columns.forEach((col, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = col.label;
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: col.editable ? 'FFD97706' : 'FF16A34A' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      cell.border = BORDER;
+    });
+    headerRow.height = 28;
+    columns.forEach((col, i) => { ws.getColumn(i + 1).width = col.width; });
+
+    const scopeColIdx = columns.findIndex(c => c.label.toLowerCase().startsWith('scope'));
+
+    rows.forEach((values, idx) => {
+      const row = ws.getRow(3 + idx);
+      values.forEach((v, i) => {
+        const col = columns[i];
+        const cell = row.getCell(i + 1);
+        cell.value = v as any;
+        cell.border = BORDER;
+        if (col?.editable) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+          cell.font = { bold: true, color: { argb: 'FF92400E' } };
+        } else if (idx % 2 === 1) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        }
+        if (col?.align === 'center') cell.alignment = { horizontal: 'center' };
+        if (col?.numFmt) cell.numFmt = col.numFmt;
+      });
+      if (scopeColIdx >= 0) {
+        row.getCell(scopeColIdx + 1).dataValidation = {
+          type: 'list', allowBlank: false, formulae: ['"1,2,3"'],
+          showErrorMessage: true,
+          errorTitle: th ? 'ค่าไม่ถูกต้อง' : 'Invalid value',
+          error: th ? 'กรุณาเลือก 1, 2 หรือ 3' : 'Please choose 1, 2 or 3',
+        };
+      }
+    });
+
+    ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: columns.length } };
+    ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 2 }];
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const exportFactors = async () => {
-    // Export the reference library (round-trips with import).
-    const rows = refs.map(r => [
-      r.activity_code, r.activity_name_th ?? '', r.activity_name_en ?? '',
-      r.scope ?? '', r.factor ?? '', r.unit ?? '', r.source ?? '',
-      r.reference_detail ?? '', r.effective_year ?? '',
+    // Export the full reference library (round-trips with import) — same
+    // styled look as "Export EF, Scope (Activity)", with Scope/Factor
+    // highlighted as the fields most worth reviewing.
+    const columns: StyledColumn[] = [
+      { label: th ? 'รหัสกิจกรรม' : 'Activity Code', width: 20 },
+      { label: th ? 'ชื่อกิจกรรม (TH)' : 'Activity Name (TH)', width: 32 },
+      { label: th ? 'ชื่อกิจกรรม (EN)' : 'Activity Name (EN)', width: 32 },
+      { label: th ? 'หน่วย' : 'Unit', width: 14 },
+      { label: 'Scope *', width: 10, editable: true, align: 'center' },
+      { label: 'Factor (EF) *', width: 16, editable: true, numFmt: '0.0000' },
+      { label: th ? 'ที่มา' : 'Source', width: 20 },
+      { label: th ? 'รายละเอียดอ้างอิง' : 'Reference Detail', width: 28 },
+      { label: th ? 'ปีที่บังคับใช้' : 'Effective Year', width: 12, align: 'center' },
+      { label: th ? 'ใช้งาน' : 'Active', width: 10, align: 'center' },
+    ];
+    const rows = [...refs].sort((a, b) => a.activity_code.localeCompare(b.activity_code)).map(r => [
+      r.activity_code, r.activity_name_th ?? '', r.activity_name_en ?? '', r.unit ?? '',
+      r.scope ?? 1, r.factor ?? null,
+      r.source ?? '', r.reference_detail ?? '', r.effective_year ?? '',
       r.active === false ? 'FALSE' : 'TRUE',
     ]);
     const stamp = new Date().toISOString().slice(0, 10);
-    await buildAndDownload(rows, `GHG_EmissionFactor_Reference_${stamp}.xlsx`);
+    const banner = th
+      ? `GHG Emission Factor — คลังอ้างอิง (ช่องสีเหลือง = Scope/Factor) · ${new Date().toLocaleDateString('th-TH')}`
+      : `GHG Emission Factor — Reference Library (yellow = Scope/Factor) · ${new Date().toLocaleDateString()}`;
+    await downloadStyledExcel(th ? 'คลังอ้างอิง' : 'Reference', banner, columns, rows, `GHG_EmissionFactor_Reference_${stamp}.xlsx`);
+  };
+
+  // Export EVERY system activity (Scope 1/2/3), pre-filled with its current
+  // guided/saved EF, as a styled hand-off sheet for someone else to fill in —
+  // only Scope and Factor are needed, so the file drops the internal-only
+  // columns (source/reference_detail/effective_year/active) and highlights
+  // the two columns that need input. Re-import via "Import Reference": the
+  // header text still resolves to the same fields (see HEADER_ALIASES) and
+  // missing columns fall back to whatever's already saved for that code.
+  const exportActivities = async () => {
+    const sorted = [...activityMetrics].sort((a, b) => groupScopeOf(a) - groupScopeOf(b));
+    const columns: StyledColumn[] = [
+      { label: th ? 'รหัสกิจกรรม' : 'Activity Code', width: 20 },
+      { label: th ? 'ชื่อกิจกรรม' : 'Activity Name', width: 44 },
+      { label: th ? 'หน่วย' : 'Unit', width: 16 },
+      { label: 'Scope *', width: 10, editable: true, align: 'center' },
+      { label: 'Factor (EF) *', width: 18, editable: true, numFmt: '0.0000' },
+    ];
+    const rows = sorted.map(m => {
+      const { value, unit, scope } = efFor(m);
+      return [m.code ?? '', m.metric_name, unit, Number(scope) || 1, value === '' ? null : Number(value)];
+    });
+    const stamp = new Date().toISOString().slice(0, 10);
+    const banner = th
+      ? `GHG Emission Factor — กรุณากรอกค่า Scope และ Factor (ช่องสีเหลือง) · ${new Date().toLocaleDateString('th-TH')}`
+      : `GHG Emission Factor — please fill in Scope and Factor (yellow cells) · ${new Date().toLocaleDateString()}`;
+    await downloadStyledExcel(th ? 'กิจกรรม' : 'Activities', banner, columns, rows, `GHG_Activities_${stamp}.xlsx`);
   };
 
   const downloadTemplate = async () => {
@@ -217,67 +378,104 @@ export default function GhgSettings() {
     await buildAndDownload(sample, 'GHG_EmissionFactor_Template.xlsx');
   };
 
-  // Parse the uploaded workbook and upsert factors by (tenant, activity_code).
-  const importFactors = async (file: File) => {
+  // Parse the uploaded workbook into pending upserts — does NOT write to the
+  // database. The caller reviews the counts (matched vs reference-only vs
+  // skipped) via the confirmation dialog before anything is saved.
+  const parseImportFile = async (file: File): Promise<ImportPreview> => {
+    const XLSX = await import('xlsx');
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    // Prefer the EmissionFactors sheet; else the first sheet containing activity_code.
+    let aoa: any[][] | null = null;
+    const sheetNames = [...wb.SheetNames].sort(n => (/emission|factor|activit/i.test(n) ? -1 : 1));
+    for (const name of sheetNames) {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as any[][];
+      if (rows.some(r => r.some(c => normalizeHeader(c) === 'activity_code'))) { aoa = rows; break; }
+    }
+    if (!aoa) throw new Error(th ? 'ไม่พบคอลัมน์ activity_code ในไฟล์' : 'No "activity_code" column found in the file');
+
+    const headerIdx = aoa.findIndex(r => r.some(c => normalizeHeader(c) === 'activity_code'));
+    const headers = aoa[headerIdx].map(normalizeHeader);
+    const col = (name: string) => headers.indexOf(name);
+    const cAct = col('activity_code'), cFactor = col('factor'), cScope = col('scope'),
+      cUnit = col('unit'), cSource = col('source'), cTh = col('activity_name_th'),
+      cEn = col('activity_name_en'), cRef = col('reference_detail'),
+      cYear = col('effective_year'), cActive = col('active');
+
+    // A file may omit optional columns (e.g. the trimmed-down Activities
+    // sheet has no source/reference_detail/effective_year/active) — fall
+    // back to whatever is already saved for that code instead of nulling it.
+    const existingByCode = new Map(refs.map(r => [r.activity_code, r]));
+
+    const seen = new Set<string>();
+    const upserts: any[] = [];
+    let skipped = 0;
+    for (const r of aoa.slice(headerIdx + 1)) {
+      const code = String(r[cAct] ?? '').trim().toUpperCase();
+      const factor = Number(r[cFactor]);
+      // Valid codes only (UPPER_SNAKE_CASE) — skips note/README/instruction rows.
+      if (!/^[A-Z0-9_]+$/.test(code) || !Number.isFinite(factor)) { skipped++; continue; }
+      if (seen.has(code)) { skipped++; continue; } // de-dupe within the file
+      seen.add(code);
+      const prev = existingByCode.get(code);
+      const scope = cScope >= 0 ? (parseInt(String(r[cScope]), 10) || 1) : (prev?.scope ?? 1);
+      upserts.push({
+        tenant_id: tenantId,
+        activity_code: code,
+        scope: scope >= 1 && scope <= 3 ? scope : 1,
+        factor,
+        unit: cUnit >= 0 ? (String(r[cUnit] ?? '').trim() || null) : (prev?.unit ?? null),
+        source: cSource >= 0 ? (String(r[cSource] ?? '').trim() || null) : (prev?.source ?? null),
+        activity_name_th: cTh >= 0 ? (String(r[cTh] ?? '').trim() || null) : (prev?.activity_name_th ?? null),
+        activity_name_en: cEn >= 0 ? (String(r[cEn] ?? '').trim() || null) : (prev?.activity_name_en ?? null),
+        reference_detail: cRef >= 0 ? (String(r[cRef] ?? '').trim() || null) : (prev?.reference_detail ?? null),
+        effective_year: cYear >= 0 && r[cYear] !== '' ? (parseInt(String(r[cYear]), 10) || null) : (prev?.effective_year ?? null),
+        active: cActive >= 0 ? !/^(false|0|no|n)$/i.test(String(r[cActive]).trim()) : (prev?.active ?? true),
+      });
+    }
+    if (upserts.length === 0) throw new Error(th ? 'ไม่พบแถวข้อมูลที่ใช้ได้' : 'No valid rows to import');
+
+    const existingRefCodes = new Set(refs.map(r => r.activity_code));
+    const inserted = upserts.filter(u => !existingRefCodes.has(u.activity_code)).length;
+    const updated = upserts.length - inserted;
+
+    // "Matched" = the code belongs to an activity that actually exists in the
+    // system right now (Scope 1/2/3 tables) — those rows update real EF/Scope.
+    // Everything else only ever lands in the reference library as a guide.
+    const currentActivityCodes = new Set(activityMetrics.map(m => m.code).filter(Boolean) as string[]);
+    const unmatched = upserts.filter(u => !currentActivityCodes.has(u.activity_code));
+
+    return {
+      upserts,
+      matchedCount: upserts.length - unmatched.length,
+      unmatchedCount: unmatched.length,
+      unmatchedCodes: unmatched.map(u => u.activity_code),
+      inserted, updated, skipped,
+    };
+  };
+
+  // File picked → parse only, then hand off to the review dialog.
+  const handleFileSelected = async (file: File) => {
     if (!tenantId) return;
     setImporting(true);
     try {
-      const XLSX = await import('xlsx');
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
-      // Prefer the EmissionFactors sheet; else the first sheet containing activity_code.
-      let aoa: any[][] | null = null;
-      const sheetNames = [...wb.SheetNames].sort(n => (/emission|factor/i.test(n) ? -1 : 1));
-      for (const name of sheetNames) {
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as any[][];
-        if (rows.some(r => r.some(c => String(c).trim().toLowerCase() === 'activity_code'))) { aoa = rows; break; }
-      }
-      if (!aoa) throw new Error(th ? 'ไม่พบคอลัมน์ activity_code ในไฟล์' : 'No "activity_code" column found in the file');
+      setImportPreview(await parseImportFile(file));
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: th ? 'นำเข้าไม่สำเร็จ' : 'Import failed', description: e.message });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } finally {
+      setImporting(false);
+    }
+  };
 
-      const headerIdx = aoa.findIndex(r => r.some(c => String(c).trim().toLowerCase() === 'activity_code'));
-      const headers = aoa[headerIdx].map(c => String(c).trim().toLowerCase());
-      const col = (name: string) => headers.indexOf(name);
-      const cAct = col('activity_code'), cFactor = col('factor'), cScope = col('scope'),
-        cUnit = col('unit'), cSource = col('source'), cTh = col('activity_name_th'),
-        cEn = col('activity_name_en'), cRef = col('reference_detail'),
-        cYear = col('effective_year'), cActive = col('active');
-
-      const seen = new Set<string>();
-      const upserts: any[] = [];
-      let skipped = 0;
-      for (const r of aoa.slice(headerIdx + 1)) {
-        const code = String(r[cAct] ?? '').trim().toUpperCase();
-        const factor = Number(r[cFactor]);
-        // Valid codes only (UPPER_SNAKE_CASE) — skips note/README/instruction rows.
-        if (!/^[A-Z0-9_]+$/.test(code) || !Number.isFinite(factor)) { skipped++; continue; }
-        if (seen.has(code)) { skipped++; continue; } // de-dupe within the file
-        seen.add(code);
-        const scope = cScope >= 0 ? (parseInt(String(r[cScope]), 10) || 1) : 1;
-        upserts.push({
-          tenant_id: tenantId,
-          activity_code: code,
-          scope: scope >= 1 && scope <= 3 ? scope : 1,
-          factor,
-          unit: cUnit >= 0 ? String(r[cUnit] ?? '').trim() || null : null,
-          source: cSource >= 0 ? String(r[cSource] ?? '').trim() || null : null,
-          activity_name_th: cTh >= 0 ? String(r[cTh] ?? '').trim() || null : null,
-          activity_name_en: cEn >= 0 ? String(r[cEn] ?? '').trim() || null : null,
-          reference_detail: cRef >= 0 ? String(r[cRef] ?? '').trim() || null : null,
-          effective_year: cYear >= 0 && r[cYear] !== '' ? (parseInt(String(r[cYear]), 10) || null) : null,
-          active: cActive >= 0 ? !/^(false|0|no|n)$/i.test(String(r[cActive]).trim()) : true,
-        });
-      }
-      if (upserts.length === 0) throw new Error(th ? 'ไม่พบแถวข้อมูลที่ใช้ได้' : 'No valid rows to import');
-
-      const existing = new Set(refs.map(r => r.activity_code));
-      const inserted = upserts.filter(u => !existing.has(u.activity_code)).length;
-      const updated = upserts.length - inserted;
-
-      // Import populates the REFERENCE library — a lookup source for guiding EFs,
-      // not the active factors the GHG calc uses.
+  // User confirmed the review dialog → actually write to the reference library.
+  const confirmImport = async () => {
+    if (!importPreview || !tenantId) return;
+    setImporting(true);
+    try {
       const { error } = await supabase
         .from('emission_factor_reference')
-        .upsert(upserts, { onConflict: 'tenant_id,activity_code' });
+        .upsert(importPreview.upserts, { onConflict: 'tenant_id,activity_code' });
       if (error) throw error;
 
       await fetchAll();
@@ -285,15 +483,55 @@ export default function GhgSettings() {
       toast({
         title: th ? 'นำเข้าตารางอ้างอิงสำเร็จ' : 'Reference imported',
         description: th
-          ? `เพิ่ม ${inserted} · อัปเดต ${updated}${skipped ? ` · ข้าม ${skipped}` : ''} รายการอ้างอิง`
-          : `${inserted} added · ${updated} updated${skipped ? ` · ${skipped} skipped` : ''} reference rows`,
+          ? `อัปเดต EF/Scope ${importPreview.matchedCount} กิจกรรม · เพิ่มอ้างอิงใหม่ ${importPreview.unmatchedCount}${importPreview.skipped ? ` · ข้าม ${importPreview.skipped}` : ''}`
+          : `Updated EF/Scope for ${importPreview.matchedCount} activities · ${importPreview.unmatchedCount} reference-only${importPreview.skipped ? ` · ${importPreview.skipped} skipped` : ''}`,
       });
     } catch (e: any) {
       toast({ variant: 'destructive', title: th ? 'นำเข้าไม่สำเร็จ' : 'Import failed', description: e.message });
     } finally {
       setImporting(false);
+      setImportPreview(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const cancelImport = () => {
+    setImportPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Delete one reference-library row. Only ever removes a suggestion — never
+  // touches a saved, actively-used emission_factor.
+  const deleteRefRow = async (ref: RefRow) => {
+    setBusy('del-ref-' + ref.ref_id);
+    try {
+      const { error } = await supabase.from('emission_factor_reference').delete().eq('ref_id', ref.ref_id);
+      if (error) throw error;
+      await fetchAll();
+      toast({ title: th ? 'ลบรายการอ้างอิงแล้ว' : 'Reference row deleted' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: th ? 'ผิดพลาด' : 'Error', description: e.message });
+    } finally { setBusy(null); }
+  };
+
+  // Bulk-delete every reference row that doesn't match a current system
+  // activity — the "unused" rows shown with the gray badge.
+  const deleteUnusedRefs = async () => {
+    if (unusedRefs.length === 0) return;
+    setBusy('del-unused-refs');
+    try {
+      const { error } = await supabase
+        .from('emission_factor_reference')
+        .delete()
+        .in('ref_id', unusedRefs.map(r => r.ref_id));
+      if (error) throw error;
+      await fetchAll();
+      toast({
+        title: th ? `ลบรายการที่ไม่ได้ใช้แล้ว ${unusedRefs.length} รายการ` : `Deleted ${unusedRefs.length} unused reference rows`,
+      });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: th ? 'ผิดพลาด' : 'Error', description: e.message });
+    } finally { setBusy(null); }
   };
 
   // ── Emission factor: add ──────────────────────────────────────────────────
@@ -477,27 +715,6 @@ export default function GhgSettings() {
     } finally { setBusy(null); }
   };
 
-  // Compute GHG from ALL existing activity data (historical backfill). Inserts
-  // only where no GHG value exists yet — never overwrites manual or existing rows.
-  const backfillGhg = async () => {
-    if (!tenantId) return;
-    setBusy('backfill');
-    try {
-      const { data, error } = await supabase.rpc('backfill_ghg_emissions');
-      if (error) throw error;
-      const n = Number(data ?? 0);
-      await fetchAll();
-      toast({
-        title: th ? `คำนวณ GHG ย้อนหลังแล้ว ${n} รายการ` : `Backfilled ${n} GHG records`,
-        description: n === 0
-          ? (th ? 'ไม่มีรายการใหม่ให้คำนวณ (มีค่าครบแล้ว)' : 'Nothing new to compute — all up to date.')
-          : (th ? 'คำนวณจากข้อมูลกิจกรรมที่มีอยู่ โดยไม่เขียนทับค่าที่มีอยู่แล้ว' : 'Computed from existing activity data without overwriting existing values.'),
-      });
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: th ? 'ผิดพลาด' : 'Error', description: e.message });
-    } finally { setBusy(null); }
-  };
-
   // Load the reference-library defaults into the editable fields (as drafts).
   // Does NOT save — the user reviews and Saves (per row or "Save all").
   const restoreDefaults = () => {
@@ -570,7 +787,7 @@ export default function GhgSettings() {
                 type="file"
                 accept=".xlsx,.xls"
                 className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) importFactors(f); }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelected(f); }}
               />
               <div className="flex flex-col items-end gap-1">
                 <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
@@ -582,6 +799,15 @@ export default function GhgSettings() {
                     <FileSpreadsheet className="h-3.5 w-3.5 text-slate-500" />
                     {th ? 'ดาวน์โหลดเทมเพลต' : 'Template'}
                   </Button>
+                  <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs bg-white" onClick={exportActivities} disabled={activityMetrics.length === 0}>
+                    <ClipboardList className="h-3.5 w-3.5 text-slate-500" />
+                    {th ? 'ส่งออก EF, Scope (กิจกรรม)' : 'Export EF, Scope (Activity)'}
+                  </Button>
+                  <Button size="sm" className="h-8 gap-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                    {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {th ? 'นำเข้า EF, Scope (กิจกรรม)' : 'Import EF, Scope (Activity)'}
+                  </Button>
+                  <div className="w-px self-stretch bg-slate-200 mx-0.5" />
                   <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs bg-white" onClick={exportFactors} disabled={refs.length === 0}>
                     <Download className="h-3.5 w-3.5 text-slate-500" />
                     {th ? 'ส่งออกอ้างอิง' : 'Export Reference'}
@@ -612,28 +838,6 @@ export default function GhgSettings() {
               {busy === 'auto-all' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
               {th ? 'เปิดอัตโนมัติทั้งหมด' : 'Auto all'}
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button size="sm" className="h-8 gap-1.5 text-xs shrink-0 bg-blue-600 hover:bg-blue-700 text-white" disabled={busy === 'backfill'}>
-                  {busy === 'backfill' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Calculator className="h-3.5 w-3.5" />}
-                  {th ? 'คำนวณย้อนหลัง' : 'Backfill GHG'}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{th ? 'คำนวณ GHG ย้อนหลังจากข้อมูลกิจกรรม?' : 'Backfill GHG from existing activity data?'}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {th
-                      ? 'ระบบจะคำนวณ GHG (กิจกรรม × EF) จากข้อมูลกิจกรรมที่บันทึกไว้ทั้งหมดในอดีต สำหรับกิจกรรมที่เปิดโหมดอัตโนมัติ — และ “ใส่เฉพาะรายการที่ยังไม่มีค่า” จะไม่เขียนทับค่าที่มีอยู่แล้ว (ทั้งที่กรอกเองหรือคำนวณไว้ก่อน)'
-                      : 'Computes GHG (activity × EF) from all your historical activity data for auto-enabled activities, and inserts ONLY where no GHG value exists yet — it never overwrites existing values (manual or previously computed).'}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{th ? 'ยกเลิก' : 'Cancel'}</AlertDialogCancel>
-                  <AlertDialogAction onClick={backfillGhg}>{th ? 'คำนวณย้อนหลัง' : 'Backfill'}</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs shrink-0" disabled={refs.length === 0}>
@@ -813,25 +1017,57 @@ export default function GhgSettings() {
             })
           )}
 
-          {/* Reference library (read-only, imported from Excel) */}
+          {/* Reference library (imported from Excel) — delete rows here */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60">
-            <button
-              type="button"
-              onClick={() => setShowRefs(s => !s)}
-              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
-            >
-              <span className="flex items-center gap-1.5">
+            <div className="w-full flex items-center justify-between px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setShowRefs(s => !s)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800"
+              >
                 <FileSpreadsheet className="h-3.5 w-3.5" />
                 {th ? `ตารางอ้างอิง (Reference Library)` : 'Reference Library'} · {refs.length}
-              </span>
-              <span>{showRefs ? '▲' : '▼'}</span>
-            </button>
+                <span className="ml-1">{showRefs ? '▲' : '▼'}</span>
+              </button>
+              {unusedRefs.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm" variant="outline"
+                      className="h-6 gap-1 px-2 text-[10px] border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                      disabled={busy === 'del-unused-refs'}
+                    >
+                      {busy === 'del-unused-refs' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                      {th ? `ลบที่ไม่ได้ใช้ (${unusedRefs.length})` : `Delete unused (${unusedRefs.length})`}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        {th ? `ลบ ${unusedRefs.length} รายการที่ไม่ได้ใช้?` : `Delete ${unusedRefs.length} unused rows?`}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {th
+                          ? 'ลบเฉพาะรายการในคลังอ้างอิงที่ไม่ตรงกับ activity ใดในระบบตอนนี้ (code ตัวอย่าง TGO ทั่วไป, สะกดผิด, หรือของ tenant/ระบบเดิม) — ไม่กระทบค่า EF ที่บันทึกใช้งานจริงของกิจกรรมใดเลย'
+                          : "Removes only reference rows that don't match any current system activity (generic TGO sample codes, typos, or leftovers) — does not touch any saved, actively-used EF."}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{th ? 'ยกเลิก' : 'Cancel'}</AlertDialogCancel>
+                      <AlertDialogAction onClick={deleteUnusedRefs} className="bg-rose-600 hover:bg-rose-700">
+                        {th ? 'ลบ' : 'Delete'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
             {showRefs && (
               <div className="overflow-x-auto border-t border-slate-200 px-3 pb-3 pt-1">
                 {refs.length === 0 ? (
                   <p className="text-[11px] text-muted-foreground italic py-3">{th ? 'ยังไม่มีข้อมูลอ้างอิง — กด “นำเข้า Excel”' : 'No reference rows yet — click “Import Excel”.'}</p>
                 ) : (
-                  <table className="w-full text-xs min-w-[640px]">
+                  <table className="w-full text-xs min-w-[720px]">
                     <thead>
                       <tr className="text-left text-[10px] text-muted-foreground border-b">
                         <th className="py-1.5 font-medium">activity_code</th>
@@ -841,20 +1077,69 @@ export default function GhgSettings() {
                         <th className="py-1.5 font-medium">unit</th>
                         <th className="py-1.5 font-medium">source</th>
                         <th className="py-1.5 font-medium">year</th>
+                        <th className="py-1.5 font-medium">{th ? 'สถานะ' : 'usage'}</th>
+                        <th className="py-1.5 font-medium w-8"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {refs.map(r => (
-                        <tr key={r.ref_id} className="text-slate-600">
-                          <td className="py-1.5 font-mono text-[11px]">{r.activity_code}</td>
-                          <td className="py-1.5">{r.activity_name_th || r.activity_name_en || '—'}</td>
-                          <td className="py-1.5">{r.scope ?? '—'}</td>
-                          <td className="py-1.5 text-right font-mono">{r.factor ?? '—'}</td>
-                          <td className="py-1.5 text-muted-foreground">{r.unit ?? '—'}</td>
-                          <td className="py-1.5 text-muted-foreground">{r.source ?? '—'}</td>
-                          <td className="py-1.5">{r.effective_year ?? '—'}</td>
-                        </tr>
-                      ))}
+                      {refs.map(r => {
+                        const inUse = activeActivityCodes.has(r.activity_code);
+                        return (
+                          <tr key={r.ref_id} className="text-slate-600">
+                            <td className="py-1.5 font-mono text-[11px]">{r.activity_code}</td>
+                            <td className="py-1.5">{r.activity_name_th || r.activity_name_en || '—'}</td>
+                            <td className="py-1.5">{r.scope ?? '—'}</td>
+                            <td className="py-1.5 text-right font-mono">{r.factor ?? '—'}</td>
+                            <td className="py-1.5 text-muted-foreground">{r.unit ?? '—'}</td>
+                            <td className="py-1.5 text-muted-foreground">{r.source ?? '—'}</td>
+                            <td className="py-1.5">{r.effective_year ?? '—'}</td>
+                            <td className="py-1.5">
+                              {inUse ? (
+                                <Badge variant="outline" className="text-[9px] border-emerald-300 text-emerald-700 bg-emerald-50">
+                                  {th ? 'ใช้งานอยู่' : 'in use'}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[9px] border-slate-300 text-slate-500 bg-slate-100">
+                                  {th ? 'ไม่ได้ใช้' : 'unused'}
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="py-1.5">
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="sm" variant="ghost"
+                                    className="h-6 w-6 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                    disabled={busy === 'del-ref-' + r.ref_id}
+                                  >
+                                    {busy === 'del-ref-' + r.ref_id
+                                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      : <Trash2 className="h-3.5 w-3.5" />}
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      {th ? `ลบ "${r.activity_code}" ออกจากคลังอ้างอิง?` : `Delete "${r.activity_code}" from the reference library?`}
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      {th
+                                        ? 'ไม่กระทบค่า EF ที่บันทึกใช้งานจริงของกิจกรรมใด — ลบแค่ข้อมูลแนะนำในคลังอ้างอิงเท่านั้น'
+                                        : 'Does not affect any saved, actively-used EF — this only removes the suggestion from the reference library.'}
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>{th ? 'ยกเลิก' : 'Cancel'}</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteRefRow(r)} className="bg-rose-600 hover:bg-rose-700">
+                                      {th ? 'ลบ' : 'Delete'}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}
@@ -863,6 +1148,79 @@ export default function GhgSettings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Review-before-import dialog — shown after a file is parsed, before anything is saved. */}
+      <AlertDialog open={!!importPreview} onOpenChange={(open) => { if (!open) cancelImport(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{th ? 'ตรวจสอบก่อนนำเข้า' : 'Review before import'}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-foreground">
+                <p className="text-muted-foreground">
+                  {th
+                    ? `พบ ${importPreview?.upserts.length ?? 0} แถวที่ใช้ได้ในไฟล์`
+                    : `Found ${importPreview?.upserts.length ?? 0} valid rows in the file`}
+                  {importPreview?.skipped
+                    ? (th ? ` (ข้าม ${importPreview.skipped} แถวที่ไม่ถูกต้อง)` : ` (${importPreview.skipped} invalid rows skipped)`)
+                    : ''}
+                </p>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">
+                    {th ? 'เทียบกับกิจกรรมในระบบ' : 'Vs. system activities'}
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1.5">
+                    <li>
+                      <span className="font-semibold text-emerald-700">{importPreview?.matchedCount ?? 0}</span>{' '}
+                      {th
+                        ? 'กิจกรรม ตรงกับ activity ที่มีอยู่ในระบบ — จะอัปเดตค่า EF/Scope ให้ทันที'
+                        : 'activities match an existing system activity — their EF/Scope will be updated immediately'}
+                    </li>
+                    <li>
+                      <span className="font-semibold text-amber-700">{importPreview?.unmatchedCount ?? 0}</span>{' '}
+                      {th
+                        ? 'แถว ไม่ตรงกับ activity ใดในระบบตอนนี้ — จะถูกเพิ่มเป็นข้อมูลอ้างอิงเท่านั้น (ยังไม่ปรากฏในตาราง Scope จนกว่าจะมี activity ที่มี code ตรงกัน)'
+                        : "rows don't match any current system activity — added as reference-only data (won't appear in the Scope tables until a matching activity exists)"}
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">
+                    {th ? 'เทียบกับคลังอ้างอิงเดิม' : 'Vs. the existing reference library'}
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1.5">
+                    <li>
+                      <span className="font-semibold text-sky-700">{importPreview?.inserted ?? 0}</span>{' '}
+                      {th ? 'รายการใหม่ — ยังไม่เคยมีในคลังอ้างอิง จะถูกเพิ่มเข้าไป' : "new rows — not in the reference library yet, will be added"}
+                    </li>
+                    <li>
+                      <span className="font-semibold text-rose-700">{importPreview?.updated ?? 0}</span>{' '}
+                      {th ? 'รายการที่มีอยู่แล้ว — ค่าเดิมในคลังอ้างอิงจะถูกเขียนทับด้วยค่าจากไฟล์นี้' : 'existing rows — their current reference values will be overwritten with what’s in this file'}
+                    </li>
+                  </ul>
+                </div>
+                {importPreview && importPreview.unmatchedCount > 0 && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <p className="font-medium mb-1">{th ? 'รหัสที่ไม่พบใน activity ปัจจุบัน:' : 'Codes not found in current activities:'}</p>
+                    <p className="font-mono break-all">
+                      {importPreview.unmatchedCodes.slice(0, 15).join(', ')}
+                      {importPreview.unmatchedCodes.length > 15
+                        ? ` … +${importPreview.unmatchedCodes.length - 15} ${th ? 'รายการ' : 'more'}`
+                        : ''}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelImport}>{th ? 'ยกเลิก' : 'Cancel'}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmImport} disabled={importing}>
+              {importing && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5 inline" />}
+              {th ? 'ยืนยันนำเข้า' : 'Confirm import'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <p className="text-xs text-muted-foreground text-center pb-2">
         {th
