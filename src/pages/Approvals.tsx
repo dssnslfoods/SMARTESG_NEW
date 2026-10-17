@@ -97,7 +97,8 @@ export default function Approvals() {
           period:period_id(year, month, month_name)
         `)
         .in('site_id', filterSite ? [filterSite] : reviewableIds)
-        .neq('data_source', 'Auto-calculated (GHG)') // derived rows follow their inputs
+        // derived GHG rows follow their inputs — hide them (NULL-safe: .neq() alone drops NULLs)
+        .or('data_source.is.null,data_source.neq.Auto-calculated (GHG)')
         .limit(1000);
 
       if (tab === 'pending') {
@@ -122,7 +123,7 @@ export default function Approvals() {
             metric:metric_id(metric_name, unit), site:site_id(site_name), period:period_id(year, month, month_name)
           `)
           .eq('status', 'rejected')
-          .neq('data_source', 'Auto-calculated (GHG)')
+          .or('data_source.is.null,data_source.neq.Auto-calculated (GHG)')
           .in('site_id', filterSite ? [filterSite] : reviewableIds)
           .order('rejected_at', { ascending: false })
           .limit(500);
