@@ -187,11 +187,22 @@ export default function DataEntry() {
       .then(({ data }) => { if (data) setRolePerm(data as any); });
   }, [role]);
 
+  // supervisor_local may only write inside the sites they can review (same
+  // scope as their approvals); everyone else is unrestricted here (RLS still
+  // applies). Until the list loads a local supervisor gets an empty scope.
+  const writeScoped = role === 'supervisor_local';
+  const [scopeSites, setScopeSites] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    if (!writeScoped) { setScopeSites(null); return; }
+    supabase.rpc('my_reviewable_sites').then(({ data }) => setScopeSites(new Set((data as string[] | null) ?? [])));
+  }, [writeScoped]);
+  const inWriteScope = (siteId: string) => !writeScoped || (scopeSites?.has(siteId) ?? false);
+
   // Whether the current user may edit / delete a specific record.
   const canEditRecord = (v: MetricValue) =>
-    dePerm.edit_scope === 'all' || (dePerm.edit_scope === 'own' && v.submitted_by === user?.id);
+    inWriteScope(v.site_id) && (dePerm.edit_scope === 'all' || (dePerm.edit_scope === 'own' && v.submitted_by === user?.id));
   const canDeleteRecord = (v: MetricValue) =>
-    dePerm.delete_scope === 'all' || (dePerm.delete_scope === 'own' && v.submitted_by === user?.id && v.status !== 'approved');
+    inWriteScope(v.site_id) && (dePerm.delete_scope === 'all' || (dePerm.delete_scope === 'own' && v.submitted_by === user?.id && v.status !== 'approved'));
 
   // Confirm-update dialog for supervisor/admin
   const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
@@ -485,9 +496,14 @@ export default function DataEntry() {
   };
 
   // Filter sites by selected company in form
-  const formFilteredSites = formCompany
+  const formFilteredSites = (formCompany
     ? sites.filter(s => s.company_id === formCompany)
-    : sites;
+    : sites
+  ).filter(s => inWriteScope(s.site_id));
+  // Companies with no writable site are hidden from a scoped supervisor.
+  const formCompanies = writeScoped
+    ? companies.filter(c => sites.some(s => s.company_id === c.company_id && inWriteScope(s.site_id)))
+    : companies;
 
   // Deep link from "My Entries": /data-entry?edit=<value_id> opens that row
   // for editing once the master lists are in (metric/theme lookups need them).
@@ -640,10 +656,11 @@ export default function DataEntry() {
 
   // Bulk selection handlers
   const handleSelectAll = () => {
-    if (selectedIds.size === filteredValues.length) {
+    const deletable = filteredValues.filter(canDeleteRecord);
+    if (deletable.length > 0 && selectedIds.size === deletable.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredValues.map(v => v.value_id)));
+      setSelectedIds(new Set(deletable.map(v => v.value_id)));
     }
   };
 
@@ -663,10 +680,13 @@ export default function DataEntry() {
     const idsToDelete = Array.from(selectedIds);
     const valuesToDelete = metricValues.filter(v => idsToDelete.includes(v.value_id));
     
-    const { error } = await supabase
+    // .select() returns the rows really deleted — RLS skips the others silently.
+    const { data: deletedRows, error } = await supabase
       .from('metric_value')
       .delete()
-      .in('value_id', idsToDelete);
+      .in('value_id', idsToDelete)
+      .select('value_id');
+    const deletedIds = (deletedRows ?? []).map(r => r.value_id);
 
     if (error) {
       toast({
@@ -676,7 +696,7 @@ export default function DataEntry() {
       });
     } else {
       // Log each deletion
-      for (const value of valuesToDelete) {
+      for (const value of valuesToDelete.filter(v => deletedIds.includes(v.value_id))) {
         await logActivity({
           action: 'DELETE',
           entityType: 'metric_value',
@@ -686,13 +706,16 @@ export default function DataEntry() {
       }
       toast({
         title: language === 'th' ? 'สำเร็จ' : 'Success',
-        description: language === 'th' 
-          ? `ลบข้อมูล ${idsToDelete.length} รายการสำเร็จ` 
-          : `${idsToDelete.length} records deleted successfully`,
+        description: deletedIds.length === idsToDelete.length
+          ? (language === 'th' ? `ลบข้อมูล ${deletedIds.length} รายการสำเร็จ` : `${deletedIds.length} records deleted successfully`)
+          : (language === 'th'
+              ? `ลบได้ ${deletedIds.length} จาก ${idsToDelete.length} รายการ (ที่เหลือไม่มีสิทธิ์ลบ)`
+              : `Deleted ${deletedIds.length} of ${idsToDelete.length} (no permission for the rest)`),
+        variant: deletedIds.length === 0 ? 'destructive' : 'default',
       });
       setSelectedIds(new Set());
       setIsDeleteDialogOpen(false);
-      removeLocalRows(idsToDelete);
+      removeLocalRows(deletedIds);
     }
   };
 
@@ -709,10 +732,14 @@ export default function DataEntry() {
       submitted_by: user.id,
     };
 
-    const { error: updateError } = await supabase
+    const { data: updRows, error: updateRawError } = await supabase
       .from('metric_value')
       .update(dataToUpdate)
-      .eq('value_id', pendingUpdateRecord.value_id);
+      .eq('value_id', pendingUpdateRecord.value_id)
+      .select('value_id');
+    const updateError = updateRawError ?? (updRows && updRows.length === 0
+      ? { message: language === 'th' ? 'ไม่มีสิทธิ์แก้ไขรายการนี้ (สาขานี้ไม่อยู่ในขอบเขตของคุณ)' : 'You are not allowed to edit this entry (its site is outside your scope)' }
+      : null);
 
     if (updateError) {
       toast({
@@ -861,10 +888,14 @@ export default function DataEntry() {
         return;
       }
 
-      const { error: updateError } = await supabase
+      const { data: updRows, error: updateRawError } = await supabase
         .from('metric_value')
         .update(dataToSave)
-        .eq('value_id', editingValue.value_id);
+        .eq('value_id', editingValue.value_id)
+        .select('value_id');
+      const updateError = updateRawError ?? (updRows && updRows.length === 0
+        ? { message: language === 'th' ? 'ไม่มีสิทธิ์แก้ไขรายการนี้ (สาขานี้ไม่อยู่ในขอบเขตของคุณ)' : 'You are not allowed to edit this entry (its site is outside your scope)' }
+        : null);
       error = updateError;
 
       if (!updateError) {
@@ -1132,8 +1163,9 @@ export default function DataEntry() {
 
   const filterDropReason = getFilterDropReason();
 
-  const isAllSelected = filteredValues.length > 0 && selectedIds.size === filteredValues.length;
-  const isPartialSelected = selectedIds.size > 0 && selectedIds.size < filteredValues.length;
+  const deletableCount = filteredValues.filter(canDeleteRecord).length;
+  const isAllSelected = deletableCount > 0 && selectedIds.size === deletableCount;
+  const isPartialSelected = selectedIds.size > 0 && selectedIds.size < deletableCount;
 
   const getDisplayName = (id: string, type: 'site' | 'period' | 'metric' | 'dimension' | 'theme' | 'company') => {
     switch (type) {
@@ -1685,6 +1717,7 @@ export default function DataEntry() {
                       <TableCell>
                         <Checkbox
                           checked={selectedIds.has(value.value_id)}
+                          disabled={!canDeleteRecord(value)}
                           onCheckedChange={() => handleSelectOne(value.value_id)}
                           aria-label={language === 'th' ? 'เลือกรายการ' : 'Select row'}
                         />
@@ -1860,7 +1893,7 @@ export default function DataEntry() {
                       <SelectValue placeholder={language === 'th' ? 'เลือกบริษัท' : 'Select company'} />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-gray-200 shadow-xl rounded-xl z-50">
-                      {companies.map((company) => (
+                      {formCompanies.map((company) => (
                         <SelectItem key={company.company_id} value={company.company_id}>
                           {company.company_name}
                         </SelectItem>

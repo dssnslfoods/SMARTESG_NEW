@@ -81,8 +81,12 @@ export function EntryEditDialog({ entry, onClose, onSaved }: Props) {
         remark: remark.trim() || null,
         status,
       };
-      const { error } = await supabase.from('metric_value').update(patch).eq('value_id', entry.value_id);
+      // .select() so a row skipped by RLS (0 rows) is not reported as saved
+      const { data: updated, error } = await supabase.from('metric_value').update(patch).eq('value_id', entry.value_id).select('value_id');
       if (error) throw error;
+      if (!updated || updated.length === 0) {
+        throw new Error(th ? 'ไม่มีสิทธิ์แก้ไขรายการนี้ (สาขานี้ไม่อยู่ในขอบเขตของคุณ หรือรายการถูกอนุมัติแล้ว)' : 'You are not allowed to edit this entry (outside your site scope, or already approved)');
+      }
 
       await logActivity({
         action: 'UPDATE',
