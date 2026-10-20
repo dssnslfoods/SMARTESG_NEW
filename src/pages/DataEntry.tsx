@@ -417,6 +417,33 @@ export default function DataEntry() {
     }
   };
 
+  // After a save / edit / delete we must NOT re-stream every record (thousands
+  // of rows, tens of seconds). The counters come from one cheap RPC; if the
+  // table is already on screen we patch just the changed row(s) in place, and
+  // if it has not been searched yet there is nothing to refresh.
+  const applySavedRow = (row: Partial<MetricValue> & { value_id: string }) => {
+    invalidateMetricValueCache();
+    fetchSummary();
+    if (!hasSearched) return;
+    setMetricValues(prev => {
+      const i = prev.findIndex(v =>
+        v.value_id === row.value_id ||
+        (v.site_id === row.site_id && v.period_id === row.period_id && v.metric_id === row.metric_id));
+      if (i === -1) return [{ created_at: new Date().toISOString(), ...row } as MetricValue, ...prev];
+      const next = prev.slice();
+      next[i] = { ...prev[i], ...row } as MetricValue;
+      return next;
+    });
+  };
+
+  const removeLocalRows = (ids: string[]) => {
+    invalidateMetricValueCache();
+    fetchSummary();
+    if (!hasSearched) return;
+    const gone = new Set(ids);
+    setMetricValues(prev => prev.filter(v => !gone.has(v.value_id)));
+  };
+
   const generateValueId = () => {
     return `VAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   };
@@ -607,7 +634,7 @@ export default function DataEntry() {
         newSet.delete(valueId);
         return newSet;
       });
-      fetchRecords();
+      removeLocalRows([valueId]);
     }
   };
 
@@ -665,7 +692,7 @@ export default function DataEntry() {
       });
       setSelectedIds(new Set());
       setIsDeleteDialogOpen(false);
-      fetchRecords();
+      removeLocalRows(idsToDelete);
     }
   };
 
@@ -705,9 +732,9 @@ export default function DataEntry() {
         title: language === 'th' ? 'อัปเดตสำเร็จ' : 'Updated',
         description: language === 'th' ? 'อัปเดตข้อมูลเรียบร้อยแล้ว' : 'Record updated successfully',
       });
+      applySavedRow({ ...pendingUpdateRecord, ...dataToUpdate });
       setPendingUpdateRecord(null);
       setIsDialogOpen(false);
-      fetchRecords();
     }
   };
 
@@ -814,6 +841,7 @@ export default function DataEntry() {
     };
 
     let error;
+    let upsertedRow: { value_id?: string } | null = null;
     if (editingValue) {
       // If user changed site/period/metric to a combo that already exists in another row,
       // PostgREST PATCH would violate the unique constraint. Detect & handle gracefully.
@@ -861,6 +889,7 @@ export default function DataEntry() {
         .maybeSingle();
       
       error = upsertError;
+      upsertedRow = upsertedData;
       
       if (!upsertError) {
         // Determine if this was an insert or update based on whether we had existingMatch
@@ -888,8 +917,12 @@ export default function DataEntry() {
           ? (language === 'th' ? 'อัปเดตข้อมูลสำเร็จ' : 'Data updated successfully')
           : (language === 'th' ? 'บันทึกข้อมูลสำเร็จ' : 'Data saved successfully'),
       });
+      // upsertedData only exists on the insert/upsert path; editingValue on edit.
+      applySavedRow({
+        ...dataToSave,
+        value_id: upsertedRow?.value_id ?? editingValue?.value_id ?? dataToSave.value_id,
+      });
       setIsDialogOpen(false);
-      fetchRecords();
     }
   };
 
